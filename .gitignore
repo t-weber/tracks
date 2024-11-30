@@ -1,0 +1,24 @@
+# Objects
+*.o
+*.obj
+
+# Headers
+*.pch
+
+# Libraries
+*.so
+*.dylib
+*.dll
+*.a
+*.lib
+
+# Executables
+*.exe
+*.out
+*.app
+
+# Build
+build/**
+
+# Externals
+ext/**
