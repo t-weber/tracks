@@ -10,11 +10,18 @@
 
 #include <QtWidgets/QWidget>
 #include <QtWidgets/QGridLayout>
+
+// https://gcc.gnu.org/onlinedocs/gcc/Diagnostic-Pragmas.html
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wall"
+#pragma GCC diagnostic ignored "-Wextra"
+#pragma GCC diagnostic ignored "-Weffc++"
 #include <qcustomplot.h>
+#pragma GCC diagnostic pop
 
 #include <memory>
 
-#include "types.h"
+#include "common/types.h"
 
 
 /**
@@ -26,17 +33,10 @@ public:
 	TrackInfos(QWidget *parent = nullptr);
 	virtual ~TrackInfos();
 
-	virtual QSize sizeHint() const override
-	{
-		QSize size = QWidget::sizeHint();
-		size.rwidth() += 128;
-		return size;
-	}
+	virtual QSize sizeHint() const override;
 
 
 protected:
-	void Clear();
-
 	void PlotMouseMove(QMouseEvent *evt);
 
 

@@ -19,9 +19,6 @@
 #if __has_include(<filesystem>)
 	#include <filesystem>
 	namespace fs = std::filesystem;
-#elif __has_include(<experimental/filesystem>)
-	#include <experimental/filesystem>
-	namespace fs = std::experimental::filesystem;
 #else
 	#include <boost/filesystem.hpp>
 	namespace fs = boost::filesystem;
@@ -45,19 +42,70 @@ public:
 	RecentFiles& operator=(const RecentFiles& other) = default;
 
 
-	void SetRecentMenu(std::shared_ptr<QMenu> recent) { m_menuRecent = recent; }
-	std::shared_ptr<QMenu> GetRecentMenu() { return m_menuRecent; }
+	void SetRecentMenu(std::shared_ptr<QMenu> recent)
+	{
+		m_menuRecent = recent;
+	}
 
-	const QStringList& GetRecentFiles() const { return m_recentFiles; }
-	void SetRecentFiles(const QStringList& recent) { m_recentFiles = recent; }
 
-	const QString& GetRecentDir() const { return m_recentDir; }
-	void SetRecentDir(const QString& recent) { m_recentDir = recent; }
+	std::shared_ptr<QMenu> GetRecentMenu()
+	{
+		return m_menuRecent;
+	}
 
-	const QString& GetOpenFile() const { return m_openFile; }
-	void SetOpenFile(const QString& file) { m_openFile = file; }
 
-	void AddForbiddenDir(const QString& dir) { m_forbidden_dirs.emplace_back(dir.toStdString()); }
+	const QStringList& GetRecentFiles() const
+	{
+		return m_recentFiles;
+	}
+
+
+	void SetRecentFiles(const QStringList& recent)
+	{
+		m_recentFiles = recent;
+	}
+
+
+	const QString& GetRecentDir() const
+	{
+		return m_recentDir;
+	}
+
+
+	void SetRecentDir(const QString& recent)
+	{
+		m_recentDir = recent;
+	}
+
+
+	const QString& GetRecentImportDir() const
+	{
+		return m_recentImportDir;
+	}
+
+
+	void SetRecentImportDir(const QString& recent)
+	{
+		m_recentImportDir = recent;
+	}
+
+
+	const QString& GetOpenFile() const
+	{
+		return m_openFile;
+	}
+
+
+	void SetOpenFile(const QString& file)
+	{
+		m_openFile = file;
+	}
+
+
+	void AddForbiddenDir(const QString& dir)
+	{
+		m_forbidden_dirs.emplace_back(dir.toStdString());
+	}
 
 
 	/**
@@ -157,6 +205,9 @@ protected:
 private:
 	// recent directory
 	QString m_recentDir{QDir::homePath()};
+
+	// recent directory for imported files
+	QString m_recentImportDir{QDir::homePath()};
 
 	// recent files
 	QStringList m_recentFiles{};

@@ -22,7 +22,7 @@
 
 #include <memory>
 
-#include "types.h"
+#include "common/types.h"
 
 
 // get basic colours

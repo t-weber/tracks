@@ -9,6 +9,7 @@
 #include "globals.h"
 #include "helpers.h"
 
+#include <QtWidgets/QListWidgetItem>
 #include <QtWidgets/QFrame>
 
 
@@ -30,20 +31,28 @@ TrackBrowser::~TrackBrowser()
 }
 
 
-/**
- * clear all widgets in the grid layout
- */
-void TrackBrowser::Clear()
+void TrackBrowser::AddTrack(const std::string& ident)
 {
-	while(m_layout->count())
-	{
-		QLayoutItem* item = m_layout->itemAt(0);
-		if(!item)
-			break;
-		m_layout->removeItem(item);
+	if(!m_list)
+		return;
 
-		if(item->widget())
-			delete item->widget();
-		delete item;
-	}
+	m_list->insertItem(m_list->count(),
+		new QListWidgetItem{ident.c_str(), m_list.get()});
+}
+
+
+void TrackBrowser::ClearTracks()
+{
+	if(!m_list)
+		return;
+
+	m_list->clear();
+}
+
+
+QSize TrackBrowser::sizeHint() const
+{
+	QSize size = QWidget::sizeHint();
+	size.rwidth() += 128;
+	return size;
 }

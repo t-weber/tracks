@@ -14,7 +14,7 @@
 
 #include <memory>
 
-#include "types.h"
+#include "common/types.h"
 
 
 /**
@@ -26,16 +26,10 @@ public:
 	TrackBrowser(QWidget *parent = nullptr);
 	virtual ~TrackBrowser();
 
-	virtual QSize sizeHint() const override
-	{
-		QSize size = QWidget::sizeHint();
-		size.rwidth() += 128;
-		return size;
-	}
+	virtual QSize sizeHint() const override;
 
-
-protected:
-	void Clear();
+	void AddTrack(const std::string& ident);
+	void ClearTracks();
 
 
 private:

@@ -19,7 +19,6 @@
 
 #include "recent.h"
 #include "resources.h"
-#include "types.h"
 #include "globals.h"
 #include "settings.h"
 #include "about.h"
@@ -27,6 +26,8 @@
 // docks
 #include "track_browser.h"
 #include "track_infos.h"
+
+#include "common/types.h"
 
 
 
@@ -84,11 +85,13 @@ public:
 	bool FileLoad();
 	bool FileSave();
 	bool FileSaveAs();
+	bool FileImport();
 
 	bool FileLoadRecent(const QString& filename);
 
 	bool SaveFile(const QString& filename) const;
 	bool LoadFile(const QString& filename);
+	bool ImportFiles(const QStringList& filenames);
 
 	void ShowSettings(bool only_create = false);
 	void ShowAbout();
@@ -105,7 +108,9 @@ protected:
 
 	void SetActiveFile();
 	bool AskUnsaved();
-	QString GetDocDir();
+
+	QString GetFileDir();
+	QString GetImportDir();
 
 	bool IsWindowModified() const { return m_window_modified; }
 	void SetWindowModified(bool b) { m_window_modified = b; }

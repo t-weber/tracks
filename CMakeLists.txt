@@ -5,8 +5,8 @@
 # @license see 'LICENSE' file
 #
 
+cmake_minimum_required(VERSION 3.5)
 project(tracks)
-cmake_minimum_required(VERSION 3.0)
 
 
 enable_language(CXX)
@@ -54,6 +54,13 @@ include_directories(
 # -----------------------------------------------------------------------------
 # gui
 # -----------------------------------------------------------------------------
+set_source_files_properties(
+	ext/qcustomplot.cpp ext/qcustomplot.h
+	${PROJECT_BINARY_DIR}/tracks_autogen/mocs_compilation.cpp
+	PROPERTIES COMPILE_FLAGS "-Wno-all -Wno-extra -Wno-effc++ -w"
+)
+
+
 add_executable(tracks
 	src/gui/main.cpp
 	src/gui/gui.cpp src/gui/gui.h
@@ -61,11 +68,12 @@ add_executable(tracks
 	src/gui/globals.cpp src/gui/globals.h
 	src/gui/about.cpp src/gui/about.h
 	src/gui/resources.cpp src/gui/resources.h
-	src/gui/recent.h src/gui/types.h src/gui/helpers.h
+	src/gui/recent.h src/gui/helpers.h
 	src/gui/track_browser.cpp src/gui/track_browser.h
 	src/gui/track_infos.cpp src/gui/track_infos.h
 
-	src/lib/calc.h src/lib/gpx.h
+	src/common/types.h
+	src/lib/calc.h src/lib/trackdb.h
 
 	ext/qcustomplot.cpp ext/qcustomplot.h
 )
@@ -83,7 +91,8 @@ target_link_libraries(tracks
 # -----------------------------------------------------------------------------
 add_executable(tracks_cli
 	src/cli/tracks.cpp
-	src/lib/calc.h src/lib/gpx.h
+	src/common/types.h
+	src/lib/calc.h src/lib/trackdb.h
 )
 
 

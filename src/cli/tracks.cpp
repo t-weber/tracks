@@ -7,7 +7,8 @@
  * g++ -std=c++20 -march=native -O2 -Wall -Wextra -Weffc++ -o track track.cpp
  */
 
-#include "lib/gpx.h"
+#include "lib/trackdb.h"
+#include "common/types.h"
 
 
 int main(int argc, char **argv)
@@ -20,14 +21,14 @@ int main(int argc, char **argv)
 
 	try
 	{
-		Gpx<double> gpx;
-		if(!gpx.Load(argv[1]))
+		SingleTrack<t_real> track;
+		if(!track.Import(argv[1]))
 		{
 			std::cerr << "Cannot load track file!" << std::endl;
 			return -1;
 		}
 
-		std::cout << gpx << std::endl;
+		std::cout << track << std::endl;
 	}
 	catch(const std::exception& ex)
 	{

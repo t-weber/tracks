@@ -8,7 +8,7 @@
 #ifndef __TRACKS_GLOBALS_H__
 #define __TRACKS_GLOBALS_H__
 
-#include "types.h"
+#include "common/types.h"
 
 
 // epsilon and precision values

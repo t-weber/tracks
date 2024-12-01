@@ -1,12 +1,12 @@
 /**
- * gpx track file loader
+ * track files loader
  * @author Tobias Weber
  * @date 24 November 2024
  * @license see 'LICENSE' file
  */
 
-#ifndef __TRACK_GPX_H__
-#define __TRACK_GPX_H__
+#ifndef __TRACK_DBFILE_H__
+#define __TRACK_DBFILE_H__
 
 #include <iostream>
 #include <sstream>
@@ -15,6 +15,14 @@
 #include <limits>
 #include <cmath>
 #include <numbers>
+
+#if __has_include(<filesystem>)
+	#include <filesystem>
+	namespace __gpx_fs = std::filesystem;
+#else
+	#include <boost/filesystem.hpp>
+	namespace __gpx_fs = boost::filesystem;
+#endif
 
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/xml_parser.hpp>
@@ -52,7 +60,7 @@ t_timept get_timepoint(const std::string& time_str)
 
 
 template<class t_timept, class t_real = double>
-struct GpxPoint
+struct TrackPoint
 {
 	t_real latitude{};
 	t_real longitude{};
@@ -74,31 +82,39 @@ struct GpxPoint
 
 
 /**
- * loads a gpx track file
- * @see https://en.wikipedia.org/wiki/GPS_Exchange_Format
- * @see https://www.topografix.com/gpx/1/1/
+ * represents a single running track
  */
 template<class t_real = double>
-class Gpx
+class SingleTrack
 {
 public:
 	using t_clk = std::chrono::system_clock;
 	using t_timept = typename t_clk::time_point;
-	using t_GpxPoint = GpxPoint<t_timept, t_real>;
+	using t_TrackPoint = TrackPoint<t_timept, t_real>;
 
 
 public:
-	Gpx() = default;
-	~Gpx() = default;
+	SingleTrack() = default;
+	~SingleTrack() = default;
 
 
-	bool Load(const std::string& trackfile, t_real assume_dt = 1.)
+	/**
+	 * import a track from a gpx file
+	 * @see https://en.wikipedia.org/wiki/GPS_Exchange_Format
+	 * @see https://www.topografix.com/gpx/1/1/
+	 */
+	bool Import(const std::string& trackfilename, t_real assume_dt = 1.)
 	{
 		namespace ptree = boost::property_tree;
 		namespace num = std::numbers;
+		namespace fs = __gpx_fs;
+
+		fs::path trackfile{trackfilename};
+		if(!fs::exists(trackfile))
+			return false;
 
 		ptree::ptree track;
-		ptree::read_xml(trackfile, track);
+		ptree::read_xml(trackfilename, track);
 
 		const auto& gpx = track.get_child_optional("gpx");
 		if(!gpx)
@@ -108,6 +124,7 @@ public:
 		if(!tracks)
 			return false;
 
+		m_filename = trackfile.filename().string();
 		m_version = gpx->get<std::string>("<xmlattr>.version", "<unknown>");
 		m_creator = gpx->get<std::string>("<xmlattr>.creator", "<unknown>");
 
@@ -145,7 +162,7 @@ public:
 					if(pt.first != "trkpt")
 						continue;
 
-					t_GpxPoint trackpt
+					t_TrackPoint trackpt
 					{
 						.latitude = pt.second.get<t_real>("<xmlattr>.lat") / t_real(180) * num::pi_v<t_real>,
 						.longitude = pt.second.get<t_real>("<xmlattr>.lon") / t_real(180) * num::pi_v<t_real>,
@@ -203,9 +220,15 @@ public:
 	}
 
 
-	const std::vector<t_GpxPoint>& GetPoints() const
+	const std::vector<t_TrackPoint>& GetPoints() const
 	{
 		return m_points;
+	}
+
+
+	const std::string& GetFileName() const
+	{
+		return m_filename;
 	}
 
 
@@ -239,7 +262,7 @@ public:
 	}
 
 
-	friend std::ostream& operator<<(std::ostream& ostr, const Gpx<t_real>& track)
+	friend std::ostream& operator<<(std::ostream& ostr, const SingleTrack<t_real>& track)
 	{
 		namespace num = std::numbers;
 
@@ -255,7 +278,7 @@ public:
 			<< std::left << std::setw(field_width) << "t" << " "
 			<< std::left << std::setw(field_width) << "s" << "\n";
 
-		for(const t_GpxPoint& pt : track.GetPoints())
+		for(const t_TrackPoint& pt : track.GetPoints())
 		{
 			t_real latitude_deg = pt.latitude * t_real(180) / num::pi_v<t_real>;
 			t_real longitude_deg = pt.longitude * t_real(180) / num::pi_v<t_real>;
@@ -295,7 +318,9 @@ public:
 
 
 private:
-	std::vector<t_GpxPoint> m_points{};
+	std::vector<t_TrackPoint> m_points{};
+
+	std::string m_filename{};
 	std::string m_version{}, m_creator{};
 
 	t_real m_total_dist{};

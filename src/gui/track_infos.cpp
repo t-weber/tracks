@@ -50,20 +50,9 @@ void TrackInfos::PlotMouseMove(QMouseEvent *evt)
 }
 
 
-/**
- * clear all widgets in the grid layout
- */
-void TrackInfos::Clear()
+QSize TrackInfos::sizeHint() const
 {
-	while(m_layout->count())
-	{
-		QLayoutItem* item = m_layout->itemAt(0);
-		if(!item)
-			break;
-		m_layout->removeItem(item);
-
-		if(item->widget())
-			delete item->widget();
-		delete item;
-	}
+	QSize size = QWidget::sizeHint();
+	size.rwidth() += 128;
+	return size;
 }

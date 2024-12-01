@@ -31,6 +31,7 @@
 #include <iostream>
 
 #include "helpers.h"
+#include "lib/trackdb.h"
 
 
 #define TRACKS_WND_TITLE  "Tracks"
@@ -113,6 +114,10 @@ void TracksWnd::SetupGUI()
 	QAction *actionSaveAs = new QAction{iconSaveAs, "Save as...", this};
 	connect(actionSaveAs, &QAction::triggered, this, &TracksWnd::FileSaveAs);
 
+	QIcon iconImport = QIcon::fromTheme("document-open");
+	QAction *actionImport = new QAction{iconImport, "Import Track...", this};
+	connect(actionImport, &QAction::triggered, this, &TracksWnd::FileImport);
+
 	QIcon iconExit = QIcon::fromTheme("application-exit");
 	QAction *actionExit = new QAction{iconExit, "Quit", this};
 	actionExit->setMenuRole(QAction::QuitRole);
@@ -131,6 +136,8 @@ void TracksWnd::SetupGUI()
 	menuFile->addAction(actionSave);
 	menuFile->addAction(actionSaveAs);
 	menuFile->addSeparator();
+	menuFile->addAction(actionImport);
+	menuFile->addSeparator();
 	menuFile->addAction(actionExit);
 	// ------------------------------------------------------------------------
 
@@ -143,6 +150,7 @@ void TracksWnd::SetupGUI()
 	toolbarFile->addAction(actionLoad);
 	toolbarFile->addAction(actionSave);
 	toolbarFile->addAction(actionSaveAs);
+	toolbarFile->addAction(actionImport);
 
 	addToolBar(toolbarFile);
 	// ------------------------------------------------------------------------
@@ -337,6 +345,8 @@ void TracksWnd::RestoreSettings()
 	if(settings.contains("file_recent_dir"))
 		m_recent.SetRecentDir(settings.value("file_recent_dir").toString());
 
+	if(settings.contains("file_recent_import_dir"))
+		m_recent.SetRecentImportDir(settings.value("file_recent_import_dir").toString());
 
 	// restore settings from settings dialog
 	ShowSettings(true);
@@ -354,6 +364,7 @@ void TracksWnd::SaveSettings()
 	settings.setValue("wnd_native", m_gui_native);
 	settings.setValue("file_recent", m_recent.GetRecentFiles());
 	settings.setValue("file_recent_dir", m_recent.GetRecentDir());
+	settings.setValue("file_recent_import_dir", m_recent.GetRecentImportDir());
 }
 
 
@@ -365,6 +376,7 @@ void TracksWnd::SetStatusMessage(const QString& msg)
 
 void TracksWnd::Clear()
 {
+	m_tracks->GetWidget()->ClearTracks();
 	m_recent.SetOpenFile("");
 }
 
@@ -378,17 +390,20 @@ void TracksWnd::FileNew()
 }
 
 
+/**
+ * load session files
+ */
 bool TracksWnd::FileLoad()
 {
 	if(!AskUnsaved())
 		return false;
 
 	auto filedlg = std::make_shared<QFileDialog>(
-		this, "Load Data", GetDocDir(),
+		this, "Load Data", GetFileDir(),
 		"Tracks Files (*.tracks);;All Files (* *.*)");
 	filedlg->setAcceptMode(QFileDialog::AcceptOpen);
 	filedlg->setDefaultSuffix("tracks");
-	filedlg->setFileMode(QFileDialog::AnyFile);
+	filedlg->setFileMode(QFileDialog::ExistingFile);
 
 	if(!filedlg->exec())
 		return false;
@@ -441,6 +456,9 @@ bool TracksWnd::FileLoadRecent(const QString& filename)
 }
 
 
+/**
+ * save session files
+ */
 bool TracksWnd::FileSave()
 {
 	// no open file, use "save as..." instead
@@ -457,10 +475,13 @@ bool TracksWnd::FileSave()
 }
 
 
+/**
+ * save session files as
+ */
 bool TracksWnd::FileSaveAs()
 {
 	auto filedlg = std::make_shared<QFileDialog>(
-		this, "Save Data", GetDocDir(),
+		this, "Save Data", GetFileDir(),
 		"Tracks Files (*.tracks)");
 	filedlg->setAcceptMode(QFileDialog::AcceptSave);
 	filedlg->setDefaultSuffix("tracks");
@@ -497,6 +518,42 @@ bool TracksWnd::FileSaveAs()
 }
 
 
+/**
+ * import track files
+ */
+bool TracksWnd::FileImport()
+{
+	auto filedlg = std::make_shared<QFileDialog>(
+		this, "Import Tracks", GetImportDir(),
+		"Track Files (*.gpx);;All Files (* *.*)");
+	filedlg->setAcceptMode(QFileDialog::AcceptOpen);
+	filedlg->setDefaultSuffix("gpx");
+	filedlg->setFileMode(QFileDialog::ExistingFiles);
+
+	if(!filedlg->exec())
+		return false;
+
+	QStringList files = filedlg->selectedFiles();
+	if(files.size() == 0 || files[0] == "")
+		return false;
+
+	if(!ImportFiles(files))
+	{
+		QMessageBox::critical(this, "Error",
+			QString("Selected files could not be imported.").arg(files[0]));
+		return false;
+	}
+
+	fs::path file{files[0].toStdString()};
+	m_recent.SetRecentImportDir(file.parent_path().string().c_str());
+
+	return true;
+}
+
+
+/**
+ * save session files
+ */
 bool TracksWnd::SaveFile(const QString& filename) const
 {
 	std::ofstream ofstr{filename.toStdString()};
@@ -509,6 +566,9 @@ bool TracksWnd::SaveFile(const QString& filename) const
 }
 
 
+/**
+ * load session files
+ */
 bool TracksWnd::LoadFile(const QString& filename)
 {
 	std::ifstream ifstr{filename.toStdString()};
@@ -516,6 +576,30 @@ bool TracksWnd::LoadFile(const QString& filename)
 		return false;
 
 	// TODO
+
+	return true;
+}
+
+
+/**
+ * import track files
+ */
+bool TracksWnd::ImportFiles(const QStringList& filenames)
+{
+	for(const QString& filename : filenames)
+	{
+		SingleTrack<t_real> track;
+		if(!track.Import(filename.toStdString()))
+		{
+			QMessageBox::critical(this, "Error",
+			QString("Track file \"%1\" could not be imported.").arg(filename));
+			return false;
+		}
+
+		// TODO: load data
+
+		m_tracks->GetWidget()->AddTrack(track.GetFileName());
+	}
 
 	return true;
 }
@@ -627,9 +711,9 @@ bool TracksWnd::AskUnsaved()
 
 
 /**
- * get the directory to save documents in
+ * get the directory to save session files in
  */
-QString TracksWnd::GetDocDir()
+QString TracksWnd::GetFileDir()
 {
 	if(g_use_recent_dir)
 		return m_recent.GetRecentDir();
@@ -666,6 +750,28 @@ QString TracksWnd::GetDocDir()
 		dir.cd(subdir);
 	}
 
+	return dir.absolutePath();
+}
+
+
+/**
+ * get the directory to import tracks from
+ */
+QString TracksWnd::GetImportDir()
+{
+	if(g_use_recent_dir)
+		return m_recent.GetRecentImportDir();
+
+	// use either the documents or the home dir
+	QString path;
+	QStringList dirs = QStandardPaths::standardLocations(
+		QStandardPaths::DocumentsLocation);
+	if(dirs.size())
+		path = dirs[0];
+	else
+		path = QDir::homePath();
+
+	QDir dir(path);
 	return dir.absolutePath();
 }
 

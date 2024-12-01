@@ -16,7 +16,6 @@
 #include <cmath>
 #include <locale>
 
-#include "types.h"
 #include "globals.h"
 
 
