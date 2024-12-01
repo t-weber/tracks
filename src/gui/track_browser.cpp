@@ -10,7 +10,6 @@
 #include "helpers.h"
 
 #include <QtWidgets/QListWidgetItem>
-#include <QtWidgets/QFrame>
 
 
 TrackBrowser::TrackBrowser(QWidget* parent)
@@ -23,6 +22,23 @@ TrackBrowser::TrackBrowser(QWidget* parent)
 	mainlayout->setVerticalSpacing(4);
 	mainlayout->setHorizontalSpacing(4);
 	mainlayout->addWidget(m_list.get(), 0, 0, 1, 1);
+
+	connect(m_list.get(), &QListWidget::currentRowChanged,
+		this, &TrackBrowser::NewTrackSelected);
+	connect(m_list.get(), &QListWidget::itemChanged,
+		[this](QListWidgetItem* item) -> void
+	{
+		if(!m_list || !item)
+			return;
+
+		int row = m_list->row(item);
+		if(row < 0)
+			return;
+
+		std::string name = item->text().toStdString();
+		t_size idx = t_size(row);
+		emit TrackNameChanged(idx, name);
+	});
 }
 
 
@@ -31,13 +47,18 @@ TrackBrowser::~TrackBrowser()
 }
 
 
-void TrackBrowser::AddTrack(const std::string& ident)
+void TrackBrowser::AddTrack(const std::string& name)
 {
 	if(!m_list)
 		return;
 
-	m_list->insertItem(m_list->count(),
-		new QListWidgetItem{ident.c_str(), m_list.get()});
+	m_list->blockSignals(true);
+
+	QListWidgetItem *item = new QListWidgetItem{name.c_str(), m_list.get()};
+	item->setFlags(item->flags() | Qt::ItemIsEditable);
+	m_list->insertItem(m_list->count(), item);
+
+	m_list->blockSignals(false);
 }
 
 

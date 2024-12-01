@@ -28,6 +28,7 @@
 #include "track_infos.h"
 
 #include "common/types.h"
+#include "lib/trackdb.h"
 
 
 
@@ -115,6 +116,8 @@ protected:
 	bool IsWindowModified() const { return m_window_modified; }
 	void SetWindowModified(bool b) { m_window_modified = b; }
 
+	SingleTrack<t_real>* GetTrack(t_size idx);
+
 
 private:
 	QString m_gui_theme{};
@@ -136,9 +139,14 @@ private:
 	std::shared_ptr<DockWidgetWrapper<TrackBrowser>> m_tracks{};
 	std::shared_ptr<DockWidgetWrapper<TrackInfos>> m_track{};
 
+	MultipleTracks<t_real> m_trackdb{};
+
 
 protected slots:
 	void ApplySettings();
+
+	void NewTrackSelected(int idx);
+	void TrackNameChanged(t_size idx, const std::string& name);
 };
 
 

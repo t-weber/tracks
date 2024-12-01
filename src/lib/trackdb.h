@@ -8,326 +8,153 @@
 #ifndef __TRACK_DBFILE_H__
 #define __TRACK_DBFILE_H__
 
-#include <iostream>
-#include <sstream>
-#include <iomanip>
-#include <chrono>
-#include <limits>
-#include <cmath>
-#include <numbers>
-
-#if __has_include(<filesystem>)
-	#include <filesystem>
-	namespace __gpx_fs = std::filesystem;
-#else
-	#include <boost/filesystem.hpp>
-	namespace __gpx_fs = boost::filesystem;
-#endif
-
-#include <boost/property_tree/ptree.hpp>
-#include <boost/property_tree/xml_parser.hpp>
-
-#include "calc.h"
+#include "track.h"
 
 
-#define HAS_CHRONO_PARSE 0
-
-
-
-template<class t_clk, class t_timept = typename t_clk::time_point>
-t_timept get_timepoint(const std::string& time_str)
-{
-	t_timept time_pt{};
-
-#if HAS_CHRONO_PARSE != 0
-	std::istringstream{time_str} >>
-		std::chrono::parse("%4Y-%2m-%2dT%2H:%2M:%2SZ", time_pt);
-#else
-	std::tm t{};
-	t.tm_year = std::stoi(time_str.substr(0, 4));
-	t.tm_mon = std::stoi(time_str.substr(5, 2)) + 1;
-	t.tm_mday = std::stoi(time_str.substr(8, 2));
-	t.tm_hour = std::stoi(time_str.substr(11, 2));
-	t.tm_min = std::stoi(time_str.substr(14, 2));
-	t.tm_sec = std::stoi(time_str.substr(17, 2));
-
-	time_pt = t_clk::from_time_t(std::mktime(&t));
-#endif
-
-	return time_pt;
-}
-
-
-
-template<class t_timept, class t_real = double>
-struct TrackPoint
-{
-	t_real latitude{};
-	t_real longitude{};
-	t_real elevation{};
-
-	std::optional<t_timept> timept{};
-	std::string timestr{};
-
-	t_real elapsed{};                // time elapsed since last point
-	t_real elapsed_total{};          // time elapsed since first point
-
-	t_real distance_planar{};        // planar distance to last point
-	t_real distance{};               // full distance to last point
-
-	t_real distance_planar_total{};  // planar distance to first point
-	t_real distance_total{};         // full distance to first point
-};
+#define TRACKDB_MAGIC "TRACKDB"
 
 
 
 /**
- * represents a single running track
+ * represents a collection of running tracks
  */
-template<class t_real = double>
-class SingleTrack
+template<class t_real = double, class t_size = std::size_t>
+class MultipleTracks
 {
 public:
-	using t_clk = std::chrono::system_clock;
-	using t_timept = typename t_clk::time_point;
-	using t_TrackPoint = TrackPoint<t_timept, t_real>;
+	using t_track = SingleTrack<t_real, t_size>;
+	using t_TrackPoint = t_track::t_TrackPoint;
+	using t_clk = typename t_track::t_clk;
+	using t_timept = typename t_track::t_timept;
 
 
 public:
-	SingleTrack() = default;
-	~SingleTrack() = default;
+	MultipleTracks() = default;
+	~MultipleTracks() = default;
 
 
-	/**
-	 * import a track from a gpx file
-	 * @see https://en.wikipedia.org/wiki/GPS_Exchange_Format
-	 * @see https://www.topografix.com/gpx/1/1/
-	 */
-	bool Import(const std::string& trackfilename, t_real assume_dt = 1.)
+	t_track* GetTrack(t_size idx)
 	{
-		namespace ptree = boost::property_tree;
-		namespace num = std::numbers;
-		namespace fs = __gpx_fs;
+		if(idx >= GetTrackCount())
+			return nullptr;
 
-		fs::path trackfile{trackfilename};
-		if(!fs::exists(trackfile))
+		return &m_tracks[idx];
+	}
+
+
+	const t_track* GetTrack(t_size idx) const
+	{
+		if(idx >= GetTrackCount())
+			return nullptr;
+
+		return &m_tracks[idx];
+	}
+
+
+	void EmplaceTrack(t_track&& track)
+	{
+		m_tracks.emplace_back(std::forward<t_track>(track));
+	}
+
+
+	void AddTrack(const t_track& track)
+	{
+		m_tracks.push_back(track);
+	}
+
+
+	t_size GetTrackCount() const
+	{
+		return m_tracks.size();
+	}
+
+
+	void ClearTracks()
+	{
+		m_tracks.clear();
+	}
+
+
+	bool Save(const std::string& filename) const
+	{
+		using t_pos = typename std::ofstream::pos_type;
+		std::ofstream ofstr{filename, std::ios::binary};
+		if(!ofstr)
 			return false;
 
-		ptree::ptree track;
-		ptree::read_xml(trackfilename, track);
+		const t_size num_tracks = GetTrackCount();
 
-		const auto& gpx = track.get_child_optional("gpx");
-		if(!gpx)
-			return false;
+		ofstr.write(TRACKDB_MAGIC, sizeof(TRACKDB_MAGIC));
+		ofstr.write(reinterpret_cast<const char*>(&num_tracks), sizeof(num_tracks));
+		t_pos pos_addresses = ofstr.tellp();
+		ofstr.seekp(num_tracks * sizeof(t_size), std::ios::cur);
 
-		const auto& tracks = gpx->get_child_optional("");
-		if(!tracks)
-			return false;
-
-		m_filename = trackfile.filename().string();
-		m_version = gpx->get<std::string>("<xmlattr>.version", "<unknown>");
-		m_creator = gpx->get<std::string>("<xmlattr>.creator", "<unknown>");
-
-		// clear old values
-		m_points.clear();
-		m_total_dist = 0.;
-		m_total_dist_planar = 0.;
-		m_total_time = 0.;
-		m_min_elev = std::numeric_limits<t_real>::max();
-		m_max_elev = -m_min_elev;
-
-		std::optional<t_real> latitude_last, longitude_last, elevation_last;
-		std::optional<t_timept> time_pt_last;
-
-		for(const auto& track : *tracks)
+		for(t_size trackidx = 0; trackidx < num_tracks; ++trackidx)
 		{
-			if(track.first != "trk")
-				continue;
+			const t_track* track = GetTrack(trackidx);
+			if(!track)
+				return false;
 
-			const auto& segs = track.second.get_child_optional("");
-			if(!segs)
-				continue;
+			t_pos pos_before = ofstr.tellp();
+			if(!track->Save(ofstr))
+				return false;
+			t_pos pos_after = ofstr.tellp();
 
-			for(const auto& seg : *segs)
-			{
-				if(seg.first != "trkseg")
-					continue;
+			// write track start address
+			t_size pos_track = static_cast<t_size>(pos_before);
+			ofstr.seekp(pos_addresses + static_cast<t_pos>(trackidx*sizeof(t_size)), std::ios::beg);
+			ofstr.write(reinterpret_cast<const char*>(&pos_track), sizeof(pos_track));
 
-				const auto& pts = seg.second.get_child_optional("");
-				if(!pts)
-					continue;
-
-				for(const auto& pt : *pts)
-				{
-					if(pt.first != "trkpt")
-						continue;
-
-					t_TrackPoint trackpt
-					{
-						.latitude = pt.second.get<t_real>("<xmlattr>.lat") / t_real(180) * num::pi_v<t_real>,
-						.longitude = pt.second.get<t_real>("<xmlattr>.lon") / t_real(180) * num::pi_v<t_real>,
-						.elevation = pt.second.get<t_real>("ele", t_real(0)),
-					};
-
-					bool has_time = false;
-					if(auto time_opt = pt.second.get_optional<std::string>("time"))
-					{
-						trackpt.timestr = *time_opt;
-						trackpt.timept = get_timepoint<t_clk>(trackpt.timestr);
-						has_time = true;
-					}
-
-					// elapsed seconds since last track point
-					if(time_pt_last)
-					{
-						if(has_time)
-							trackpt.elapsed = std::chrono::duration<t_real>{*trackpt.timept - *time_pt_last}.count();
-						else
-							trackpt.elapsed = assume_dt;
-					}
-
-					if(latitude_last && longitude_last && elevation_last)
-					{
-						std::tie(trackpt.distance_planar, trackpt.distance) = geo_dist/*_2*/<t_real>(
-							*latitude_last, trackpt.latitude,
-							*longitude_last, trackpt.longitude,
-							*elevation_last, trackpt.elevation);
-					}
-
-					// cumulative values
-					m_total_time += trackpt.elapsed;
-					m_total_dist += trackpt.distance;
-					m_total_dist_planar += trackpt.distance_planar;
-					m_max_elev = std::max(m_max_elev, trackpt.elevation);
-					m_min_elev = std::min(m_min_elev, trackpt.elevation);
-
-					trackpt.elapsed_total = m_total_time;
-					trackpt.distance_total = m_total_dist;
-					trackpt.distance_planar_total = m_total_dist_planar;
-
-					// save last values
-					latitude_last = trackpt.latitude;
-					longitude_last = trackpt.longitude;
-					elevation_last = trackpt.elevation;
-					time_pt_last = trackpt.timept;
-
-					m_points.emplace_back(std::move(trackpt));
-				}  // point iteration
-			}  // segment iteration
-		}  // track iteration
+			ofstr.seekp(pos_after, std::ios::beg);
+		}
 
 		return true;
 	}
 
 
-	const std::vector<t_TrackPoint>& GetPoints() const
+	bool Load(const std::string& filename)
 	{
-		return m_points;
-	}
+		ClearTracks();
 
+		using t_pos = typename std::ifstream::pos_type;
+		std::ifstream ifstr{filename, std::ios::binary};
+		if(!ifstr)
+			return false;
 
-	const std::string& GetFileName() const
-	{
-		return m_filename;
-	}
+		char magic[sizeof(TRACKDB_MAGIC)];
+		ifstr.read(magic, sizeof(magic));
+		if(std::string(magic) != TRACKDB_MAGIC)
+			return false;
 
+		t_size num_tracks = 0;
+		ifstr.read(reinterpret_cast<char*>(&num_tracks), sizeof(num_tracks));
+		m_tracks.reserve(num_tracks);
 
-	const std::string& GetVersion() const
-	{
-		return m_version;
-	}
+		t_pos pos_addresses = ifstr.tellg();
 
-
-	const std::string& GetCreator() const
-	{
-		return m_creator;
-	}
-
-
-	t_real GetTotalDistance(bool planar = false) const
-	{
-		return planar ? m_total_dist_planar : m_total_dist;
-	}
-
-
-	t_real GetTotalTime() const
-	{
-		return m_total_time;
-	}
-
-
-	std::pair<t_real, t_real> GetElevationRange() const
-	{
-		return std::make_pair(m_min_elev, m_max_elev);
-	}
-
-
-	friend std::ostream& operator<<(std::ostream& ostr, const SingleTrack<t_real>& track)
-	{
-		namespace num = std::numbers;
-
-		const int field_width = ostr.precision() + 2;
-
-		// header
-		ostr
-			<< std::left << std::setw(field_width) << "Lat." << " "
-			<< std::left << std::setw(field_width) << "Lon." << " "
-			<< std::left << std::setw(field_width) << "h" << " "
-			<< std::left << std::setw(field_width) << "\xce\x94t" << "  "
-			<< std::left << std::setw(field_width) << "\xce\x94s" << "  "
-			<< std::left << std::setw(field_width) << "t" << " "
-			<< std::left << std::setw(field_width) << "s" << "\n";
-
-		for(const t_TrackPoint& pt : track.GetPoints())
+		for(t_size trackidx = 0; trackidx < num_tracks; ++trackidx)
 		{
-			t_real latitude_deg = pt.latitude * t_real(180) / num::pi_v<t_real>;
-			t_real longitude_deg = pt.longitude * t_real(180) / num::pi_v<t_real>;
+			// read track start address
+			t_size pos_track = 0;
+			ifstr.seekg(pos_addresses + static_cast<t_pos>(trackidx*sizeof(t_size)), std::ios::beg);
+			ifstr.read(reinterpret_cast<char*>(&pos_track), sizeof(pos_track));
 
-			ostr
-				<< std::left << std::setw(field_width) << latitude_deg << " "
-				<< std::left << std::setw(field_width) << longitude_deg << " "
-				<< std::left << std::setw(field_width) << pt.elevation << " "
-				<< std::left << std::setw(field_width) << pt.elapsed << " "
-				<< std::left << std::setw(field_width) << pt.distance << " "
-				<< std::left << std::setw(field_width) << pt.elapsed_total << " "
-				<< std::left << std::setw(field_width) << pt.distance_total << " ";
+			// seek to track
+			ifstr.seekg(static_cast<t_pos>(pos_track), std::ios::beg);
 
-			if(pt.timept)
-				ostr << std::left << std::setw(25) << pt.timestr << " ";
+			t_track track{};
+			if(!track.Load(ifstr))
+				return false;
 
-			ostr << "\n";
+			m_tracks.emplace_back(std::move(track));
 		}
 
-		// totals
-		auto [ min_elev, max_elev ] = track.GetElevationRange();
-		t_real t = track.GetTotalTime();
-		t_real s = track.GetTotalDistance(false);
-
-		ostr << "\n";
-		ostr << "Number of track points: " << track.GetPoints().size() << "\n";
-		ostr << "Elevation range: [ " << min_elev << ", " << max_elev << " ] m\n";
-		ostr << "Height difference: " << max_elev - min_elev << " m\n";
-		ostr << "Total distance: " << s / 1000. << " km\n";
-		ostr << "Total planar distance: " << track.GetTotalDistance(true) / 1000. << " km\n";
-		ostr << "Total time: " << t / 60. << " min\n";
-		ostr << "Speed: " << s / t << " m/s" << " = " << (s / 1000.) / (t / 60. / 60.) << " km/h\n";
-		ostr << "Pace: " << (t / 60.) / (s / 1000.) << " min/km\n";
-
-		return ostr;
+		return true;
 	}
 
 
 private:
-	std::vector<t_TrackPoint> m_points{};
-
-	std::string m_filename{};
-	std::string m_version{}, m_creator{};
-
-	t_real m_total_dist{};
-	t_real m_total_dist_planar{};
-	t_real m_total_time{};
-	t_real m_min_elev{};
-	t_real m_max_elev{};
+	std::vector<t_track> m_tracks{};
 };
 
 

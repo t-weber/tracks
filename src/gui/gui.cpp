@@ -27,11 +27,7 @@
 	#include <QtWidgets/QActionGroup>
 #endif
 
-#include <fstream>
-#include <iostream>
-
 #include "helpers.h"
-#include "lib/trackdb.h"
 
 
 #define TRACKS_WND_TITLE  "Tracks"
@@ -42,8 +38,7 @@
 // main window
 // ----------------------------------------------------------------------------
 TracksWnd::TracksWnd(QWidget* pParent)
-	: QMainWindow{pParent},
-		m_statusLabel{std::make_shared<QLabel>(this)}
+	: QMainWindow{pParent}, m_statusLabel{std::make_shared<QLabel>(this)}
 {
 	m_recent.SetOpenFile("");
 	SetActiveFile();
@@ -51,7 +46,6 @@ TracksWnd::TracksWnd(QWidget* pParent)
 	// allow dropping of files onto the main window
 	setAcceptDrops(true);
 
-	//m_recent.AddForbiddenDir("/home/tw/Documents");
 	RestoreSettings();
 }
 
@@ -85,6 +79,10 @@ void TracksWnd::SetupGUI()
 	m_tracks->setWindowTitle("Track Browser");
 	m_tracks->setObjectName("TrackBrowser");
 	addDockWidget(Qt::LeftDockWidgetArea, m_tracks.get());
+	connect(m_tracks->GetWidget(), &TrackBrowser::NewTrackSelected,
+		this, &TracksWnd::NewTrackSelected);
+	connect(m_tracks->GetWidget(), &TrackBrowser::TrackNameChanged,
+		this, &TracksWnd::TrackNameChanged);
 
 	setDockOptions(QMainWindow::AnimatedDocks);
 	setDockNestingEnabled(false);
@@ -314,6 +312,9 @@ void TracksWnd::SetupGUI()
 	if(m_saved_window_state.size())
 		restoreState(m_saved_window_state);
 
+	QSettings settings{this};
+	m_track->GetWidget()->RestoreSettings(settings);
+
 	SetStatusMessage("Ready.");
 }
 
@@ -365,6 +366,8 @@ void TracksWnd::SaveSettings()
 	settings.setValue("file_recent", m_recent.GetRecentFiles());
 	settings.setValue("file_recent_dir", m_recent.GetRecentDir());
 	settings.setValue("file_recent_import_dir", m_recent.GetRecentImportDir());
+
+	m_track->GetWidget()->SaveSettings(settings);
 }
 
 
@@ -376,8 +379,48 @@ void TracksWnd::SetStatusMessage(const QString& msg)
 
 void TracksWnd::Clear()
 {
+	m_trackdb.ClearTracks();
 	m_tracks->GetWidget()->ClearTracks();
 	m_recent.SetOpenFile("");
+}
+
+
+SingleTrack<t_real>* TracksWnd::GetTrack(t_size idx)
+{
+	SingleTrack<t_real> *track = m_trackdb.GetTrack(t_size(idx));
+	if(!track)
+	{
+		QMessageBox::critical(this, "Error",
+			QString("Invalid track index %1, only %2 tracks are available.")
+			.arg(idx).arg(m_trackdb.GetTrackCount()));
+		return nullptr;
+	}
+
+	return track;
+}
+
+
+void TracksWnd::NewTrackSelected(int idx)
+{
+	if(!m_track)
+		return;
+
+	if(idx < 0)
+	{
+		// no track selected
+		m_track->GetWidget()->Clear();
+		return;
+	}
+
+	const SingleTrack<t_real> *track = GetTrack(idx);
+	m_track->GetWidget()->ShowTrack(*track);
+}
+
+
+void TracksWnd::TrackNameChanged(t_size idx, const std::string& name)
+{
+	if(SingleTrack<t_real> *track = GetTrack(idx); track)
+		track->SetFileName(name);
 }
 
 
@@ -556,13 +599,7 @@ bool TracksWnd::FileImport()
  */
 bool TracksWnd::SaveFile(const QString& filename) const
 {
-	std::ofstream ofstr{filename.toStdString()};
-	if(!ofstr)
-		return false;
-
-	// TODO
-
-	return true;
+	return m_trackdb.Save(filename.toStdString());
 }
 
 
@@ -571,11 +608,14 @@ bool TracksWnd::SaveFile(const QString& filename) const
  */
 bool TracksWnd::LoadFile(const QString& filename)
 {
-	std::ifstream ifstr{filename.toStdString()};
-	if(!ifstr)
+	if(!m_trackdb.Load(filename.toStdString()))
 		return false;
 
-	// TODO
+	for(t_size trackidx = 0; trackidx < m_trackdb.GetTrackCount(); ++trackidx)
+	{
+		const SingleTrack<t_real> *track = m_trackdb.GetTrack(trackidx);
+		m_tracks->GetWidget()->AddTrack(track->GetFileName());
+	}
 
 	return true;
 }
@@ -596,9 +636,8 @@ bool TracksWnd::ImportFiles(const QStringList& filenames)
 			return false;
 		}
 
-		// TODO: load data
-
 		m_tracks->GetWidget()->AddTrack(track.GetFileName());
+		m_trackdb.EmplaceTrack(std::move(track));
 	}
 
 	return true;
@@ -617,7 +656,7 @@ void TracksWnd::ShowSettings(bool only_create)
 			this, &TracksWnd::ApplySettings);
 
 		m_settings->AddSpinbox("settings/precision_gui",
-			"Number precision:", g_prec_gui, 0, 1, 1);
+			"Number precision:", g_prec_gui, 0, 99, 1);
 		m_settings->AddDoubleSpinbox("settings/epsilon",
 			"Calculation epsilon:", g_eps, 0., 1., 1e-6, 8);
 		m_settings->FinishSetup();

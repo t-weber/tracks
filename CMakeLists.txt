@@ -73,7 +73,9 @@ add_executable(tracks
 	src/gui/track_infos.cpp src/gui/track_infos.h
 
 	src/common/types.h
-	src/lib/calc.h src/lib/trackdb.h
+
+	src/lib/calc.h
+	src/lib/track.h src/lib/trackdb.h
 
 	ext/qcustomplot.cpp ext/qcustomplot.h
 )
@@ -92,7 +94,9 @@ target_link_libraries(tracks
 add_executable(tracks_cli
 	src/cli/tracks.cpp
 	src/common/types.h
-	src/lib/calc.h src/lib/trackdb.h
+
+	src/lib/calc.h
+	src/lib/track.h src/lib/trackdb.h
 )
 
 

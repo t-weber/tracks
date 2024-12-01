@@ -35,6 +35,11 @@ public:
 private:
 	std::shared_ptr<QListWidget> m_list{};
 	std::shared_ptr<QGridLayout> m_layout{};
+
+
+signals:
+	void NewTrackSelected(int idx);
+	void TrackNameChanged(t_size idx, const std::string& name);
 };
 
 
