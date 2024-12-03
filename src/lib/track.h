@@ -33,7 +33,8 @@
 #include "calc.h"
 
 
-#define HAS_CHRONO_PARSE 0
+#define HAS_CHRONO_PARSE    0
+#define HAS_CHRONO_PUTTIME  1
 
 
 
@@ -47,7 +48,7 @@ t_timept to_timepoint(const std::string& time_str)
 		std::chrono::parse("%4Y-%2m-%2dT%2H:%2M:%2SZ", time_pt);
 #else
 	std::tm t{};
-	t.tm_year = std::stoi(time_str.substr(0, 4));
+	t.tm_year = std::stoi(time_str.substr(0, 4)) - 1900;
 	t.tm_mon = std::stoi(time_str.substr(5, 2)) - 1;
 	t.tm_mday = std::stoi(time_str.substr(8, 2));
 	t.tm_hour = std::stoi(time_str.substr(11, 2));
@@ -70,6 +71,9 @@ std::string from_timepoint(const t_timept& time_pt)
 	boost::date_time::c_time::localtime(&tt, &t);
 
 	std::ostringstream ostr;
+#if HAS_CHRONO_PUTTIME != 0
+	ostr << std::put_time(&t, "%Y-%m-%d %H:%M:%S");
+#else
 	ostr
 		<< std::setw(4) << std::setfill('0') << t.tm_year << "-"
 		<< std::setw(2) << std::setfill('0') << (t.tm_mon + 1) << "-"
@@ -77,6 +81,8 @@ std::string from_timepoint(const t_timept& time_pt)
 		<< std::setw(2) << std::setfill('0') << t.tm_hour << ":"
 		<< std::setw(2) << std::setfill('0') << t.tm_min << ":"
 		<< std::setw(2) << std::setfill('0') << t.tm_sec;
+#endif
+
 	return ostr.str();
 }
 

@@ -494,6 +494,7 @@ bool TracksWnd::FileLoad()
 		return this->FileLoadRecent(filename);
 	});
 
+	SetWindowModified(false);
 	return true;
 }
 
@@ -516,6 +517,7 @@ bool TracksWnd::FileLoadRecent(const QString& filename)
 	}
 
 	m_recent.SetOpenFile(filename);
+	SetWindowModified(false);
 	return true;
 }
 
@@ -535,6 +537,7 @@ bool TracksWnd::FileSave()
 		return false;
 	}
 
+	SetWindowModified(false);
 	return true;
 }
 
@@ -559,26 +562,25 @@ bool TracksWnd::FileSaveAs()
 	if(files.size() == 0 || files[0] == "")
 		return false;
 
-	if(SaveFile(files[0]))
-	{
-		fs::path file{files[0].toStdString()};
-		m_recent.SetRecentDir(file.parent_path().string().c_str());
-		m_recent.SetOpenFile(files[0]);
-
-		m_recent.AddRecentFile(m_recent.GetOpenFile(),
-			[this](const QString& filename) -> bool
-		{
-			return this->FileLoadRecent(filename);
-		});
-
-		return true;
-	}
-	else
+	if(!SaveFile(files[0]))
 	{
 		QMessageBox::critical(this, "Error",
 			QString("File \"%1\" could not be saved.").arg(files[0]));
 		return false;
 	}
+
+	fs::path file{files[0].toStdString()};
+	m_recent.SetRecentDir(file.parent_path().string().c_str());
+	m_recent.SetOpenFile(files[0]);
+
+	m_recent.AddRecentFile(m_recent.GetOpenFile(),
+		[this](const QString& filename) -> bool
+	{
+		return this->FileLoadRecent(filename);
+	});
+
+	SetWindowModified(false);
+	return true;
 }
 
 
