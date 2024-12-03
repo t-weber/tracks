@@ -1,6 +1,6 @@
 /**
  * track files loader
- * @author Tobias Weber
+ * @author Tobias Weber (orcid: 0000-0002-7230-1932)
  * @date 24 November 2024
  * @license see 'LICENSE' file
  */
@@ -26,6 +26,7 @@
 	namespace __gpx_fs = boost::filesystem;
 #endif
 
+#include <boost/date_time/c_time.hpp>
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/xml_parser.hpp>
 
@@ -37,7 +38,7 @@
 
 
 template<class t_clk, class t_timept = typename t_clk::time_point>
-t_timept get_timepoint(const std::string& time_str)
+t_timept to_timepoint(const std::string& time_str)
 {
 	t_timept time_pt{};
 
@@ -47,7 +48,7 @@ t_timept get_timepoint(const std::string& time_str)
 #else
 	std::tm t{};
 	t.tm_year = std::stoi(time_str.substr(0, 4));
-	t.tm_mon = std::stoi(time_str.substr(5, 2)) + 1;
+	t.tm_mon = std::stoi(time_str.substr(5, 2)) - 1;
 	t.tm_mday = std::stoi(time_str.substr(8, 2));
 	t.tm_hour = std::stoi(time_str.substr(11, 2));
 	t.tm_min = std::stoi(time_str.substr(14, 2));
@@ -61,6 +62,62 @@ t_timept get_timepoint(const std::string& time_str)
 
 
 
+template<class t_clk, class t_timept = typename t_clk::time_point>
+std::string from_timepoint(const t_timept& time_pt)
+{
+	std::tm t{};
+	std::time_t tt = t_clk::to_time_t(time_pt);
+	boost::date_time::c_time::localtime(&tt, &t);
+
+	std::ostringstream ostr;
+	ostr
+		<< std::setw(4) << std::setfill('0') << t.tm_year << "-"
+		<< std::setw(2) << std::setfill('0') << (t.tm_mon + 1) << "-"
+		<< std::setw(2) << std::setfill('0') << t.tm_mday << " "
+		<< std::setw(2) << std::setfill('0') << t.tm_hour << ":"
+		<< std::setw(2) << std::setfill('0') << t.tm_min << ":"
+		<< std::setw(2) << std::setfill('0') << t.tm_sec;
+	return ostr.str();
+}
+
+
+
+template<class t_real = double, class t_int = int>
+std::string get_time_str(t_real secs)
+{
+	t_int h = std::floor(secs / 60. / 60.);
+	secs = std::fmod(secs, 60. * 60.);
+
+	t_int m = std::floor(secs / 60.);
+	secs = std::fmod(secs, 60.);
+
+	std::ostringstream ostr;
+	bool started = false;
+	if(h || started)
+	{
+		ostr << h << " h";
+		started = true;
+	}
+	if(started)
+		ostr << ", ";
+	if(m || started)
+	{
+		ostr << m << " min";
+		started = true;
+	}
+	if(started)
+		ostr << ", ";
+	if(secs || started)
+	{
+		ostr << secs << " s";
+		started = true;
+	}
+
+	return ostr.str();
+}
+
+
+
 template<class t_timept, class t_real = double>
 struct TrackPoint
 {
@@ -69,7 +126,6 @@ struct TrackPoint
 	t_real elevation{};
 
 	std::optional<t_timept> timept{};
-	std::string timestr{};
 
 	t_real elapsed{};                // time elapsed since last point
 	t_real elapsed_total{};          // time elapsed since first point
@@ -92,12 +148,78 @@ class SingleTrack
 public:
 	using t_clk = std::chrono::system_clock;
 	using t_timept = typename t_clk::time_point;
+	using t_dur = typename t_clk::duration;
 	using t_TrackPoint = TrackPoint<t_timept, t_real>;
 
 
 public:
 	SingleTrack() = default;
 	~SingleTrack() = default;
+
+
+	/**
+	 * calculate track properties
+	 */
+	void Calculate()
+	{
+		// clear old values
+		m_total_dist = 0.;
+		m_total_dist_planar = 0.;
+		m_total_time = 0.;
+
+		// reset ranges
+		m_min_elev = std::numeric_limits<t_real>::max();
+		m_max_elev = -m_min_elev;
+		m_min_lat = std::numeric_limits<t_real>::max();
+		m_max_lat = -m_min_lat;
+		m_min_long = std::numeric_limits<t_real>::max();
+		m_max_long = -m_min_long;
+
+		std::optional<t_real> latitude_last, longitude_last, elevation_last;
+		std::optional<t_timept> time_pt_last;
+
+		for(t_TrackPoint& trackpt : m_points)
+		{
+			// elapsed seconds since last track point
+			if(time_pt_last)
+			{
+				trackpt.elapsed = std::chrono::duration<t_real>{
+					*trackpt.timept - *time_pt_last}.count();
+			}
+
+			if(latitude_last && longitude_last && elevation_last)
+			{
+				std::tie(trackpt.distance_planar, trackpt.distance)
+					= geo_dist/*_2*/<t_real>(
+					*latitude_last, trackpt.latitude,
+					*longitude_last, trackpt.longitude,
+					*elevation_last, trackpt.elevation);
+			}
+
+			// cumulative values
+			m_total_time += trackpt.elapsed;
+			m_total_dist += trackpt.distance;
+			m_total_dist_planar += trackpt.distance_planar;
+
+			// ranges
+			m_max_lat = std::max(m_max_lat, trackpt.latitude);
+			m_min_lat = std::min(m_min_lat, trackpt.latitude);
+			m_max_long = std::max(m_max_long, trackpt.longitude);
+			m_min_long = std::min(m_min_long, trackpt.longitude);
+			m_max_elev = std::max(m_max_elev, trackpt.elevation);
+			m_min_elev = std::min(m_min_elev, trackpt.elevation);
+
+			trackpt.elapsed_total = m_total_time;
+			trackpt.distance_total = m_total_dist;
+			trackpt.distance_planar_total = m_total_dist_planar;
+
+			// save last values
+			latitude_last = trackpt.latitude;
+			longitude_last = trackpt.longitude;
+			elevation_last = trackpt.elevation;
+			time_pt_last = trackpt.timept;
+		}
+	}
 
 
 	/**
@@ -130,22 +252,9 @@ public:
 		m_version = gpx->get<std::string>("<xmlattr>.version", "<unknown>");
 		m_creator = gpx->get<std::string>("<xmlattr>.creator", "<unknown>");
 
-		// clear old values
+		// clear old track points
 		m_points.clear();
-		m_total_dist = 0.;
-		m_total_dist_planar = 0.;
-		m_total_time = 0.;
-
-		// ranges
-		m_min_elev = std::numeric_limits<t_real>::max();
-		m_max_elev = -m_min_elev;
-		m_min_lat = std::numeric_limits<t_real>::max();
-		m_max_lat = -m_min_lat;
-		m_min_long = std::numeric_limits<t_real>::max();
-		m_max_long = -m_min_long;
-
-		std::optional<t_real> latitude_last, longitude_last, elevation_last;
-		std::optional<t_timept> time_pt_last;
+		t_size pt_idx = 0;
 
 		for(const auto& track : *tracks)
 		{
@@ -177,59 +286,25 @@ public:
 						.elevation = pt.second.get<t_real>("ele", t_real(0)),
 					};
 
-					bool has_time = false;
 					if(auto time_opt = pt.second.get_optional<std::string>("time"))
 					{
-						trackpt.timestr = *time_opt;
-						trackpt.timept = get_timepoint<t_clk>(trackpt.timestr);
-						has_time = true;
+						trackpt.timept = to_timepoint<t_clk>(*time_opt);
 					}
-
-					// elapsed seconds since last track point
-					if(time_pt_last)
+					else
 					{
-						if(has_time)
-							trackpt.elapsed = std::chrono::duration<t_real>{*trackpt.timept - *time_pt_last}.count();
-						else
-							trackpt.elapsed = assume_dt;
+						trackpt.timept = t_timept{};
+						(*trackpt.timept) +=
+							long(t_real(pt_idx * 1000) * assume_dt) *
+							t_dur(std::chrono::milliseconds(1));
 					}
 
-					if(latitude_last && longitude_last && elevation_last)
-					{
-						std::tie(trackpt.distance_planar, trackpt.distance) = geo_dist/*_2*/<t_real>(
-							*latitude_last, trackpt.latitude,
-							*longitude_last, trackpt.longitude,
-							*elevation_last, trackpt.elevation);
-					}
-
-					// cumulative values
-					m_total_time += trackpt.elapsed;
-					m_total_dist += trackpt.distance;
-					m_total_dist_planar += trackpt.distance_planar;
-
-					// ranges
-					m_max_lat = std::max(m_max_lat, trackpt.latitude);
-					m_min_lat = std::min(m_min_lat, trackpt.latitude);
-					m_max_long = std::max(m_max_long, trackpt.longitude);
-					m_min_long = std::min(m_min_long, trackpt.longitude);
-					m_max_elev = std::max(m_max_elev, trackpt.elevation);
-					m_min_elev = std::min(m_min_elev, trackpt.elevation);
-
-					trackpt.elapsed_total = m_total_time;
-					trackpt.distance_total = m_total_dist;
-					trackpt.distance_planar_total = m_total_dist_planar;
-
-					// save last values
-					latitude_last = trackpt.latitude;
-					longitude_last = trackpt.longitude;
-					elevation_last = trackpt.elevation;
-					time_pt_last = trackpt.timept;
-
+					++pt_idx;
 					m_points.emplace_back(std::move(trackpt));
 				}  // point iteration
 			}  // segment iteration
 		}  // track iteration
 
+		Calculate();
 		return true;
 	}
 
@@ -237,6 +312,24 @@ public:
 	const std::vector<t_TrackPoint>& GetPoints() const
 	{
 		return m_points;
+	}
+
+
+	std::optional<t_timept> GetStartTime() const
+	{
+		if(m_points.size() == 0)
+			return std::nullopt;
+
+		return m_points.begin()->timept;
+	}
+
+
+	std::optional<t_timept> GetEndTime() const
+	{
+		if(m_points.size() == 0)
+			return std::nullopt;
+
+		return m_points.rbegin()->timept;
 	}
 
 
@@ -347,7 +440,7 @@ public:
 	}
 
 
-	bool Load(std::ifstream& ifstr)
+	bool Load(std::ifstream& ifstr, bool recalculate = false)
 	{
 		if(!ifstr)
 			return false;
@@ -404,6 +497,8 @@ public:
 		m_filename.resize(name_len);
 		ifstr.read(reinterpret_cast<char*>(m_filename.data()), m_filename.size() * sizeof(char));
 
+		if(recalculate)
+			Calculate();
 		return true;
 	}
 
@@ -418,16 +513,24 @@ public:
 		t_real s = GetTotalDistance(false);
 		t_real s_planar = GetTotalDistance(true);
 		auto [ min_elev, max_elev ] = GetElevationRange();
+		std::optional<t_timept> start_time = GetStartTime();
+		std::optional<t_timept> end_time = GetEndTime();
 
 		ostr << "<html>";
 		ostr << "<ul>";
 
+		if(start_time && end_time)
+		{
+			ostr << "<li>Track time: "
+				<< from_timepoint<t_clk, t_timept>(*start_time) << " - "
+				<< from_timepoint<t_clk, t_timept>(*end_time) << ".</li>";
+		}
 		ostr << "<li>Number of track points: " << GetPoints().size() << ".</li>";
 		ostr << "<li>Elevation range: [ " << min_elev << ", " << max_elev << " ] m.</li>";
 		ostr << "<li>Height difference: " << max_elev - min_elev << " m.</li>";
 		ostr << "<li>Total distance: " << s << " m = " << s / 1000. << " km.</li>";
 		ostr << "<li>Total planar distance: " << s_planar / 1000. << " km.</li>";
-		ostr << "<li>Total time: " << t / 60. << " min = " << t / 60. / 60. << " h.</li>";
+		ostr << "<li>Total time: " << get_time_str(t) << ".</li>";
 		ostr << "<li>Pace: " << (t / 60.) / (s / 1000.) << " min/km.</li>";
 		ostr << "<li>Planar pace: " << (t / 60.) / (s_planar / 1000.) << " min/km.</li>";
 		ostr << "<li>Speed: " << s / t << " m/s" << " = " << (s / 1000.) / (t / 60. / 60.) << " km/h.</li>";
@@ -471,7 +574,10 @@ public:
 				<< std::left << std::setw(field_width) << pt.distance_total << " ";
 
 			if(pt.timept)
-				ostr << std::left << std::setw(25) << pt.timestr << " ";
+			{
+				std::string timestr = from_timepoint<t_clk, t_timept>(*pt.timept);
+				ostr << std::left << std::setw(25) << timestr << " ";
+			}
 
 			ostr << "\n";
 		}
@@ -488,7 +594,7 @@ public:
 		ostr << "Height difference: " << max_elev - min_elev << " m\n";
 		ostr << "Total distance: " << s << " m = " << s / 1000. << " km\n";
 		ostr << "Total planar distance: " << s_planar / 1000. << " km\n";
-		ostr << "Total time: " << t / 60. << " min = " << t / 60. / 60. << " h\n";
+		ostr << "Total time: " << get_time_str(t) << "\n";
 		ostr << "Speed: " << s / t << " m/s" << " = " << (s / 1000.) / (t / 60. / 60.) << " km/h\n";
 		ostr << "Planar speed: " << s_planar / t << " m/s" << " = " << (s_planar / 1000.) / (t / 60. / 60.) << " km/h\n";
 		ostr << "Pace: " << (t / 60.) / (s / 1000.) << " min/km\n";

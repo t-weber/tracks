@@ -1,6 +1,6 @@
 /**
  * basic calculations
- * @author Tobias Weber
+ * @author Tobias Weber (orcid: 0000-0002-7230-1932)
  * @date 24 November 2024
  * @license see 'LICENSE' file
  */
@@ -82,7 +82,8 @@ geo_dist(t_real lat1, t_real lat2,
 		havsin<t_real>(lon2 - lon1) * std::cos(lat1)*std::cos(lat2);
 
 	t_real dist = rad * arcaversin<t_real>(h);
-	return std::make_tuple(dist, dist + std::abs(elev2 - elev1));
+	t_real elev_diff = elev2 - elev1;
+	return std::make_tuple(dist, std::sqrt(dist*dist + elev_diff*elev_diff));
 }
 
 
@@ -125,7 +126,8 @@ geo_dist_2(t_real lat1, t_real lat2,
 		dist = geo::distance<t_pt, t_pt, t_strat>(pt1, pt2, t_strat{rad});
 	}
 
-	return std::make_tuple(dist, dist + std::abs(elev2 - elev1));
+	t_real elev_diff = elev2 - elev1;
+	return std::make_tuple(dist, std::sqrt(dist*dist + elev_diff*elev_diff));
 }
 
 

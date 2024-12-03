@@ -38,9 +38,11 @@
 // main window
 // ----------------------------------------------------------------------------
 TracksWnd::TracksWnd(QWidget* pParent)
-	: QMainWindow{pParent}, m_statusLabel{std::make_shared<QLabel>(this)}
+	: QMainWindow{pParent},
+	m_statusLabel{std::make_shared<QLabel>(this)}
 {
 	m_recent.SetOpenFile("");
+	m_recent.SetLastOpenFile("");
 	SetActiveFile();
 
 	// allow dropping of files onto the main window
@@ -83,6 +85,8 @@ void TracksWnd::SetupGUI()
 		this, &TracksWnd::NewTrackSelected);
 	connect(m_tracks->GetWidget(), &TrackBrowser::TrackNameChanged,
 		this, &TracksWnd::TrackNameChanged);
+	connect(m_track->GetWidget(), &TrackInfos::PlotCoordsChanged,
+		this, &TracksWnd::PlotCoordsChanged);
 
 	setDockOptions(QMainWindow::AnimatedDocks);
 	setDockNestingEnabled(false);
@@ -315,6 +319,19 @@ void TracksWnd::SetupGUI()
 	QSettings settings{this};
 	m_track->GetWidget()->RestoreSettings(settings);
 
+	// reload last open file
+	bool loaded_last_file = false;
+	if(g_reload_last && m_recent.GetLastOpenFile() != "")
+	{
+		if(fs::exists(m_recent.GetLastOpenFile().toStdString()))
+			loaded_last_file = LoadFile(m_recent.GetLastOpenFile());
+	}
+
+	if(loaded_last_file)
+		m_recent.SetOpenFile(m_recent.GetLastOpenFile());
+	else
+		FileNew();
+
 	SetStatusMessage("Ready.");
 }
 
@@ -340,14 +357,7 @@ void TracksWnd::RestoreSettings()
 	if(settings.contains("wnd_native"))
 		m_gui_native = settings.value("wnd_native").toBool();
 
-	if(settings.contains("file_recent"))
-		m_recent.SetRecentFiles(settings.value("file_recent").toStringList());
-
-	if(settings.contains("file_recent_dir"))
-		m_recent.SetRecentDir(settings.value("file_recent_dir").toString());
-
-	if(settings.contains("file_recent_import_dir"))
-		m_recent.SetRecentImportDir(settings.value("file_recent_import_dir").toString());
+	m_recent.RestoreSettings(settings);
 
 	// restore settings from settings dialog
 	ShowSettings(true);
@@ -363,17 +373,15 @@ void TracksWnd::SaveSettings()
 	settings.setValue("wnd_state", state);
 	settings.setValue("wnd_theme", m_gui_theme);
 	settings.setValue("wnd_native", m_gui_native);
-	settings.setValue("file_recent", m_recent.GetRecentFiles());
-	settings.setValue("file_recent_dir", m_recent.GetRecentDir());
-	settings.setValue("file_recent_import_dir", m_recent.GetRecentImportDir());
 
+	m_recent.SaveSettings(settings);
 	m_track->GetWidget()->SaveSettings(settings);
 }
 
 
-void TracksWnd::SetStatusMessage(const QString& msg)
+void TracksWnd::SetStatusMessage(const QString& msg) const
 {
-	m_statusLabel->setText(msg);
+	const_cast<TracksWnd*>(this)->m_statusLabel->setText(msg);
 }
 
 
@@ -382,12 +390,13 @@ void TracksWnd::Clear()
 	m_trackdb.ClearTracks();
 	m_tracks->GetWidget()->ClearTracks();
 	m_recent.SetOpenFile("");
+	m_recent.SetLastOpenFile("");
 }
 
 
-SingleTrack<t_real>* TracksWnd::GetTrack(t_size idx)
+t_track* TracksWnd::GetTrack(t_size idx)
 {
-	SingleTrack<t_real> *track = m_trackdb.GetTrack(t_size(idx));
+	t_track *track = m_trackdb.GetTrack(t_size(idx));
 	if(!track)
 	{
 		QMessageBox::critical(this, "Error",
@@ -412,15 +421,27 @@ void TracksWnd::NewTrackSelected(int idx)
 		return;
 	}
 
-	const SingleTrack<t_real> *track = GetTrack(idx);
+	const t_track *track = GetTrack(idx);
 	m_track->GetWidget()->ShowTrack(*track);
 }
 
 
 void TracksWnd::TrackNameChanged(t_size idx, const std::string& name)
 {
-	if(SingleTrack<t_real> *track = GetTrack(idx); track)
+	if(t_track *track = GetTrack(idx); track)
+	{
 		track->SetFileName(name);
+		SetWindowModified(true);
+	}
+}
+
+
+void TracksWnd::PlotCoordsChanged(t_real longitude, t_real latitude)
+{
+	std::ostringstream ostr;
+	ostr.precision(g_prec_gui);
+	ostr << "(" << longitude << "°, " << latitude << "°)";
+	SetStatusMessage(ostr.str().c_str());
 }
 
 
@@ -589,6 +610,7 @@ bool TracksWnd::FileImport()
 
 	fs::path file{files[0].toStdString()};
 	m_recent.SetRecentImportDir(file.parent_path().string().c_str());
+	SetWindowModified(true);
 
 	return true;
 }
@@ -599,7 +621,12 @@ bool TracksWnd::FileImport()
  */
 bool TracksWnd::SaveFile(const QString& filename) const
 {
-	return m_trackdb.Save(filename.toStdString());
+	bool ok = m_trackdb.Save(filename.toStdString());
+	if(ok)
+		SetStatusMessage(QString("Saved file \"%1\".").arg(filename));
+	else
+		SetStatusMessage(QString("Error saving file \"%1\".").arg(filename));
+	return ok;
 }
 
 
@@ -609,14 +636,18 @@ bool TracksWnd::SaveFile(const QString& filename) const
 bool TracksWnd::LoadFile(const QString& filename)
 {
 	if(!m_trackdb.Load(filename.toStdString()))
+	{
+		SetStatusMessage(QString("Error loading file \"%1\".").arg(filename));
 		return false;
+	}
 
 	for(t_size trackidx = 0; trackidx < m_trackdb.GetTrackCount(); ++trackidx)
 	{
-		const SingleTrack<t_real> *track = m_trackdb.GetTrack(trackidx);
+		const t_track *track = m_trackdb.GetTrack(trackidx);
 		m_tracks->GetWidget()->AddTrack(track->GetFileName());
 	}
 
+	SetStatusMessage(QString("Loaded file \"%1\".").arg(filename));
 	return true;
 }
 
@@ -628,11 +659,10 @@ bool TracksWnd::ImportFiles(const QStringList& filenames)
 {
 	for(const QString& filename : filenames)
 	{
-		SingleTrack<t_real> track;
+		t_track track;
 		if(!track.Import(filename.toStdString()))
 		{
-			QMessageBox::critical(this, "Error",
-			QString("Track file \"%1\" could not be imported.").arg(filename));
+			SetStatusMessage(QString("Error importing file \"%1\".").arg(filename));
 			return false;
 		}
 
@@ -640,6 +670,7 @@ bool TracksWnd::ImportFiles(const QStringList& filenames)
 		m_trackdb.EmplaceTrack(std::move(track));
 	}
 
+	SetStatusMessage(QString("Imported %1 file(s).").arg(filenames.size()));
 	return true;
 }
 
@@ -651,6 +682,7 @@ void TracksWnd::ShowSettings(bool only_create)
 {
 	if(!m_settings)
 	{
+		// populate the settings dialog
 		m_settings = std::make_shared<Settings>(this);
 		connect(m_settings.get(), &Settings::SignalApplySettings,
 			this, &TracksWnd::ApplySettings);
@@ -659,6 +691,9 @@ void TracksWnd::ShowSettings(bool only_create)
 			"Number precision:", g_prec_gui, 0, 99, 1);
 		m_settings->AddDoubleSpinbox("settings/epsilon",
 			"Calculation epsilon:", g_eps, 0., 1., 1e-6, 8);
+		m_settings->AddSpacer();
+		m_settings->AddCheckbox("settings/load_last_file",
+			"Reload last file on startup", g_reload_last);
 		m_settings->FinishSetup();
 	}
 
@@ -679,6 +714,8 @@ void TracksWnd::ApplySettings()
 		value<decltype(g_prec_gui)>();
 	g_eps = m_settings->GetValue("settings/epsilon").
 		value<decltype(g_eps)>();
+	g_reload_last = m_settings->GetValue("settings/load_last_file").
+		value<decltype(g_reload_last)>();
 
 	update();
 }
@@ -823,7 +860,9 @@ void TracksWnd::closeEvent(QCloseEvent *evt)
 		return;
 	}
 
+	m_recent.SetLastOpenFile(m_recent.GetOpenFile());
 	SaveSettings();
+
 	QMainWindow::closeEvent(evt);
 }
 
@@ -868,24 +907,44 @@ void TracksWnd::dropEvent(QDropEvent *evt)
 	const QUrl& url = *urls.begin();
 	QString filename = url.path();
 
-	// load the dropped file
-	Clear();
-	if(!LoadFile(filename))
-	{
-		QMessageBox::critical(this, "Error",
-			QString("File \"%1\" could not be loaded.").arg(filename));
-		return;
-	}
-
 	fs::path file{filename.toStdString()};
-	m_recent.SetRecentDir(file.parent_path().string().c_str());
-	m_recent.SetOpenFile(filename);
+	std::string ext = file.extension();
 
-	m_recent.AddRecentFile(m_recent.GetOpenFile(),
-		[this](const QString& filename) -> bool
+	// load or import the dropped file
+	if(ext == ".tracks")
 	{
-		return this->FileLoadRecent(filename);
-	});
+		if(!AskUnsaved())
+			return;
+		Clear();
+
+		if(!LoadFile(filename))
+		{
+			QMessageBox::critical(this, "Error",
+				QString("File \"%1\" could not be loaded.").arg(filename));
+			return;
+		}
+
+		m_recent.SetRecentDir(file.parent_path().string().c_str());
+		m_recent.SetOpenFile(filename);
+
+		m_recent.AddRecentFile(m_recent.GetOpenFile(),
+			[this](const QString& filename) -> bool
+		{
+			return this->FileLoadRecent(filename);
+		});
+	}
+	else if(ext == ".gpx")
+	{
+		if(!ImportFiles({ filename }))
+		{
+			QMessageBox::critical(this, "Error",
+				QString("File \"%1\" could not be imported.").arg(filename));
+			return;
+		}
+
+		m_recent.SetRecentImportDir(file.parent_path().string().c_str());
+		SetWindowModified(true);
+	}
 
 	QMainWindow::dropEvent(evt);
 }

@@ -25,8 +25,7 @@
 
 #include <memory>
 
-#include "common/types.h"
-#include "lib/track.h"
+#include "globals.h"
 
 
 /**
@@ -44,7 +43,7 @@ public:
 	void RestoreSettings(QSettings& settings);
 
 	void Clear();
-	void ShowTrack(const SingleTrack<t_real>& track);
+	void ShowTrack(const t_track& track);
 
 
 protected:
@@ -56,6 +55,10 @@ private:
 	std::shared_ptr<QCustomPlot> m_plot{};
 	std::shared_ptr<QTextEdit> m_infos{};
 	std::shared_ptr<QGridLayout> m_layout{};
+
+
+signals:
+	void PlotCoordsChanged(t_real, t_real);
 };
 
 

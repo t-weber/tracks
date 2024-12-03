@@ -39,7 +39,6 @@ int main(int argc, char** argv)
 
 		// setup main window gui
 		tracks->SetupGUI();
-		tracks->FileNew();
 
 		// show the main window
 		show_dialog(tracks.get());

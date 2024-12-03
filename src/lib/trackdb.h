@@ -1,6 +1,6 @@
 /**
  * track files loader
- * @author Tobias Weber
+ * @author Tobias Weber (orcid: 0000-0002-7230-1932)
  * @date 24 November 2024
  * @license see 'LICENSE' file
  */
@@ -72,6 +72,16 @@ public:
 	void ClearTracks()
 	{
 		m_tracks.clear();
+	}
+
+
+        /**
+         * calculate track properties
+         */
+	void Calculate()
+	{
+		for(t_track& track : m_tracks)
+			track.Calculate();
 	}
 
 

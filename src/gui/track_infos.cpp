@@ -6,7 +6,6 @@
  */
 
 #include "track_infos.h"
-#include "globals.h"
 #include "helpers.h"
 
 #include <QtCore/QByteArray>
@@ -49,10 +48,8 @@ TrackInfos::~TrackInfos()
 }
 
 
-void TrackInfos::ShowTrack(const SingleTrack<t_real>& track)
+void TrackInfos::ShowTrack(const t_track& track)
 {
-	using t_pt = typename SingleTrack<t_real>::t_TrackPoint;
-
 	// print track infos
 	m_infos->setHtml(track.PrintHtml(g_prec_gui).c_str());
 
@@ -64,7 +61,7 @@ void TrackInfos::ShowTrack(const SingleTrack<t_real>& track)
 	latitudes.reserve(track.GetPoints().size());
 	longitudes.reserve(track.GetPoints().size());
 
-	for(const t_pt& pt : track.GetPoints())
+	for(const t_track_pt& pt : track.GetPoints())
 	{
 		latitudes.push_back(pt.latitude * t_real(180) / num::pi_v<t_real>);
 		longitudes.push_back(pt.longitude * t_real(180) / num::pi_v<t_real>);
@@ -107,11 +104,10 @@ void TrackInfos::PlotMouseMove(QMouseEvent *evt)
 	if(!m_plot)
 		return;
 
-	t_real x = m_plot->xAxis->pixelToCoord(evt->x());
-	t_real y = m_plot->yAxis->pixelToCoord(evt->y());
+	t_real longitude = m_plot->xAxis->pixelToCoord(evt->x());
+	t_real latitude = m_plot->yAxis->pixelToCoord(evt->y());
 
-	std::string strCoord = std::to_string(x) + ", " + std::to_string(y);
-	// TODO
+	emit PlotCoordsChanged(longitude, latitude);
 }
 
 

@@ -6,7 +6,6 @@
  */
 
 #include "track_browser.h"
-#include "globals.h"
 #include "helpers.h"
 
 #include <QtWidgets/QListWidgetItem>

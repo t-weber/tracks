@@ -11,6 +11,7 @@
 #include <QtCore/QObject>
 #include <QtCore/QStringList>
 #include <QtCore/QDir>
+#include <QtCore/QSettings>
 
 #include <vector>
 #include <algorithm>
@@ -102,6 +103,18 @@ public:
 	}
 
 
+	const QString& GetLastOpenFile() const
+	{
+		return m_lastOpenFile;
+	}
+
+
+	void SetLastOpenFile(const QString& file)
+	{
+		m_lastOpenFile = file;
+	}
+
+
 	void AddForbiddenDir(const QString& dir)
 	{
 		m_forbidden_dirs.emplace_back(dir.toStdString());
@@ -163,6 +176,31 @@ public:
 	}
 
 
+	void RestoreSettings(QSettings& settings)
+	{
+		if(settings.contains("file_recent"))
+			SetRecentFiles(settings.value("file_recent").toStringList());
+
+		if(settings.contains("file_recent_dir"))
+			SetRecentDir(settings.value("file_recent_dir").toString());
+
+		if(settings.contains("file_recent_import_dir"))
+			SetRecentImportDir(settings.value("file_recent_import_dir").toString());
+
+		if(settings.contains("file_last"))
+			SetLastOpenFile(settings.value("file_last").toString());
+	}
+
+
+	void SaveSettings(QSettings& settings) const
+	{
+		settings.setValue("file_recent", GetRecentFiles());
+		settings.setValue("file_recent_dir", GetRecentDir());
+		settings.setValue("file_recent_import_dir", GetRecentImportDir());
+		settings.setValue("file_last", GetLastOpenFile());
+	}
+
+
 protected:
 	/**
 	 * is the file in the list of forbidden directories?
@@ -215,6 +253,9 @@ private:
 
 	// currently open file
 	QString m_openFile{};
+
+	// the last file opened before the program closed
+	QString m_lastOpenFile{};
 
 	// parent widget
 	QWidget* m_parentWidget{nullptr};

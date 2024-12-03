@@ -14,7 +14,7 @@
 
 #include <memory>
 
-#include "common/types.h"
+#include "globals.h"
 
 
 /**
