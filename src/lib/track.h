@@ -75,7 +75,7 @@ std::string from_timepoint(const t_timept& time_pt)
 	ostr << std::put_time(&t, "%Y-%m-%d %H:%M:%S");
 #else
 	ostr
-		<< std::setw(4) << std::setfill('0') << t.tm_year << "-"
+		<< std::setw(4) << std::setfill('0') << (t.tm_year + 1900) << "-"
 		<< std::setw(2) << std::setfill('0') << (t.tm_mon + 1) << "-"
 		<< std::setw(2) << std::setfill('0') << t.tm_mday << " "
 		<< std::setw(2) << std::setfill('0') << t.tm_hour << ":"
