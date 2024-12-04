@@ -304,6 +304,19 @@ QVariant Settings::GetValue(const QString& key) const
 		}
 	}
 
+	if(val.isValid())
+		return val;
+
+	// look for the key among the combo boxes
+	for(auto& [box, box_key, initial] : m_comboboxes)
+	{
+		if(key == box_key)
+		{
+			val.setValue(box->currentIndex());
+			break;
+		}
+	}
+
 	return val;
 }
 

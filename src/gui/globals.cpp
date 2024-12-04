@@ -20,3 +20,7 @@ t_int g_prec_gui = 4;
 
 bool g_use_recent_dir = true;
 bool g_reload_last = true;
+
+
+// distance calculation function index
+int g_dist_func = 0;

@@ -29,4 +29,8 @@ extern bool g_use_recent_dir;
 extern bool g_reload_last;
 
 
+// distance calculation function index
+extern int g_dist_func;
+
+
 #endif

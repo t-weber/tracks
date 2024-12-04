@@ -74,7 +74,7 @@ add_executable(tracks
 
 	src/common/types.h
 
-	src/lib/calc.h
+	src/lib/calc.h src/lib/timepoint.h
 	src/lib/track.h src/lib/trackdb.h
 
 	ext/qcustomplot.cpp ext/qcustomplot.h

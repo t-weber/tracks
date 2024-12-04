@@ -145,7 +145,7 @@ void TracksWnd::SetupGUI()
 
 
 	// ------------------------------------------------------------------------
-	// tool bar
+	// file tool bar
 	QToolBar *toolbarFile = new QToolBar{"File", this};
 	toolbarFile->setObjectName("FileToolbar");
 	toolbarFile->addAction(actionNew);
@@ -245,23 +245,38 @@ void TracksWnd::SetupGUI()
 	});
 
 
-	// tool menu
-	QIcon iconTools = QIcon::fromTheme("applications-system");
-	QMenu *menuTools = new QMenu{"Tools", this};
-	menuTools->setIcon(iconTools);
-	menuTools->addAction(toolbarFile->toggleViewAction());
-	menuTools->addSeparator();
-	menuTools->addAction(m_tracks->toggleViewAction());
-	menuTools->addAction(m_track->toggleViewAction());
+	// toolbar submenu
+	QIcon iconToolbars = QIcon::fromTheme("applications-system");
+	QMenu *menuToolbars = new QMenu{"Toolbars", this};
+	menuToolbars->setIcon(iconToolbars);
+	menuToolbars->addAction(toolbarFile->toggleViewAction());
+	menuToolbars->addSeparator();
+	menuToolbars->addAction(m_tracks->toggleViewAction());
+	menuToolbars->addAction(m_track->toggleViewAction());
 
 	menuSettings->addAction(actionSettings);
 	menuSettings->addAction(actionClearSettings);
 	menuSettings->addSeparator();
-	menuSettings->addMenu(menuTools);
+	menuSettings->addMenu(menuToolbars);
 	menuSettings->addSeparator();
 	menuSettings->addMenu(menuGuiTheme);
 	menuSettings->addAction(actionGuiNative);
 	menuSettings->addAction(actionRestoreLayout);
+	// ------------------------------------------------------------------------
+
+
+	// ------------------------------------------------------------------------
+	// tools menu
+	QMenu *menuTools = new QMenu{"Tools", this};
+
+	QAction *actionRecalc = new QAction{"Recalculate", this};
+	connect(actionRecalc, &QAction::triggered, [this]()
+	{
+		m_trackdb.Calculate();
+		SetStatusMessage("Recalculated all values.");
+	});
+
+	menuTools->addAction(actionRecalc);
 	// ------------------------------------------------------------------------
 
 
@@ -295,6 +310,7 @@ void TracksWnd::SetupGUI()
 	// menu bar
 	QMenuBar *menuBar = new QMenuBar{this};
 	menuBar->addMenu(menuFile);
+	menuBar->addMenu(menuTools);
 	menuBar->addMenu(menuSettings);
 	menuBar->addMenu(menuHelp);
 	setMenuBar(menuBar);
@@ -661,7 +677,7 @@ bool TracksWnd::ImportFiles(const QStringList& filenames)
 {
 	for(const QString& filename : filenames)
 	{
-		t_track track;
+		t_track track{};
 		if(!track.Import(filename.toStdString()))
 		{
 			SetStatusMessage(QString("Error importing file \"%1\".").arg(filename));
@@ -693,7 +709,12 @@ void TracksWnd::ShowSettings(bool only_create)
 			"Number precision:", g_prec_gui, 0, 99, 1);
 		m_settings->AddDoubleSpinbox("settings/epsilon",
 			"Calculation epsilon:", g_eps, 0., 1., 1e-6, 8);
-		m_settings->AddSpacer();
+		m_settings->AddSpacer(4);
+		m_settings->AddCombobox("settings/distance_function",
+			"Distance calculation:",
+			{ "Haversine Formula", "Thomas Formula", "Vincenty Formula" },
+			g_dist_func);
+		m_settings->AddSpacer(4);
 		m_settings->AddCheckbox("settings/load_last_file",
 			"Reload last file on startup", g_reload_last);
 		m_settings->FinishSetup();
@@ -716,9 +737,12 @@ void TracksWnd::ApplySettings()
 		value<decltype(g_prec_gui)>();
 	g_eps = m_settings->GetValue("settings/epsilon").
 		value<decltype(g_eps)>();
+	g_dist_func = m_settings->GetValue("settings/distance_function").
+		value<decltype(g_dist_func)>();
 	g_reload_last = m_settings->GetValue("settings/load_last_file").
 		value<decltype(g_reload_last)>();
 
+	m_trackdb.SetDistanceFunction(g_dist_func);
 	update();
 }
 

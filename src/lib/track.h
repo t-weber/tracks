@@ -12,7 +12,6 @@
 #include <sstream>
 #include <fstream>
 #include <iomanip>
-#include <chrono>
 #include <limits>
 #include <cmath>
 #include <numbers>
@@ -26,101 +25,11 @@
 	namespace __gpx_fs = boost::filesystem;
 #endif
 
-#include <boost/date_time/c_time.hpp>
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/xml_parser.hpp>
 
 #include "calc.h"
-
-
-#define HAS_CHRONO_PARSE    0
-#define HAS_CHRONO_PUTTIME  1
-
-
-
-template<class t_clk, class t_timept = typename t_clk::time_point>
-t_timept to_timepoint(const std::string& time_str)
-{
-	t_timept time_pt{};
-
-#if HAS_CHRONO_PARSE != 0
-	std::istringstream{time_str} >>
-		std::chrono::parse("%4Y-%2m-%2dT%2H:%2M:%2SZ", time_pt);
-#else
-	std::tm t{};
-	t.tm_year = std::stoi(time_str.substr(0, 4)) - 1900;
-	t.tm_mon = std::stoi(time_str.substr(5, 2)) - 1;
-	t.tm_mday = std::stoi(time_str.substr(8, 2));
-	t.tm_hour = std::stoi(time_str.substr(11, 2));
-	t.tm_min = std::stoi(time_str.substr(14, 2));
-	t.tm_sec = std::stoi(time_str.substr(17, 2));
-
-	time_pt = t_clk::from_time_t(std::mktime(&t));
-#endif
-
-	return time_pt;
-}
-
-
-
-template<class t_clk, class t_timept = typename t_clk::time_point>
-std::string from_timepoint(const t_timept& time_pt)
-{
-	std::tm t{};
-	std::time_t tt = t_clk::to_time_t(time_pt);
-	boost::date_time::c_time::localtime(&tt, &t);
-
-	std::ostringstream ostr;
-#if HAS_CHRONO_PUTTIME != 0
-	ostr << std::put_time(&t, "%Y-%m-%d %H:%M:%S");
-#else
-	ostr
-		<< std::setw(4) << std::setfill('0') << (t.tm_year + 1900) << "-"
-		<< std::setw(2) << std::setfill('0') << (t.tm_mon + 1) << "-"
-		<< std::setw(2) << std::setfill('0') << t.tm_mday << " "
-		<< std::setw(2) << std::setfill('0') << t.tm_hour << ":"
-		<< std::setw(2) << std::setfill('0') << t.tm_min << ":"
-		<< std::setw(2) << std::setfill('0') << t.tm_sec;
-#endif
-
-	return ostr.str();
-}
-
-
-
-template<class t_real = double, class t_int = int>
-std::string get_time_str(t_real secs)
-{
-	t_int h = std::floor(secs / 60. / 60.);
-	secs = std::fmod(secs, 60. * 60.);
-
-	t_int m = std::floor(secs / 60.);
-	secs = std::fmod(secs, 60.);
-
-	std::ostringstream ostr;
-	bool started = false;
-	if(h || started)
-	{
-		ostr << h << " h";
-		started = true;
-	}
-	if(started)
-		ostr << ", ";
-	if(m || started)
-	{
-		ostr << m << " min";
-		started = true;
-	}
-	if(started)
-		ostr << ", ";
-	if(secs || started)
-	{
-		ostr << secs << " s";
-		started = true;
-	}
-
-	return ostr.str();
-}
+#include "timepoint.h"
 
 
 
@@ -184,6 +93,19 @@ public:
 		std::optional<t_real> latitude_last, longitude_last, elevation_last;
 		std::optional<t_timept> time_pt_last;
 
+		// get distance function
+		std::tuple<t_real, t_real> (*dist_func)(t_real lat1, t_real lat2,
+			t_real lon1, t_real lon2,
+			t_real elev1, t_real elev2) = &geo_dist<t_real>;
+
+		//std::cout << "distance function: " << m_distance_function << std::endl;
+		switch(m_distance_function)
+		{
+			case 0: dist_func = &geo_dist<t_real>; break;
+			case 1: dist_func = &geo_dist_2<t_real, 1>; break;
+			case 2: dist_func = &geo_dist_2<t_real, 2>; break;
+		}
+
 		for(t_TrackPoint& trackpt : m_points)
 		{
 			// elapsed seconds since last track point
@@ -196,7 +118,7 @@ public:
 			if(latitude_last && longitude_last && elevation_last)
 			{
 				std::tie(trackpt.distance_planar, trackpt.distance)
-					= geo_dist/*_2*/<t_real>(
+					= (*dist_func)(
 					*latitude_last, trackpt.latitude,
 					*longitude_last, trackpt.longitude,
 					*elevation_last, trackpt.elevation);
@@ -480,6 +402,7 @@ public:
 				t_timept tpt{};
 				ifstr.read(reinterpret_cast<char*>(&tpt), sizeof(tpt));
 				pt.timept = std::move(tpt);
+				// *pt.timept += std::chrono::hours(1);
 			}
 
 			m_points.emplace_back(std::move(pt));
@@ -610,6 +533,12 @@ public:
 	}
 
 
+	void SetDistanceFunction(int dist_func)
+	{
+		m_distance_function = dist_func;
+	}
+
+
 private:
 	std::vector<t_TrackPoint> m_points{};
 
@@ -623,6 +552,8 @@ private:
 	t_real m_min_lat{}, m_max_lat{};
 	t_real m_min_long{}, m_max_long{};
 	t_real m_min_elev{}, m_max_elev{};
+
+	int m_distance_function{0};
 };
 
 

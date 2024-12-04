@@ -54,12 +54,14 @@ public:
 	void EmplaceTrack(t_track&& track)
 	{
 		m_tracks.emplace_back(std::forward<t_track>(track));
+		m_tracks.rbegin()->SetDistanceFunction(m_distance_function);
 	}
 
 
 	void AddTrack(const t_track& track)
 	{
 		m_tracks.push_back(track);
+		m_tracks.rbegin()->SetDistanceFunction(m_distance_function);
 	}
 
 
@@ -75,9 +77,9 @@ public:
 	}
 
 
-        /**
-         * calculate track properties
-         */
+	/**
+	 * calculate track properties
+	 */
 	void Calculate()
 	{
 		for(t_track& track : m_tracks)
@@ -153,6 +155,7 @@ public:
 			ifstr.seekg(static_cast<t_pos>(pos_track), std::ios::beg);
 
 			t_track track{};
+			track.SetDistanceFunction(m_distance_function);
 			if(!track.Load(ifstr))
 				return false;
 
@@ -163,8 +166,19 @@ public:
 	}
 
 
+	void SetDistanceFunction(int dist_func)
+	{
+		m_distance_function = dist_func;
+
+		for(t_track& track : m_tracks)
+			track.SetDistanceFunction(m_distance_function);
+	}
+
+
 private:
 	std::vector<t_track> m_tracks{};
+
+	int m_distance_function{0};
 };
 
 

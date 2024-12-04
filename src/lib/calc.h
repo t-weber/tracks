@@ -107,12 +107,12 @@ geo_dist_2(t_real lat1, t_real lat2,
 
 	t_real dist = t_real(0);
 
-	if constexpr(STRATEGY == 0)
+	if constexpr(STRATEGY == 1)
 	{
 		using t_strat = geo::strategy::distance::thomas<geo::srs::spheroid<t_real>>;
 		dist = geo::distance<t_pt, t_pt, t_strat>(pt1, pt2, t_strat{});
 	}
-	else if constexpr(STRATEGY == 1)
+	else if constexpr(STRATEGY == 2)
 	{
 		using t_strat = geo::strategy::distance::vincenty<geo::srs::spheroid<t_real>>;
 		dist = geo::distance<t_pt, t_pt, t_strat>(pt1, pt2, t_strat{});
