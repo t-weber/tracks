@@ -10,7 +10,6 @@
 
 #include <QtWidgets/QWidget>
 #include <QtWidgets/QListWidget>
-#include <QtWidgets/QGridLayout>
 
 #include <memory>
 
@@ -26,16 +25,17 @@ public:
 	TrackBrowser(QWidget *parent = nullptr);
 	virtual ~TrackBrowser();
 
-	virtual QSize sizeHint() const override;
-
 	void AddTrack(const std::string& ident);
 	void ClearTracks();
 	int GetCurrentTrackIndex() const;
 
 
+protected:
+	virtual QSize sizeHint() const override;
+
+
 private:
 	std::shared_ptr<QListWidget> m_list{};
-	std::shared_ptr<QGridLayout> m_layout{};
 
 
 signals:

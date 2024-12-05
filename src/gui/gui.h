@@ -27,6 +27,9 @@
 #include "track_browser.h"
 #include "track_infos.h"
 
+// dialogs
+#include "conversions.h"
+
 #include "common/types.h"
 #include "lib/trackdb.h"
 
@@ -95,6 +98,7 @@ public:
 	bool ImportFiles(const QStringList& filenames);
 
 	void ShowSettings(bool only_create = false);
+	void ShowConversions();
 	void ShowAbout();
 
 	Resources& GetResources() { return m_res; }
@@ -136,8 +140,12 @@ private:
 	std::shared_ptr<Settings> m_settings{};
 	std::shared_ptr<About> m_about{};
 
+	// docks
 	std::shared_ptr<DockWidgetWrapper<TrackBrowser>> m_tracks{};
 	std::shared_ptr<DockWidgetWrapper<TrackInfos>> m_track{};
+
+	// dialogs
+	std::shared_ptr<Conversions> m_conversions{};
 
 	t_tracks m_trackdb{};
 

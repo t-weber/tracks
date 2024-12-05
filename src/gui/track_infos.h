@@ -12,7 +12,6 @@
 #include <QtCore/QSettings>
 #include <QtWidgets/QWidget>
 #include <QtWidgets/QTextEdit>
-#include <QtWidgets/QGridLayout>
 #include <QtWidgets/QSplitter>
 
 // https://gcc.gnu.org/onlinedocs/gcc/Diagnostic-Pragmas.html
@@ -37,8 +36,6 @@ public:
 	TrackInfos(QWidget *parent = nullptr);
 	virtual ~TrackInfos();
 
-	virtual QSize sizeHint() const override;
-
 	void SaveSettings(QSettings& settings);
 	void RestoreSettings(QSettings& settings);
 
@@ -47,6 +44,8 @@ public:
 
 
 protected:
+	virtual QSize sizeHint() const override;
+
 	void PlotMouseMove(QMouseEvent *evt);
 
 
@@ -54,7 +53,6 @@ private:
 	std::shared_ptr<QSplitter> m_split{};
 	std::shared_ptr<QCustomPlot> m_plot{};
 	std::shared_ptr<QTextEdit> m_infos{};
-	std::shared_ptr<QGridLayout> m_layout{};
 
 
 signals:

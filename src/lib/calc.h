@@ -131,4 +131,12 @@ geo_dist_2(t_real lat1, t_real lat2,
 }
 
 
+
+template<typename t_real = double>
+t_real speed_to_pace(t_real speed)
+{
+	return t_real(60.) / speed;
+}
+
+
 #endif

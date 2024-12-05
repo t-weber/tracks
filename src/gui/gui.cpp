@@ -269,7 +269,7 @@ void TracksWnd::SetupGUI()
 	// tools menu
 	QMenu *menuTools = new QMenu{"Tools", this};
 
-	QIcon iconRecalc = QIcon::fromTheme("accessories-calculator");
+	QIcon iconRecalc = QIcon::fromTheme("view-refresh");
 	QAction *actionRecalc = new QAction{iconRecalc, "Recalculate", this};
 	connect(actionRecalc, &QAction::triggered, [this]()
 	{
@@ -279,7 +279,13 @@ void TracksWnd::SetupGUI()
 		SetStatusMessage("Recalculated all values.");
 	});
 
+	QIcon iconConversions = QIcon::fromTheme("accessories-calculator");
+	QAction *actionConversions = new QAction{iconConversions, "Speed Conversions...", this};
+	connect(actionConversions, &QAction::triggered, this, &TracksWnd::ShowConversions);
+
 	menuTools->addAction(actionRecalc);
+	menuTools->addSeparator();
+	menuTools->addAction(actionConversions);
 	// ------------------------------------------------------------------------
 
 
@@ -748,6 +754,18 @@ void TracksWnd::ApplySettings()
 
 	m_trackdb.SetDistanceFunction(g_dist_func);
 	update();
+}
+
+
+/**
+ * show speed conversions dialog
+ */
+void TracksWnd::ShowConversions()
+{
+	if(!m_conversions)
+		m_conversions = std::make_shared<Conversions>(this);
+
+	show_dialog(m_conversions.get());
 }
 
 

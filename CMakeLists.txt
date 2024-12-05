@@ -71,6 +71,7 @@ add_executable(tracks
 	src/gui/recent.h src/gui/helpers.h
 	src/gui/track_browser.cpp src/gui/track_browser.h
 	src/gui/track_infos.cpp src/gui/track_infos.h
+	src/gui/conversions.cpp src/gui/conversions.h
 
 	src/common/types.h
 

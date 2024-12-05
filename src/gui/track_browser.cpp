@@ -9,6 +9,7 @@
 #include "helpers.h"
 
 #include <QtWidgets/QListWidgetItem>
+#include <QtWidgets/QGridLayout>
 
 
 TrackBrowser::TrackBrowser(QWidget* parent)

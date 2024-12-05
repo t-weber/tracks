@@ -9,6 +9,7 @@
 #include "helpers.h"
 
 #include <QtCore/QByteArray>
+#include <QtWidgets/QGridLayout>
 
 #include <numbers>
 namespace num = std::numbers;
@@ -72,7 +73,7 @@ void TrackInfos::ShowTrack(const t_track& track)
 		return;
 	m_plot->clearPlottables();
 
-	auto curve = new QCPCurve(m_plot->xAxis, m_plot->yAxis);
+	QCPCurve *curve = new QCPCurve(m_plot->xAxis, m_plot->yAxis);
 	curve->setData(longitudes, latitudes);
 	curve->setLineStyle(QCPCurve::lsLine);
 	QPen pen = curve->pen();
@@ -121,8 +122,8 @@ QSize TrackInfos::sizeHint() const
 
 void TrackInfos::SaveSettings(QSettings& settings)
 {
-        QByteArray split{m_split->saveState()};
-        settings.setValue("track_info_split", split);
+	QByteArray split{m_split->saveState()};
+	settings.setValue("track_info_split", split);
 }
 
 
