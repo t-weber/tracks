@@ -52,6 +52,7 @@ public:
 	void AddCombobox(const QString& key, const QString& descr,
 		const QStringList& items, int idx);
 	void AddSpacer(int size_v = -1);
+	void AddLine();
 	void FinishSetup();
 
 	void SetNumGridColumns(unsigned int num) { m_numGridColumns = num; }

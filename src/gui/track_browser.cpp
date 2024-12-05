@@ -70,6 +70,12 @@ void TrackBrowser::ClearTracks()
 }
 
 
+int TrackBrowser::GetCurrentTrackIndex() const
+{
+	return m_list->currentRow();
+}
+
+
 QSize TrackBrowser::sizeHint() const
 {
 	QSize size = QWidget::sizeHint();

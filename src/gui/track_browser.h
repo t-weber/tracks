@@ -30,6 +30,7 @@ public:
 
 	void AddTrack(const std::string& ident);
 	void ClearTracks();
+	int GetCurrentTrackIndex() const;
 
 
 private:

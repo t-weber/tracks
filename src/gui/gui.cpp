@@ -269,10 +269,13 @@ void TracksWnd::SetupGUI()
 	// tools menu
 	QMenu *menuTools = new QMenu{"Tools", this};
 
-	QAction *actionRecalc = new QAction{"Recalculate", this};
+	QIcon iconRecalc = QIcon::fromTheme("accessories-calculator");
+	QAction *actionRecalc = new QAction{iconRecalc, "Recalculate", this};
 	connect(actionRecalc, &QAction::triggered, [this]()
 	{
 		m_trackdb.Calculate();
+		if(m_tracks)
+			NewTrackSelected(m_tracks->GetWidget()->GetCurrentTrackIndex());
 		SetStatusMessage("Recalculated all values.");
 	});
 
@@ -347,8 +350,6 @@ void TracksWnd::SetupGUI()
 		m_recent.SetOpenFile(m_recent.GetLastOpenFile());
 	else
 		FileNew();
-
-	SetStatusMessage("Ready.");
 }
 
 
@@ -467,6 +468,7 @@ void TracksWnd::FileNew()
 		return;
 
 	Clear();
+	SetStatusMessage("Ready.");
 }
 
 
@@ -665,7 +667,8 @@ bool TracksWnd::LoadFile(const QString& filename)
 		m_tracks->GetWidget()->AddTrack(track->GetFileName());
 	}
 
-	SetStatusMessage(QString("Loaded file \"%1\".").arg(filename));
+	SetStatusMessage(QString("Loaded %1 tracks from file \"%2\".")
+		.arg(m_trackdb.GetTrackCount()).arg(filename));
 	return true;
 }
 
@@ -678,6 +681,8 @@ bool TracksWnd::ImportFiles(const QStringList& filenames)
 	for(const QString& filename : filenames)
 	{
 		t_track track{};
+		track.SetDistanceFunction(g_dist_func);
+
 		if(!track.Import(filename.toStdString()))
 		{
 			SetStatusMessage(QString("Error importing file \"%1\".").arg(filename));
@@ -709,12 +714,11 @@ void TracksWnd::ShowSettings(bool only_create)
 			"Number precision:", g_prec_gui, 0, 99, 1);
 		m_settings->AddDoubleSpinbox("settings/epsilon",
 			"Calculation epsilon:", g_eps, 0., 1., 1e-6, 8);
-		m_settings->AddSpacer(4);
 		m_settings->AddCombobox("settings/distance_function",
 			"Distance calculation:",
 			{ "Haversine Formula", "Thomas Formula", "Vincenty Formula" },
 			g_dist_func);
-		m_settings->AddSpacer(4);
+		m_settings->AddLine();
 		m_settings->AddCheckbox("settings/load_last_file",
 			"Reload last file on startup", g_reload_last);
 		m_settings->FinishSetup();

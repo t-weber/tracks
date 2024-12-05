@@ -62,8 +62,10 @@ class SingleTrack
 {
 public:
 	using t_clk = std::chrono::system_clock;
+	using t_time_ty = typename t_clk::rep;
 	using t_timept = typename t_clk::time_point;
 	using t_dur = typename t_clk::duration;
+	using t_sec = std::chrono::duration<t_real, std::ratio<1, 1>>;
 	using t_TrackPoint = TrackPoint<t_timept, t_real>;
 
 
@@ -110,10 +112,7 @@ public:
 		{
 			// elapsed seconds since last track point
 			if(time_pt_last)
-			{
-				trackpt.elapsed = std::chrono::duration<t_real>{
-					*trackpt.timept - *time_pt_last}.count();
-			}
+				trackpt.elapsed = t_sec{*trackpt.timept - *time_pt_last}.count();
 
 			if(latitude_last && longitude_last && elevation_last)
 			{
@@ -222,7 +221,7 @@ public:
 					{
 						trackpt.timept = t_timept{};
 						(*trackpt.timept) +=
-							long(t_real(pt_idx * 1000) * assume_dt) *
+							static_cast<t_time_ty>(t_real(pt_idx * 1000) * assume_dt) *
 							t_dur(std::chrono::milliseconds(1));
 					}
 
@@ -344,7 +343,11 @@ public:
 			char has_time = pt.timept ? 1 : 0;
 			ofstr.write(&has_time, sizeof(has_time));
 			if(pt.timept)
-				ofstr.write(reinterpret_cast<const char*>(&*pt.timept), sizeof(*pt.timept));
+			{
+				t_real secs = std::chrono::duration_cast<t_sec>(
+					pt.timept->time_since_epoch()).count();
+				ofstr.write(reinterpret_cast<const char*>(&secs), sizeof(secs));
+			}
 		}
 
 		// write track data
@@ -399,9 +402,10 @@ public:
 			ifstr.read(&has_time, sizeof(has_time));
 			if(has_time)
 			{
-				t_timept tpt{};
-				ifstr.read(reinterpret_cast<char*>(&tpt), sizeof(tpt));
-				pt.timept = std::move(tpt);
+				t_real secs{};
+				ifstr.read(reinterpret_cast<char*>(&secs), sizeof(secs));
+				pt.timept = t_timept{static_cast<t_time_ty>(secs * 1000.)
+					* std::chrono::milliseconds{1}};
 				// *pt.timept += std::chrono::hours(1);
 			}
 
@@ -448,22 +452,22 @@ public:
 		ostr << "<html>";
 		ostr << "<ul>";
 
+		ostr << "<li>Number of track points: " << GetPoints().size() << ".</li>";
 		if(start_time && end_time)
 		{
 			ostr << "<li>Track time: "
-				<< from_timepoint<t_clk, t_timept>(*start_time) << " - "
-				<< from_timepoint<t_clk, t_timept>(*end_time) << ".</li>";
+				<< from_timepoint<t_clk, t_timept>(*start_time, true) << " - "
+				<< from_timepoint<t_clk, t_timept>(*end_time, false)
+				<< " (" << get_time_str(t) << ").</li>";
 		}
-		ostr << "<li>Number of track points: " << GetPoints().size() << ".</li>";
-		ostr << "<li>Elevation range: [ " << min_elev << ", " << max_elev << " ] m.</li>";
-		ostr << "<li>Height difference: " << max_elev - min_elev << " m.</li>";
-		ostr << "<li>Total distance: " << s << " m = " << s / 1000. << " km.</li>";
-		ostr << "<li>Total planar distance: " << s_planar / 1000. << " km.</li>";
-		ostr << "<li>Total time: " << get_time_str(t) << ".</li>";
-		ostr << "<li>Pace: " << (t / 60.) / (s / 1000.) << " min/km.</li>";
-		ostr << "<li>Planar pace: " << (t / 60.) / (s_planar / 1000.) << " min/km.</li>";
-		ostr << "<li>Speed: " << s / t << " m/s" << " = " << (s / 1000.) / (t / 60. / 60.) << " km/h.</li>";
-		ostr << "<li>Planar speed: " << s_planar / t << " m/s" << " = " << (s_planar / 1000.) / (t / 60. / 60.) << " km/h.</li>";
+		ostr << "<li>Elevation range: [ " << min_elev << ", " << max_elev << " ] m"
+			<< " (height difference: " << max_elev - min_elev << " m).</li>";
+		ostr << "<li>Total distance: " << s << " m = " << s / 1000. << " km"
+			<< " (planar: " << s_planar / 1000. << " km).</li>";
+		ostr << "<li>Pace: " << (t / 60.) / (s / 1000.) << " min/km"
+			<< " (planar: " << (t / 60.) / (s_planar / 1000.) << " min/km).</li>";
+		ostr << "<li>Speed: " << s / t << " m/s" << " = " << (s / 1000.) / (t / 60. / 60.) << " km/h"
+			<< " (planar: " << s_planar / t << " m/s" << " = " << (s_planar / 1000.) / (t / 60. / 60.) << " km/h).</li>";
 
 		ostr << "</ul>";
 		ostr << "</html>";

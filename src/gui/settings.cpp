@@ -249,6 +249,20 @@ void Settings::AddSpacer(int size_v)
 
 
 /**
+ * adds a horizontal line to the end of the grid layout
+ */
+void Settings::AddLine()
+{
+	QFrame *frame = new QFrame(this);
+	frame->setFrameStyle(QFrame::HLine);
+	frame->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+
+	m_grid->addWidget(frame,
+		m_grid->rowCount(), 0, 1, m_numGridColumns*2);
+}
+
+
+/**
  * adds the button box at the end of the grid layout
  */
 void Settings::FinishSetup()
