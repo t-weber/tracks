@@ -54,30 +54,41 @@ t_timept to_timepoint(const std::string& time_str)
  * converts a time point to a local time string
  */
 template<class t_clk, class t_timept = typename t_clk::time_point>
-std::string from_timepoint(const t_timept& time_pt, bool with_date = true)
+std::string from_timepoint(const t_timept& time_pt,
+	bool show_date = true, bool show_time = true)
 {
 	std::tm t{};
 	std::time_t tt = t_clk::to_time_t(time_pt);
 	boost::date_time::c_time::localtime(&tt, &t);
 
 	std::ostringstream ostr;
+
 #if HAS_CHRONO_PUTTIME != 0
-	if(with_date)
-		ostr << std::put_time(&t, "%Y-%m-%d %H:%M:%S");
-	else
+	if(show_date)
+		ostr << std::put_time(&t, "%Y-%m-%d");
+	if(show_date && show_time)
+		ostr << " ";
+	if(show_time)
 		ostr << std::put_time(&t, "%H:%M:%S");
 #else
-	if(with_date)
+	if(show_date)
 	{
 		ostr
 			<< std::setw(4) << std::setfill('0') << (t.tm_year + 1900) << "-"
 			<< std::setw(2) << std::setfill('0') << (t.tm_mon + 1) << "-"
-			<< std::setw(2) << std::setfill('0') << t.tm_mday << " "
+			<< std::setw(2) << std::setfill('0') << t.tm_mday
 	}
 
-	ostr << std::setw(2) << std::setfill('0') << t.tm_hour << ":"
-		<< std::setw(2) << std::setfill('0') << t.tm_min << ":"
-		<< std::setw(2) << std::setfill('0') << t.tm_sec;
+	if(show_date && show_time)
+		ostr << " ";
+
+	if(show_time)
+	{
+		ostr
+			<< std::setw(2) << std::setfill('0') << t.tm_hour << ":"
+			<< std::setw(2) << std::setfill('0') << t.tm_min << ":"
+			<< std::setw(2) << std::setfill('0') << t.tm_sec;
+	}
 #endif
 
 	return ostr.str();

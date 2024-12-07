@@ -283,9 +283,14 @@ void TracksWnd::SetupGUI()
 	QAction *actionConversions = new QAction{iconConversions, "Speed Conversions...", this};
 	connect(actionConversions, &QAction::triggered, this, &TracksWnd::ShowConversions);
 
+	QIcon iconStatistics = QIcon::fromTheme("applications-graphics");
+	QAction *actionStatistics = new QAction{iconStatistics, "Pace Statistics...", this};
+	connect(actionStatistics, &QAction::triggered, this, &TracksWnd::ShowStatistics);
+
 	menuTools->addAction(actionRecalc);
 	menuTools->addSeparator();
 	menuTools->addAction(actionConversions);
+	menuTools->addAction(actionStatistics);
 	// ------------------------------------------------------------------------
 
 
@@ -463,7 +468,7 @@ void TracksWnd::PlotCoordsChanged(t_real longitude, t_real latitude)
 {
 	std::ostringstream ostr;
 	ostr.precision(g_prec_gui);
-	ostr << "(" << longitude << "°, " << latitude << "°)";
+	ostr << "Coordinates: (" << longitude << "°, " << latitude << "°).";
 	SetStatusMessage(ostr.str().c_str());
 }
 
@@ -766,6 +771,21 @@ void TracksWnd::ShowConversions()
 		m_conversions = std::make_shared<Conversions>(this);
 
 	show_dialog(m_conversions.get());
+}
+
+
+/**
+ * show speed statistics dialog
+ */
+void TracksWnd::ShowStatistics()
+{
+	if(!m_statistics)
+	{
+		m_statistics = std::make_shared<Statistics>(this);
+		m_statistics->SetTrackDB(&m_trackdb);
+	}
+
+	show_dialog(m_statistics.get());
 }
 
 

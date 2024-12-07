@@ -29,6 +29,7 @@
 
 // dialogs
 #include "conversions.h"
+#include "statistics.h"
 
 #include "common/types.h"
 #include "lib/trackdb.h"
@@ -97,8 +98,10 @@ public:
 	bool LoadFile(const QString& filename);
 	bool ImportFiles(const QStringList& filenames);
 
+	// dialogs
 	void ShowSettings(bool only_create = false);
 	void ShowConversions();
+	void ShowStatistics();
 	void ShowAbout();
 
 	Resources& GetResources() { return m_res; }
@@ -146,6 +149,7 @@ private:
 
 	// dialogs
 	std::shared_ptr<Conversions> m_conversions{};
+	std::shared_ptr<Statistics> m_statistics{};
 
 	t_tracks m_trackdb{};
 

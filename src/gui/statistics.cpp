@@ -1,11 +1,11 @@
 /**
- * speed conversions
+ * speed statistics
  * @author Tobias Weber (orcid: 0000-0002-7230-1932)
  * @date Dec-2024
  * @license see 'LICENSE' file
  */
 
-#include "conversions.h"
+#include "statistics.h"
 #include "helpers.h"
 #include "lib/calc.h"
 
@@ -17,42 +17,24 @@
 #include <limits>
 
 
-Conversions::Conversions(QWidget* parent)
+Statistics::Statistics(QWidget* parent)
 	: QDialog(parent)
 {
-	setWindowTitle("Speed Conversions");
+	setWindowTitle("Pace Statistics");
 	setSizeGripEnabled(true);
 
 	// plot
 	m_plot = std::make_shared<QCustomPlot>(this);
 	m_plot->setSelectionRectMode(QCP::srmZoom);
 	m_plot->setInteraction(QCP::Interaction(int(QCP::iRangeZoom) | int(QCP::iRangeDrag)));
-	m_plot->xAxis->setLabel("Speed (km/h)");
+	m_plot->xAxis->setLabel("Date");
 	m_plot->yAxis->setLabel("Pace (min/km)");
+	auto *ticker = new QCPAxisTickerDateTime{};
+	ticker->setDateTimeSpec(Qt::LocalTime);
+	ticker->setDateTimeFormat("yyyy-MM-dd");
+	m_plot->xAxis->setTicker(QSharedPointer<QCPAxisTicker>{ticker});
 
-	connect(m_plot.get(), &QCustomPlot::mouseMove, this, &Conversions::PlotMouseMove);
-
-	// plot settings
-	QLabel *min_speed_label = new QLabel{"Min. Speed:", this};
-	QLabel *max_speed_label = new QLabel{"Max. Speed:", this};
-
-	m_min_speed = std::make_shared<QDoubleSpinBox>(this);
-	m_max_speed = std::make_shared<QDoubleSpinBox>(this);
-
-	m_min_speed->setValue(5.);
-	m_min_speed->setRange(0.01, 99.);
-	m_min_speed->setSingleStep(0.5);
-	m_min_speed->setDecimals(2);
-	m_min_speed->setSuffix(" km/h");
-	m_max_speed->setValue(20.);
-	m_max_speed->setRange(0.01, 99.);
-	m_max_speed->setSingleStep(0.5);
-	m_max_speed->setDecimals(2);
-	m_max_speed->setSuffix(" km/h");
-
-	auto value_changed = static_cast<void (QDoubleSpinBox::*)(double)>(&QDoubleSpinBox::valueChanged);
-	connect(m_min_speed.get(), value_changed, this, &Conversions::PlotSpeeds);
-	connect(m_max_speed.get(), value_changed, this, &Conversions::PlotSpeeds);
+	connect(m_plot.get(), &QCustomPlot::mouseMove, this, &Statistics::PlotMouseMove);
 
 	// status bar
 	m_status = std::make_shared<QLabel>(this);
@@ -91,74 +73,100 @@ Conversions::Conversions(QWidget* parent)
 	mainlayout->setVerticalSpacing(4);
 	mainlayout->setHorizontalSpacing(4);
 	mainlayout->addWidget(m_plot.get(), 0, 0, 1, 4);
-	mainlayout->addWidget(min_speed_label, 1, 0, 1, 1);
-	mainlayout->addWidget(max_speed_label, 1, 2, 1, 1);
-	mainlayout->addWidget(m_min_speed.get(), 1, 1, 1, 1);
-	mainlayout->addWidget(m_max_speed.get(), 1, 3, 1, 1);
 	mainlayout->addWidget(panel, 2, 0, 1, 4);
 
 	// restore settings
 	QSettings settings{this};
-	if(settings.contains("dlg_conversions/wnd_geo"))
+	if(settings.contains("dlg_statistics/wnd_geo"))
 	{
-		QByteArray arr{settings.value("dlg_conversions/wnd_geo").toByteArray()};
+		QByteArray arr{settings.value("dlg_statistics/wnd_geo").toByteArray()};
 		this->restoreGeometry(arr);
 	}
 	else
 	{
 		this->resize(512, 512);
 	}
+}
 
+
+Statistics::~Statistics()
+{
+}
+
+
+void Statistics::SetTrackDB(const t_tracks *trackdb)
+{
+	m_trackdb = trackdb;
 	PlotSpeeds();
 }
 
 
-Conversions::~Conversions()
+void Statistics::PlotSpeeds()
 {
-}
-
-
-void Conversions::PlotSpeeds()
-{
-	std::size_t num_points = 256;
-
-	t_real min_speed = m_min_speed->value(), max_speed = m_max_speed->value();
-	t_real min_pace = std::numeric_limits<t_real>::max(), max_pace = -min_pace;
-
-	if(min_speed > max_speed)
-		std::swap(min_speed, max_speed);
-
-	if(!m_plot)
+	if(!m_trackdb || !m_plot)
 		return;
+
 	m_plot->clearPlottables();
 
-	QVector<t_real> speeds, paces;
-	speeds.reserve(num_points);
-	paces.reserve(num_points);
+	const t_size num_tracks = m_trackdb->GetTrackCount();
 
-	for(std::size_t pt = 0; pt < num_points; ++pt)
+	t_real min_epoch = std::numeric_limits<t_real>::max(), max_epoch = -min_epoch;
+	t_real min_pace = std::numeric_limits<t_real>::max(), max_pace = -min_pace;
+
+	QVector<t_real> epochs, paces;
+	epochs.reserve(num_tracks);
+	paces.reserve(num_tracks);
+
+	for(std::size_t track_idx = 0; track_idx < num_tracks; ++track_idx)
 	{
-		t_real speed = std::lerp(min_speed, max_speed, t_real(pt)/t_real(num_points - 1));
-		t_real pace = speed_to_pace<t_real>(speed);
+		const t_track *track = m_trackdb->GetTrack(track_idx);
+		if(!track)
+			continue;
+
+		// get track time
+		auto tp = track->GetStartTime();
+		if(!tp)
+			continue;
+
+		t_real epoch = std::chrono::duration_cast<typename t_track::t_sec>(
+			tp->time_since_epoch()).count();
+
+		// get track pace
+		t_real t = track->GetTotalTime();
+		t_real s = track->GetTotalDistance(false);
+		t_real pace = (t / 60.) / (s / 1000.);
+
+		// ranges
+		min_epoch = std::min(min_epoch, epoch);
+		max_epoch = std::max(max_epoch, epoch);
 
 		min_pace = std::min(min_pace, pace);
 		max_pace = std::max(max_pace, pace);
 
-		speeds.push_back(speed);
+		epochs.push_back(epoch);
 		paces.push_back(pace);
 	}
 
+	// create graph
 	QCPGraph *graph = new QCPGraph(m_plot->xAxis, m_plot->yAxis);
-	graph->setData(speeds, paces, true);
-	graph->setLineStyle(QCPGraph::lsLine);
+
 	QPen pen = graph->pen();
 	pen.setWidthF(2.);
 	pen.setColor(QColor{0x00, 0x00, 0xff, 0xff});
+
+	QBrush brush = graph->brush();
+	brush.setStyle(Qt::SolidPattern);
+	brush.setColor(QColor{0x00, 0x00, 0xff, 0x99});
+
+	graph->setData(epochs, paces, true);
+	graph->setLineStyle(QCPGraph::lsLine);
+	graph->setScatterStyle(QCPScatterStyle{QCPScatterStyle::ssCircle, pen, brush, 6.});
 	graph->setPen(pen);
+	//graph->setBrush(brush);
 
 	m_plot->xAxis->setRange(
-		min_speed - (max_speed - min_speed) / 20.,
-		max_speed + (max_speed - min_speed) / 20.);
+		min_epoch - (max_epoch - min_epoch) / 20.,
+		max_epoch + (max_epoch - min_epoch) / 20.);
 	m_plot->yAxis->setRange(
 		min_pace - (max_pace - min_pace) / 20.,
 		max_pace + (max_pace - min_pace) / 20.);
@@ -166,33 +174,39 @@ void Conversions::PlotSpeeds()
 }
 
 
-void Conversions::PlotMouseMove(QMouseEvent *evt)
+void Statistics::PlotMouseMove(QMouseEvent *evt)
 {
 	if(!m_plot)
 		return;
 
-	t_real speed = m_plot->xAxis->pixelToCoord(evt->x());
-	t_real pace = speed_to_pace<t_real>(speed);
+	t_real epoch = m_plot->xAxis->pixelToCoord(evt->x());
+	t_real pace = m_plot->yAxis->pixelToCoord(evt->y());
+
+	// get date string
+	auto tp = t_track::t_timept{static_cast<typename t_track::t_time_ty>(
+		epoch * 1000.) * std::chrono::milliseconds{1}};
+	std::string date = from_timepoint<typename t_track::t_clk, typename t_track::t_timept>(
+		tp, true, false);
 
 	std::ostringstream ostr;
 	ostr.precision(g_prec_gui);
-	ostr << speed << " km/h \xe2\x89\x98 " << pace << " min/km.";
+	ostr << "Date: " << date << ", Pace: " << pace << " min/km.";
 	m_status->setText(ostr.str().c_str());
 }
 
 
-void Conversions::accept()
+void Statistics::accept()
 {
 	// save settings
 	QSettings settings{this};
 	QByteArray geo{this->saveGeometry()};
-	settings.setValue("dlg_conversions/wnd_geo", geo);
+	settings.setValue("dlg_statistics/wnd_geo", geo);
 
 	QDialog::accept();
 }
 
 
-void Conversions::reject()
+void Statistics::reject()
 {
 	QDialog::reject();
 }

@@ -78,6 +78,7 @@ void TrackInfos::ShowTrack(const t_track& track)
 	curve->setLineStyle(QCPCurve::lsLine);
 	QPen pen = curve->pen();
 	pen.setWidthF(2.);
+	pen.setColor(QColor{0x00, 0x00, 0xff, 0xff});
 	curve->setPen(pen);
 
 	m_plot->xAxis->setRange(
