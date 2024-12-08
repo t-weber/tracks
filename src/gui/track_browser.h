@@ -12,6 +12,7 @@
 #include <QtWidgets/QListWidget>
 
 #include <memory>
+#include <optional>
 
 #include "globals.h"
 
@@ -25,9 +26,18 @@ public:
 	TrackBrowser(QWidget *parent = nullptr);
 	virtual ~TrackBrowser();
 
-	void AddTrack(const std::string& ident);
+	void CreateHeaders();
+	void AddTrack(const std::string& ident, t_size idx,
+		std::optional<t_real> timestamp = std::nullopt);
 	void ClearTracks();
-	int GetCurrentTrackIndex() const;
+
+	t_size GetCurrentTrackIndex() const;
+	t_size GetTrackIndex(int row) const;
+	void SetTrackIndex(int row, t_size idx);
+
+	std::optional<t_real> GetTrackTime(int row) const;
+
+	void DeleteSelectedTracks();
 
 
 protected:
@@ -39,8 +49,9 @@ private:
 
 
 signals:
-	void NewTrackSelected(int idx);
+	void NewTrackSelected(t_size idx);
 	void TrackNameChanged(t_size idx, const std::string& name);
+	void TrackDeleted(t_size idx);
 };
 
 

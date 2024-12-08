@@ -33,4 +33,8 @@ extern bool g_reload_last;
 extern int g_dist_func;
 
 
+// assumed time interval if non is given (for import)
+extern t_real g_assume_dt;
+
+
 #endif

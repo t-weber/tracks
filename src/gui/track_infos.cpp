@@ -98,6 +98,8 @@ void TrackInfos::Clear()
 
 	m_plot->clearPlottables();
 	m_plot->replot();
+
+	m_infos->clear();
 }
 
 

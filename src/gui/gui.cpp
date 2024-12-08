@@ -85,6 +85,8 @@ void TracksWnd::SetupGUI()
 		this, &TracksWnd::NewTrackSelected);
 	connect(m_tracks->GetWidget(), &TrackBrowser::TrackNameChanged,
 		this, &TracksWnd::TrackNameChanged);
+	connect(m_tracks->GetWidget(), &TrackBrowser::TrackDeleted,
+		this, &TracksWnd::TrackDeleted);
 	connect(m_track->GetWidget(), &TrackInfos::PlotCoordsChanged,
 		this, &TracksWnd::PlotCoordsChanged);
 
@@ -274,9 +276,22 @@ void TracksWnd::SetupGUI()
 	connect(actionRecalc, &QAction::triggered, [this]()
 	{
 		m_trackdb.Calculate();
+		if(m_statistics)
+			m_statistics->PlotSpeeds();
+
+		// refresh selected track
 		if(m_tracks)
 			NewTrackSelected(m_tracks->GetWidget()->GetCurrentTrackIndex());
+
 		SetStatusMessage("Recalculated all values.");
+	});
+
+	QIcon iconResort = QIcon::fromTheme("view-sort-descending");
+	QAction *actionResort = new QAction{iconResort, "Sort List", this};
+	connect(actionResort, &QAction::triggered, [this]()
+	{
+		PopulateTrackList(true);
+		SetStatusMessage("Resorted all values.");
 	});
 
 	QIcon iconConversions = QIcon::fromTheme("accessories-calculator");
@@ -288,6 +303,7 @@ void TracksWnd::SetupGUI()
 	connect(actionStatistics, &QAction::triggered, this, &TracksWnd::ShowStatistics);
 
 	menuTools->addAction(actionRecalc);
+	menuTools->addAction(actionResort);
 	menuTools->addSeparator();
 	menuTools->addAction(actionConversions);
 	menuTools->addAction(actionStatistics);
@@ -422,6 +438,31 @@ void TracksWnd::Clear()
 }
 
 
+/**
+ * sorts the tracks and repopulates the list
+ */
+void TracksWnd::PopulateTrackList(bool resort)
+{
+	m_tracks->GetWidget()->ClearTracks();
+
+	if(resort)
+		m_trackdb.SortTracks();
+
+	for(t_size trackidx = 0; trackidx < m_trackdb.GetTrackCount(); ++trackidx)
+	{
+		const t_track *track = m_trackdb.GetTrack(trackidx);
+		if(!track)
+			continue;
+
+		t_real epoch = std::chrono::duration_cast<typename t_track::t_sec>(
+			track->GetStartTime()->time_since_epoch()).count();
+		m_tracks->GetWidget()->AddTrack(track->GetFileName(), trackidx, epoch);
+	}
+
+	m_tracks->GetWidget()->CreateHeaders();
+}
+
+
 t_track* TracksWnd::GetTrack(t_size idx)
 {
 	t_track *track = m_trackdb.GetTrack(t_size(idx));
@@ -437,12 +478,12 @@ t_track* TracksWnd::GetTrack(t_size idx)
 }
 
 
-void TracksWnd::NewTrackSelected(int idx)
+void TracksWnd::NewTrackSelected(t_size idx)
 {
 	if(!m_track)
 		return;
 
-	if(idx < 0)
+	if(idx >= m_trackdb.GetTrackCount())
 	{
 		// no track selected
 		m_track->GetWidget()->Clear();
@@ -461,6 +502,15 @@ void TracksWnd::TrackNameChanged(t_size idx, const std::string& name)
 		track->SetFileName(name);
 		SetWindowModified(true);
 	}
+}
+
+
+void TracksWnd::TrackDeleted(t_size idx)
+{
+	if(!m_track || idx >= m_trackdb.GetTrackCount())
+		return;
+
+	m_trackdb.DeleteTrack(idx);
 }
 
 
@@ -536,8 +586,7 @@ bool TracksWnd::FileLoadRecent(const QString& filename)
 	if(!AskUnsaved())
 		return false;
 
-	this->Clear();
-
+	Clear();
 	if(!LoadFile(filename))
 	{
 		QMessageBox::critical(this, "Error",
@@ -672,11 +721,7 @@ bool TracksWnd::LoadFile(const QString& filename)
 		return false;
 	}
 
-	for(t_size trackidx = 0; trackidx < m_trackdb.GetTrackCount(); ++trackidx)
-	{
-		const t_track *track = m_trackdb.GetTrack(trackidx);
-		m_tracks->GetWidget()->AddTrack(track->GetFileName());
-	}
+	PopulateTrackList(false);
 
 	SetStatusMessage(QString("Loaded %1 tracks from file \"%2\".")
 		.arg(m_trackdb.GetTrackCount()).arg(filename));
@@ -694,13 +739,15 @@ bool TracksWnd::ImportFiles(const QStringList& filenames)
 		t_track track{};
 		track.SetDistanceFunction(g_dist_func);
 
-		if(!track.Import(filename.toStdString()))
+		if(!track.Import(filename.toStdString(), g_assume_dt))
 		{
 			SetStatusMessage(QString("Error importing file \"%1\".").arg(filename));
 			return false;
 		}
 
-		m_tracks->GetWidget()->AddTrack(track.GetFileName());
+		t_real epoch = std::chrono::duration_cast<typename t_track::t_sec>(
+			track.GetStartTime()->time_since_epoch()).count();
+		m_tracks->GetWidget()->AddTrack(track.GetFileName(), m_trackdb.GetTrackCount(), epoch);
 		m_trackdb.EmplaceTrack(std::move(track));
 	}
 
@@ -730,6 +777,9 @@ void TracksWnd::ShowSettings(bool only_create)
 			{ "Haversine Formula", "Thomas Formula", "Vincenty Formula" },
 			g_dist_func);
 		m_settings->AddLine();
+		m_settings->AddDoubleSpinbox("settings/assume_dt",
+			"Assumed time interval:", g_assume_dt, 0., 99., 1., 1);
+		m_settings->AddLine();
 		m_settings->AddCheckbox("settings/load_last_file",
 			"Reload last file on startup", g_reload_last);
 		m_settings->FinishSetup();
@@ -754,6 +804,8 @@ void TracksWnd::ApplySettings()
 		value<decltype(g_eps)>();
 	g_dist_func = m_settings->GetValue("settings/distance_function").
 		value<decltype(g_dist_func)>();
+	g_assume_dt = m_settings->GetValue("settings/assume_dt").
+		value<decltype(g_assume_dt)>();
 	g_reload_last = m_settings->GetValue("settings/load_last_file").
 		value<decltype(g_reload_last)>();
 
@@ -796,8 +848,8 @@ void TracksWnd::ShowAbout()
 {
 	if(!m_about)
 	{
-		QIcon icon = windowIcon();
-		m_about = std::make_shared<About>(this, &icon);
+		//QIcon icon = windowIcon();
+		m_about = std::make_shared<About>(this/*, &icon*/);
 	}
 
 	show_dialog(m_about.get());
@@ -983,8 +1035,8 @@ void TracksWnd::dropEvent(QDropEvent *evt)
 	{
 		if(!AskUnsaved())
 			return;
-		Clear();
 
+		Clear();
 		if(!LoadFile(filename))
 		{
 			QMessageBox::critical(this, "Error",

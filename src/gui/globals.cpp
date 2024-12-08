@@ -24,3 +24,7 @@ bool g_reload_last = true;
 
 // distance calculation function index
 int g_dist_func = 0;
+
+
+// assumed time interval if non is given (for import)
+t_real g_assume_dt = 2.;

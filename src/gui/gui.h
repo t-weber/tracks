@@ -157,10 +157,12 @@ private:
 protected slots:
 	void ApplySettings();
 
-	void NewTrackSelected(int idx);
+	void NewTrackSelected(t_size idx);
 	void TrackNameChanged(t_size idx, const std::string& name);
+	void TrackDeleted(t_size idx);
 
 	void PlotCoordsChanged(t_real, t_real);
+	void PopulateTrackList(bool resort = true);
 };
 
 

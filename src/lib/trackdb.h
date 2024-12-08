@@ -9,6 +9,7 @@
 #define __TRACK_DBFILE_H__
 
 #include "track.h"
+#include <algorithm>
 
 
 #define TRACKDB_MAGIC "TRACKDB"
@@ -74,6 +75,34 @@ public:
 	void ClearTracks()
 	{
 		m_tracks.clear();
+	}
+
+
+	void DeleteTrack(t_size idx)
+	{
+		if(idx >= GetTrackCount())
+			return;
+
+		m_tracks.erase(m_tracks.begin() + idx);
+	}
+
+
+	/**
+	 * sort tracks by time stamp
+	 */
+	void SortTracks()
+	{
+		std::stable_sort(m_tracks.begin(), m_tracks.end(),
+			[](const t_track& track1, const t_track& track2) -> bool
+		{
+			auto t1 = track1.GetStartTime();
+			auto t2 = track2.GetStartTime();
+
+			if(!t1 || !t2)
+				return false;
+
+			return *t1 >= *t2;
+		});
 	}
 
 
@@ -162,6 +191,7 @@ public:
 			m_tracks.emplace_back(std::move(track));
 		}
 
+		SortTracks();
 		return true;
 	}
 
