@@ -98,6 +98,30 @@ std::string from_timepoint(const t_timept& time_pt,
 
 
 /**
+ * rounds a time point to months
+ */
+template<class t_clk, class t_timept = typename t_clk::time_point>
+t_timept round_timepoint(const t_timept& time_pt)
+{
+	// convert time point to std::tm
+	std::tm t{};
+	std::time_t tt = t_clk::to_time_t(time_pt);
+	boost::date_time::c_time::localtime(&tt, &t);
+
+	// round
+	t.tm_mday = 1;
+	t.tm_hour = 0;
+	t.tm_min = 0;
+	t.tm_sec = 0;
+
+	// convert std::tm to time point
+	// mktime converts from local time, timegm from UTC
+	return t_clk::from_time_t(/*std::mktime*/timegm(&t));
+}
+
+
+
+/**
  * converts a time point to a local time string
  */
 template<class t_clk, class t_timept = typename t_clk::time_point, class t_epoch = double>

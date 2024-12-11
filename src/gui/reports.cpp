@@ -29,7 +29,7 @@ Reports::Reports(QWidget* parent)
 	m_plot = std::make_shared<QCustomPlot>(this);
 	m_plot->setSelectionRectMode(QCP::srmZoom);
 	m_plot->setInteraction(QCP::Interaction(int(QCP::iRangeZoom) | int(QCP::iRangeDrag)));
-	m_plot->xAxis->setLabel("Date");
+	m_plot->xAxis->setLabel("Month");
 	m_plot->yAxis->setLabel("Distance (km)");
 	m_plot->legend->setVisible(false);
 	auto *ticker = new QCPAxisTickerDateTime{};
@@ -38,6 +38,20 @@ Reports::Reports(QWidget* parent)
 	m_plot->xAxis->setTicker(QSharedPointer<QCPAxisTicker>{ticker});
 
 	connect(m_plot.get(), &QCustomPlot::mouseMove, this, &Reports::PlotMouseMove);
+
+	// "all tracks" checkbox
+	m_all_tracks = std::make_shared<QCheckBox>(this);
+	m_all_tracks->setText("Per Track");
+	m_all_tracks->setToolTip("Show the distances from all tracks individually.");
+	m_all_tracks->setChecked(false);
+	connect(m_all_tracks.get(), &QCheckBox::toggled, this, &Reports::PlotDistances);
+
+	// distance sum checkbox
+	m_cumulative = std::make_shared<QCheckBox>(this);
+	m_cumulative->setText("Sum");
+	m_cumulative->setToolTip("Show the sum of the distances.");
+	m_cumulative->setChecked(false);
+	connect(m_cumulative.get(), &QCheckBox::toggled, this, &Reports::PlotDistances);
 
 	// plot reset button
 	QPushButton *btn_replot = new QPushButton(this);
@@ -81,6 +95,8 @@ Reports::Reports(QWidget* parent)
 	mainlayout->setVerticalSpacing(4);
 	mainlayout->setHorizontalSpacing(4);
 	mainlayout->addWidget(m_plot.get(), 0, 0, 1, 3);
+	mainlayout->addWidget(m_all_tracks.get(), 1, 0, 1, 1);
+	mainlayout->addWidget(m_cumulative.get(), 1, 1, 1, 1);
 	mainlayout->addWidget(btn_replot, 1, 2, 1, 1);
 	mainlayout->addWidget(panel, 2, 0, 1, 3);
 
@@ -96,6 +112,11 @@ Reports::Reports(QWidget* parent)
 	{
 		this->resize(512, 512);
 	}
+
+	if(settings.contains("dlg_reports/all_tracks"))
+		m_all_tracks->setChecked(settings.value("dlg_reports/all_tracks").toBool());
+	if(settings.contains("dlg_reports/sum_distances"))
+		m_cumulative->setChecked(settings.value("dlg_reports/sum_distances").toBool());
 }
 
 
@@ -132,41 +153,82 @@ void Reports::PlotDistances()
 
 	m_plot->clearPlottables();
 
-	const t_size num_tracks = m_trackdb->GetTrackCount();
-
-	m_min_epoch = std::numeric_limits<t_real>::max(), m_max_epoch = -m_min_epoch;
-	m_min_dist = std::numeric_limits<t_real>::max(), m_max_dist = -m_min_dist;
+	m_min_epoch = std::numeric_limits<t_real>::max();
+	m_max_epoch = -m_min_epoch;
+	m_min_dist = std::numeric_limits<t_real>::max();
+	m_max_dist = -m_min_dist;
 
 	QVector<t_real> epochs, dists;
-	epochs.reserve(num_tracks);
-	dists.reserve(num_tracks);
+	t_real total_dist = 0.;
 
-	for(std::size_t track_idx = 0; track_idx < num_tracks; ++track_idx)
+	bool cumulative = m_cumulative && m_cumulative->isChecked();
+
+	if(m_all_tracks && m_all_tracks->isChecked())
 	{
-		const t_track *track = m_trackdb->GetTrack(track_idx);
-		if(!track)
-			continue;
+		const t_size num_tracks = m_trackdb->GetTrackCount();
+		epochs.reserve(num_tracks);
+		dists.reserve(num_tracks);
 
-		// get track time
-		auto tp = track->GetStartTime();
-		if(!tp)
-			continue;
+		for(std::size_t track_idx = 0; track_idx < num_tracks; ++track_idx)
+		{
+			// tracks are in reverse order
+			const t_track *track = m_trackdb->GetTrack(num_tracks - track_idx - 1);
+			if(!track)
+				continue;
 
-		t_real epoch = std::chrono::duration_cast<typename t_track::t_sec>(
-			tp->time_since_epoch()).count();
+			// get track time
+			auto tp = track->GetStartTime();
+			if(!tp)
+				continue;
 
-		// get track distance
-		t_real dist = track->GetTotalDistance(false);
+			t_real epoch = std::chrono::duration_cast<typename t_track::t_sec>(
+				tp->time_since_epoch()).count();
 
-		epochs.push_back(epoch);
-		dists.push_back(dist);
+			// get track distance
+			t_real dist = track->GetTotalDistance(false) / 1000.;
+			total_dist += dist;
 
-		// ranges
-		m_min_epoch = std::min(m_min_epoch, epoch);
-		m_max_epoch = std::max(m_max_epoch, epoch);
+			epochs.push_back(epoch);
+			dists.push_back(cumulative ? total_dist : dist);
 
-		m_min_dist = std::min(m_min_dist, dist);
-		m_max_dist = std::max(m_max_dist, dist);
+			// ranges
+			m_min_epoch = std::min(m_min_epoch, epoch);
+			m_max_epoch = std::max(m_max_epoch, epoch);
+
+			m_min_dist = std::min(m_min_dist, dist);
+			m_max_dist = std::max(m_max_dist, dist);
+		}
+	}
+	else
+	{
+		auto monthly = m_trackdb->GetDistancePerMonth();
+		const t_size num_tracks = monthly.size();
+		epochs.reserve(num_tracks);
+		dists.reserve(num_tracks);
+
+		for(const auto& pair : monthly)
+		{
+			t_real epoch = std::chrono::duration_cast<typename t_track::t_sec>(
+				pair.first.time_since_epoch()).count();
+			t_real dist = pair.second / 1000.;
+			total_dist += dist;
+
+			epochs.push_back(epoch);
+			dists.push_back(cumulative ? total_dist : dist);
+
+			// ranges
+			m_min_epoch = std::min(m_min_epoch, epoch);
+			m_max_epoch = std::max(m_max_epoch, epoch);
+
+			m_min_dist = std::min(m_min_dist, dist);
+			m_max_dist = std::max(m_max_dist, dist);
+		}
+	}
+
+	if(cumulative)
+	{
+		m_min_dist = std::min(m_min_dist, total_dist);
+		m_max_dist = std::max(m_max_dist, total_dist);
 	}
 
 	// create graph
@@ -224,6 +286,9 @@ void Reports::accept()
 
 	QByteArray geo{this->saveGeometry()};
 	settings.setValue("dlg_reports/wnd_geo", geo);
+
+	settings.setValue("dlg_reports/all_tracks", m_all_tracks->isChecked());
+	settings.setValue("dlg_reports/sum_distances", m_cumulative->isChecked());
 
 	QDialog::accept();
 }

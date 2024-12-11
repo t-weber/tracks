@@ -28,8 +28,8 @@ TrackInfos::TrackInfos(QWidget* parent)
 	m_plot->yAxis->setLabel("Latitude (Degrees)");
 
 	m_same_range = std::make_shared<QCheckBox>(plot_panel);
-	m_same_range->setText("Equal Range");
-	m_same_range->setToolTip("Use the same angular range for longitudes and latitudes.");
+	m_same_range->setText("Keep Aspect");
+	m_same_range->setToolTip("Correct the angular range aspect ratio for longitudes and latitudes.");
 	m_same_range->setChecked(true);
 	connect(m_same_range.get(), &QAbstractButton::toggled, this, &TrackInfos::ResetPlotRange);
 
@@ -76,6 +76,9 @@ void TrackInfos::ResetPlotRange()
 	if(!m_plot || !m_same_range)
 		return;
 
+	t_real aspect = t_real(m_plot->viewport().height()) /
+		t_real(m_plot->viewport().width());
+
 	t_real min_long = m_min_long;
 	t_real max_long = m_max_long;
 	t_real min_lat = m_min_lat;
@@ -86,19 +89,19 @@ void TrackInfos::ResetPlotRange()
 
 	if(m_same_range->isChecked())
 	{
-		if(range_long > range_lat)
+		if(range_long*aspect > range_lat)
 		{
 			t_real mid_lat = min_lat + range_lat * 0.5;
 
-			range_lat = range_long;
+			range_lat = range_long * aspect;
 			min_lat = mid_lat - range_lat * 0.5;
 			max_lat = mid_lat + range_lat * 0.5;
 		}
-		else if(range_long < range_lat)
+		else if(range_long*aspect < range_lat)
 		{
 			t_real mid_long = min_long + range_long * 0.5;
 
-			range_long = range_lat;
+			range_long = range_lat / aspect;
 			min_long = mid_long - range_long * 0.5;
 			max_long = mid_long + range_long * 0.5;
 		}
@@ -188,6 +191,7 @@ void TrackInfos::SaveSettings(QSettings& settings)
 {
 	QByteArray split{m_split->saveState()};
 	settings.setValue("track_info_split", split);
+	settings.setValue("track_info_keep_aspect", m_same_range->isChecked());
 }
 
 
@@ -196,4 +200,7 @@ void TrackInfos::RestoreSettings(QSettings& settings)
 	QByteArray split = settings.value("track_info_split").toByteArray();
 	if(split.size())
 		m_split->restoreState(split);
+
+	if(settings.contains("track_info_keep_aspect"))
+		m_same_range->setChecked(settings.value("track_info_keep_aspect").toBool());
 }

@@ -9,7 +9,9 @@
 #define __TRACK_DBFILE_H__
 
 #include "track.h"
+
 #include <algorithm>
+#include <map>
 
 
 #define TRACKDB_MAGIC "TRACKDB"
@@ -205,6 +207,9 @@ public:
 	}
 
 
+	/**
+	 * total distance of all tracks
+	 */
 	t_real GetTotalDistance(bool planar = false) const
 	{
 		t_real dist{};
@@ -213,6 +218,31 @@ public:
 			dist += track.GetTotalDistance(planar);
 
 		return dist;
+	}
+
+
+	/**
+	 * distance of all tracks sorted by months
+	 */
+	std::map<t_timept, t_real> GetDistancePerMonth(bool planar = false) const
+	{
+		std::map<t_timept, t_real> map;
+
+		for(const t_track& track : m_tracks)
+		{
+			std::optional<t_timept> tp = track.GetStartTime();
+			if(!tp)
+				continue;
+			t_timept tp_rd = round_timepoint<t_clk, t_timept>(*tp);
+
+			t_real dist = track.GetTotalDistance(planar);
+			if(auto iter = map.find(tp_rd); iter != map.end())
+				iter->second += dist;
+			else
+				map.insert(std::make_pair(tp_rd, dist));
+		}
+
+		return map;
 	}
 
 

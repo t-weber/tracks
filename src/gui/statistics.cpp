@@ -42,6 +42,7 @@ Statistics::Statistics(QWidget* parent)
 	// speed/pace checkbox
 	m_speed_check = std::make_shared<QCheckBox>(this);
 	m_speed_check->setText("Plot speeds instead.");
+	m_speed_check->setToolTip("Show speeds instead of paces.");
 	m_speed_check->setChecked(false);
 	connect(m_speed_check.get(), &QCheckBox::toggled, this, &Statistics::PlotSpeeds);
 
@@ -185,7 +186,7 @@ void Statistics::PlotSpeeds()
 		return;
 
 	const t_size num_tracks = m_trackdb->GetTrackCount();
-	const bool plot_speed = m_speed_check->isChecked();
+	const bool plot_speed = m_speed_check && m_speed_check->isChecked();
 
 	m_plot->clearPlottables();
 	if(plot_speed)

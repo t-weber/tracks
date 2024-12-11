@@ -53,6 +53,7 @@ protected:
 
 private:
 	std::shared_ptr<QCustomPlot> m_plot{};
+	std::shared_ptr<QCheckBox> m_all_tracks{}, m_cumulative{};
 	std::shared_ptr<QLabel> m_status{};
 	std::shared_ptr<QDialogButtonBox> m_buttonbox{};
 

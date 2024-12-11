@@ -150,6 +150,7 @@ void TracksWnd::SetupGUI()
 	// ------------------------------------------------------------------------
 	// file tool bar
 	QToolBar *toolbarFile = new QToolBar{"File", this};
+
 	toolbarFile->setObjectName("FileToolbar");
 	toolbarFile->addAction(actionNew);
 	toolbarFile->addAction(actionLoad);
@@ -158,6 +159,75 @@ void TracksWnd::SetupGUI()
 	toolbarFile->addAction(actionImport);
 
 	addToolBar(toolbarFile);
+	// ------------------------------------------------------------------------
+
+
+	// ------------------------------------------------------------------------
+	// tracks menu
+	QMenu *menuTracks = new QMenu{"Tracks", this};
+
+	QIcon iconRecalc = QIcon::fromTheme("view-refresh");
+	QAction *actionRecalc = new QAction{iconRecalc, "Recalculate", this};
+	connect(actionRecalc, &QAction::triggered, [this]()
+	{
+		m_trackdb.Calculate();
+		if(m_statistics)
+			m_statistics->PlotSpeeds();
+		if(m_reports)
+			m_reports->PlotDistances();
+
+		// refresh selected track
+		if(m_tracks)
+			NewTrackSelected(m_tracks->GetWidget()->GetCurrentTrackIndex());
+
+		SetStatusMessage("Recalculated all values.");
+	});
+
+	QIcon iconResort = QIcon::fromTheme("view-sort-descending");
+	QAction *actionResort = new QAction{iconResort, "Sort List", this};
+	connect(actionResort, &QAction::triggered, [this]()
+	{
+		PopulateTrackList(true);
+		SetStatusMessage("Resorted all values.");
+	});
+
+	QIcon iconStatistics = QIcon::fromTheme("applications-science");
+	QAction *actionStatistics = new QAction{iconStatistics, "Pace Statistics...", this};
+	connect(actionStatistics, &QAction::triggered, this, &TracksWnd::ShowStatistics);
+
+	QIcon iconReports = QIcon::fromTheme("applications-graphics");
+	QAction *actionReports = new QAction{iconReports, "Distance Reports...", this};
+	connect(actionReports, &QAction::triggered, this, &TracksWnd::ShowReports);
+
+	menuTracks->addAction(actionRecalc);
+	menuTracks->addAction(actionResort);
+	menuTracks->addSeparator();
+	menuTracks->addAction(actionStatistics);
+	menuTracks->addAction(actionReports);
+	// ------------------------------------------------------------------------
+
+
+	// ------------------------------------------------------------------------
+	// tracks tool bar
+	QToolBar *toolbarTracks = new QToolBar{"Tracks", this};
+
+	toolbarTracks->setObjectName("TracksToolbar");
+	toolbarTracks->addAction(actionStatistics);
+	toolbarTracks->addAction(actionReports);
+
+	addToolBar(toolbarTracks);
+	// ------------------------------------------------------------------------
+
+
+	// ------------------------------------------------------------------------
+	// tools menu
+	QMenu *menuTools = new QMenu{"Tools", this};
+
+	QIcon iconConversions = QIcon::fromTheme("accessories-calculator");
+	QAction *actionConversions = new QAction{iconConversions, "Speed Conversions...", this};
+	connect(actionConversions, &QAction::triggered, this, &TracksWnd::ShowConversions);
+
+	menuTools->addAction(actionConversions);
 	// ------------------------------------------------------------------------
 
 
@@ -253,6 +323,7 @@ void TracksWnd::SetupGUI()
 	QMenu *menuToolbars = new QMenu{"Toolbars && Panels", this};
 	menuToolbars->setIcon(iconToolbars);
 	menuToolbars->addAction(toolbarFile->toggleViewAction());
+	menuToolbars->addAction(toolbarTracks->toggleViewAction());
 	menuToolbars->addSeparator();
 	menuToolbars->addAction(m_tracks->toggleViewAction());
 	menuToolbars->addAction(m_track->toggleViewAction());
@@ -265,56 +336,6 @@ void TracksWnd::SetupGUI()
 	menuSettings->addMenu(menuGuiTheme);
 	menuSettings->addAction(actionGuiNative);
 	menuSettings->addAction(actionRestoreLayout);
-	// ------------------------------------------------------------------------
-
-
-	// ------------------------------------------------------------------------
-	// tools menu
-	QMenu *menuTools = new QMenu{"Tracks", this};
-
-	QIcon iconRecalc = QIcon::fromTheme("view-refresh");
-	QAction *actionRecalc = new QAction{iconRecalc, "Recalculate", this};
-	connect(actionRecalc, &QAction::triggered, [this]()
-	{
-		m_trackdb.Calculate();
-		if(m_statistics)
-			m_statistics->PlotSpeeds();
-		if(m_reports)
-			m_reports->PlotDistances();
-
-		// refresh selected track
-		if(m_tracks)
-			NewTrackSelected(m_tracks->GetWidget()->GetCurrentTrackIndex());
-
-		SetStatusMessage("Recalculated all values.");
-	});
-
-	QIcon iconResort = QIcon::fromTheme("view-sort-descending");
-	QAction *actionResort = new QAction{iconResort, "Sort List", this};
-	connect(actionResort, &QAction::triggered, [this]()
-	{
-		PopulateTrackList(true);
-		SetStatusMessage("Resorted all values.");
-	});
-
-	QIcon iconConversions = QIcon::fromTheme("accessories-calculator");
-	QAction *actionConversions = new QAction{iconConversions, "Speed Conversions...", this};
-	connect(actionConversions, &QAction::triggered, this, &TracksWnd::ShowConversions);
-
-	QIcon iconStatistics = QIcon::fromTheme("applications-graphics");
-	QAction *actionStatistics = new QAction{iconStatistics, "Pace Statistics...", this};
-	connect(actionStatistics, &QAction::triggered, this, &TracksWnd::ShowStatistics);
-
-	QIcon iconReports = QIcon::fromTheme("applications-graphics");
-	QAction *actionReports = new QAction{iconReports, "Distance Reports...", this};
-	connect(actionReports, &QAction::triggered, this, &TracksWnd::ShowReports);
-
-	menuTools->addAction(actionRecalc);
-	menuTools->addAction(actionResort);
-	menuTools->addSeparator();
-	menuTools->addAction(actionConversions);
-	menuTools->addAction(actionStatistics);
-	menuTools->addAction(actionReports);
 	// ------------------------------------------------------------------------
 
 
@@ -348,6 +369,7 @@ void TracksWnd::SetupGUI()
 	// menu bar
 	QMenuBar *menuBar = new QMenuBar{this};
 	menuBar->addMenu(menuFile);
+	menuBar->addMenu(menuTracks);
 	menuBar->addMenu(menuTools);
 	menuBar->addMenu(menuSettings);
 	menuBar->addMenu(menuHelp);
