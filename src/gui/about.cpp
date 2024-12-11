@@ -43,7 +43,7 @@ static std::string get_compiler_url(
 }
 
 
-About::About(QWidget *parent, const QIcon* progIcon)
+About::About(QWidget *parent, const QIcon *progIcon)
 	: QDialog(parent)
 {
 	namespace alg = boost::algorithm;
@@ -129,7 +129,7 @@ About::About(QWidget *parent, const QIcon* progIcon)
 /**
  * adds the program title to the end of the grid layout
  */
-void About::AddTitle(const char *title, const QIcon* icon)
+void About::AddTitle(const char *title, const QIcon *icon)
 {
 	QLabel *label = new QLabel(title, this);
 	label->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
@@ -146,7 +146,7 @@ void About::AddTitle(const char *title, const QIcon* icon)
 	label->setFont(font);
 
 	// add an icon and a title
-	if(icon)
+	if(icon && !icon->isNull())
 	{
 		QWidget *titleWidget = new QWidget(this);
 

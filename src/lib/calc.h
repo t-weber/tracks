@@ -132,6 +132,9 @@ geo_dist_2(t_real lat1, t_real lat2,
 
 
 
+/**
+ * km/h <-> min/km
+ */
 template<typename t_real = double>
 t_real speed_to_pace(t_real speed)
 {

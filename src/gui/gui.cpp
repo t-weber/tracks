@@ -37,9 +37,7 @@
 // ----------------------------------------------------------------------------
 // main window
 // ----------------------------------------------------------------------------
-TracksWnd::TracksWnd(QWidget* pParent)
-	: QMainWindow{pParent},
-	m_statusLabel{std::make_shared<QLabel>(this)}
+TracksWnd::TracksWnd(QWidget* pParent) : QMainWindow{pParent}
 {
 	m_recent.SetOpenFile("");
 	m_recent.SetLastOpenFile("");
@@ -67,9 +65,12 @@ void TracksWnd::SetupGUI()
 		setWindowIcon(QIcon{optIconFile->string().c_str()});
 
 	QStatusBar *statusBar = new QStatusBar{this};
-	statusBar->addPermanentWidget(m_statusLabel.get(), 1);
 	statusBar->setSizeGripEnabled(true);
 	setStatusBar(statusBar);
+
+	//m_statusLabel = std::make_shared<QLabel>(this);
+	//m_statusLabel->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
+	//statusBar->addPermanentWidget(m_statusLabel.get(), 1);
 
 	m_track = std::make_shared<DockWidgetWrapper<TrackInfos>>(this);
 	m_track->setWindowTitle("Track Infos");
@@ -249,7 +250,7 @@ void TracksWnd::SetupGUI()
 
 	// toolbar submenu
 	QIcon iconToolbars = QIcon::fromTheme("applications-system");
-	QMenu *menuToolbars = new QMenu{"Toolbars", this};
+	QMenu *menuToolbars = new QMenu{"Toolbars && Panels", this};
 	menuToolbars->setIcon(iconToolbars);
 	menuToolbars->addAction(toolbarFile->toggleViewAction());
 	menuToolbars->addSeparator();
@@ -269,7 +270,7 @@ void TracksWnd::SetupGUI()
 
 	// ------------------------------------------------------------------------
 	// tools menu
-	QMenu *menuTools = new QMenu{"Tools", this};
+	QMenu *menuTools = new QMenu{"Tracks", this};
 
 	QIcon iconRecalc = QIcon::fromTheme("view-refresh");
 	QAction *actionRecalc = new QAction{iconRecalc, "Recalculate", this};
@@ -278,6 +279,8 @@ void TracksWnd::SetupGUI()
 		m_trackdb.Calculate();
 		if(m_statistics)
 			m_statistics->PlotSpeeds();
+		if(m_reports)
+			m_reports->PlotDistances();
 
 		// refresh selected track
 		if(m_tracks)
@@ -302,11 +305,16 @@ void TracksWnd::SetupGUI()
 	QAction *actionStatistics = new QAction{iconStatistics, "Pace Statistics...", this};
 	connect(actionStatistics, &QAction::triggered, this, &TracksWnd::ShowStatistics);
 
+	QIcon iconReports = QIcon::fromTheme("applications-graphics");
+	QAction *actionReports = new QAction{iconReports, "Distance Reports...", this};
+	connect(actionReports, &QAction::triggered, this, &TracksWnd::ShowReports);
+
 	menuTools->addAction(actionRecalc);
 	menuTools->addAction(actionResort);
 	menuTools->addSeparator();
 	menuTools->addAction(actionConversions);
 	menuTools->addAction(actionStatistics);
+	menuTools->addAction(actionReports);
 	// ------------------------------------------------------------------------
 
 
@@ -423,9 +431,17 @@ void TracksWnd::SaveSettings()
 }
 
 
-void TracksWnd::SetStatusMessage(const QString& msg) const
+void TracksWnd::SetStatusMessage(const QString& msg, int display_ms) const
 {
-	const_cast<TracksWnd*>(this)->m_statusLabel->setText(msg);
+	QStatusBar *status = statusBar();
+	if(!status)
+		return;
+	status->showMessage(msg, display_ms);
+
+	// permanent message
+	//if(!m_statusLabel)
+	//	return;
+	//const_cast<TracksWnd*>(this)->m_statusLabel->setText(msg);
 }
 
 
@@ -723,8 +739,10 @@ bool TracksWnd::LoadFile(const QString& filename)
 
 	PopulateTrackList(false);
 
-	SetStatusMessage(QString("Loaded %1 tracks from file \"%2\".")
-		.arg(m_trackdb.GetTrackCount()).arg(filename));
+	SetStatusMessage(QString("Loaded %1 tracks from file \"%2\". Total distance: %3 km.")
+		.arg(m_trackdb.GetTrackCount())
+		.arg(filename)
+		.arg(m_trackdb.GetTotalDistance(false) / 1000.));
 	return true;
 }
 
@@ -842,14 +860,29 @@ void TracksWnd::ShowStatistics()
 
 
 /**
+ * show speed statistics dialog
+ */
+void TracksWnd::ShowReports()
+{
+	if(!m_reports)
+	{
+		m_reports = std::make_shared<Reports>(this);
+		m_reports->SetTrackDB(&m_trackdb);
+	}
+
+	show_dialog(m_reports.get());
+}
+
+
+/**
  * show about dialog
  */
 void TracksWnd::ShowAbout()
 {
 	if(!m_about)
 	{
-		//QIcon icon = windowIcon();
-		m_about = std::make_shared<About>(this/*, &icon*/);
+		QIcon icon = windowIcon();
+		m_about = std::make_shared<About>(this, &icon);
 	}
 
 	show_dialog(m_about.get());

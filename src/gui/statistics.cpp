@@ -12,6 +12,7 @@
 #include <QtCore/QSettings>
 #include <QtCore/QByteArray>
 #include <QtWidgets/QGridLayout>
+#include <QtWidgets/QPushButton>
 
 #include <sstream>
 #include <limits>
@@ -37,6 +38,17 @@ Statistics::Statistics(QWidget* parent)
 	m_plot->xAxis->setTicker(QSharedPointer<QCPAxisTicker>{ticker});
 
 	connect(m_plot.get(), &QCustomPlot::mouseMove, this, &Statistics::PlotMouseMove);
+
+	// speed/pace checkbox
+	m_speed_check = std::make_shared<QCheckBox>(this);
+	m_speed_check->setText("Plot speeds instead.");
+	m_speed_check->setChecked(false);
+	connect(m_speed_check.get(), &QCheckBox::toggled, this, &Statistics::PlotSpeeds);
+
+	// plot reset button
+	QPushButton *btn_replot = new QPushButton(this);
+	btn_replot->setText("Reset Plot");
+	connect(btn_replot, &QAbstractButton::clicked, this, &Statistics::ResetSpeedPlotRange);
 
 	// track length check boxes
 	for(t_size idx = 0; idx < s_num_lengths; ++idx)
@@ -90,6 +102,12 @@ Statistics::Statistics(QWidget* parent)
 	panellayout->addWidget(m_status.get(), 0, 0, 1, 3);
 	panellayout->addWidget(m_buttonbox.get(), 0, 3, 1, 1);
 
+	// horizontal lines
+	QFrame *frame1 = new QFrame(this);
+	frame1->setFrameStyle(QFrame::HLine);
+	QFrame *frame2 = new QFrame(this);
+	frame2->setFrameStyle(QFrame::HLine);
+
 	// main grid
 	int num_cols = 3;
 	QGridLayout *mainlayout = new QGridLayout(this);
@@ -97,12 +115,17 @@ Statistics::Statistics(QWidget* parent)
 	mainlayout->setVerticalSpacing(4);
 	mainlayout->setHorizontalSpacing(4);
 	mainlayout->addWidget(m_plot.get(), 0, 0, 1, num_cols);
+	mainlayout->addWidget(m_speed_check.get(), 1, 0, 1, 2);
+	mainlayout->addWidget(btn_replot, 1, 2, 1, 1);
+	mainlayout->addWidget(frame1, 2, 0, 1, num_cols);
+
 	for(t_size idx = 0; idx < s_num_lengths; ++idx)
 	{
 		mainlayout->addWidget(m_length_checks[idx].get(),
-			1 + idx/num_cols, idx%num_cols, 1, 1);
+			3 + idx/num_cols, idx%num_cols, 1, 1);
 	}
-	mainlayout->addWidget(panel, 2 + s_num_lengths/4, 0, 1, num_cols);
+	mainlayout->addWidget(frame2, 4 + s_num_lengths/4, 0, 1, num_cols);
+	mainlayout->addWidget(panel, 5 + s_num_lengths/4, 0, 1, num_cols);
 
 	// restore settings
 	QSettings settings{this};
@@ -125,6 +148,8 @@ Statistics::Statistics(QWidget* parent)
 		m_length_checks[idx]->setChecked(settings.value(key).toBool());
 	}
 
+	if(settings.contains("dlg_statistics/speed_check"))
+		m_speed_check->setChecked(settings.value("dlg_statistics/speed_check").toBool());
 }
 
 
@@ -140,17 +165,38 @@ void Statistics::SetTrackDB(const t_tracks *trackdb)
 }
 
 
+void Statistics::ResetSpeedPlotRange()
+{
+	m_plot->xAxis->setRange(
+		m_min_epoch - (m_max_epoch - m_min_epoch) / 20.,
+		m_max_epoch + (m_max_epoch - m_min_epoch) / 20.);
+
+	m_plot->yAxis->setRange(
+		m_min_pace - (m_max_pace - m_min_pace) / 20.,
+		m_max_pace + (m_max_pace - m_min_pace) / 20.);
+
+	m_plot->replot();
+}
+
+
 void Statistics::PlotSpeeds()
 {
 	if(!m_trackdb || !m_plot)
 		return;
 
-	m_plot->clearPlottables();
-
 	const t_size num_tracks = m_trackdb->GetTrackCount();
+	const bool plot_speed = m_speed_check->isChecked();
 
-	t_real min_epoch = std::numeric_limits<t_real>::max(), max_epoch = -min_epoch;
-	t_real min_pace = std::numeric_limits<t_real>::max(), max_pace = -min_pace;
+	m_plot->clearPlottables();
+	if(plot_speed)
+		m_plot->yAxis->setLabel("Speed (km/h)");
+	else
+		m_plot->yAxis->setLabel("Pace (min/km)");
+
+	m_min_epoch = std::numeric_limits<t_real>::max();
+	m_max_epoch = -m_min_epoch;
+	m_min_pace = std::numeric_limits<t_real>::max();
+	m_max_pace = -m_min_pace;
 
 	QVector<t_real> epochs[s_num_lengths], paces[s_num_lengths];
 	for(t_size idx = 0; idx < s_num_lengths; ++idx)
@@ -176,7 +222,9 @@ void Statistics::PlotSpeeds()
 		// get track pace
 		t_real t = track->GetTotalTime();
 		t_real s = track->GetTotalDistance(false);
-		t_real pace = (t / 60.) / (s / 1000.);
+		t_real pace = plot_speed
+			? (s / 1000.) / (t / 60. / 60.)  // speed
+			: (t / 60.) / (s / 1000.);       // pace
 
 		bool is_visible = false;
 		for(t_size idx = 0; idx < s_num_lengths; ++idx)
@@ -198,11 +246,11 @@ void Statistics::PlotSpeeds()
 		if(is_visible)
 		{
 			// ranges
-			min_epoch = std::min(min_epoch, epoch);
-			max_epoch = std::max(max_epoch, epoch);
+			m_min_epoch = std::min(m_min_epoch, epoch);
+			m_max_epoch = std::max(m_max_epoch, epoch);
 
-			min_pace = std::min(min_pace, pace);
-			max_pace = std::max(max_pace, pace);
+			m_min_pace = std::min(m_min_pace, pace);
+			m_max_pace = std::max(m_max_pace, pace);
 		}
 	}
 
@@ -252,13 +300,7 @@ void Statistics::PlotSpeeds()
 		++eff_idx;
 	}
 
-	m_plot->xAxis->setRange(
-		min_epoch - (max_epoch - min_epoch) / 20.,
-		max_epoch + (max_epoch - min_epoch) / 20.);
-	m_plot->yAxis->setRange(
-		min_pace - (max_pace - min_pace) / 20.,
-		max_pace + (max_pace - min_pace) / 20.);
-	m_plot->replot();
+	ResetSpeedPlotRange();
 }
 
 
@@ -278,7 +320,7 @@ void Statistics::PlotMouseMove(QMouseEvent *evt)
 
 	std::ostringstream ostr;
 	ostr.precision(g_prec_gui);
-	ostr << "Date: " << date << ", Pace: " << pace << " min/km.";
+	ostr << "Date: " << date << ", Pace: " << get_pace_str(pace) << ".";
 	m_status->setText(ostr.str().c_str());
 }
 
@@ -296,6 +338,8 @@ void Statistics::accept()
 		settings.setValue(QString("dlg_statistics/length_check_%1").arg(idx),
 			m_length_checks[idx]->isChecked());
 	}
+
+	settings.setValue("dlg_statistics/speed_check", m_speed_check->isChecked());
 
 	QDialog::accept();
 }

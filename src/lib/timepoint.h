@@ -150,4 +150,19 @@ std::string get_time_str(t_real secs)
 }
 
 
+
+template<class t_real = double, class t_int = int>
+std::string get_pace_str(t_real min)
+{
+	t_int secs = std::round(std::fmod(min*60., 60.));
+	t_int mins = std::floor(min);
+
+	std::ostringstream ostr;
+
+	ostr << mins << ":" << std::setw(2) << std::setfill('0') << secs;
+	ostr << " min/km";
+	return ostr.str();
+}
+
+
 #endif

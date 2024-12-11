@@ -40,7 +40,7 @@ struct TrackPoint
 	t_real longitude{};
 	t_real elevation{};
 
-	std::optional<t_timept> timept{};
+	t_timept timept{};
 
 	t_real elapsed{};                // time elapsed since last point
 	t_real elapsed_total{};          // time elapsed since first point
@@ -112,7 +112,7 @@ public:
 		{
 			// elapsed seconds since last track point
 			if(time_pt_last)
-				trackpt.elapsed = t_sec{*trackpt.timept - *time_pt_last}.count();
+				trackpt.elapsed = t_sec{trackpt.timept - *time_pt_last}.count();
 
 			if(latitude_last && longitude_last && elevation_last)
 			{
@@ -220,7 +220,7 @@ public:
 					else
 					{
 						trackpt.timept = t_timept{};
-						(*trackpt.timept) +=
+						trackpt.timept +=
 							static_cast<t_time_ty>(t_real(pt_idx * 1000) * assume_dt) *
 							t_dur(std::chrono::milliseconds(1));
 					}
@@ -340,14 +340,9 @@ public:
 			ofstr.write(reinterpret_cast<const char*>(&pt.distance), sizeof(pt.distance));
 			ofstr.write(reinterpret_cast<const char*>(&pt.distance_total), sizeof(pt.distance_total));
 
-			char has_time = pt.timept ? 1 : 0;
-			ofstr.write(&has_time, sizeof(has_time));
-			if(pt.timept)
-			{
-				t_real secs = std::chrono::duration_cast<t_sec>(
-					pt.timept->time_since_epoch()).count();
-				ofstr.write(reinterpret_cast<const char*>(&secs), sizeof(secs));
-			}
+			t_real secs = std::chrono::duration_cast<t_sec>(
+				pt.timept.time_since_epoch()).count();
+			ofstr.write(reinterpret_cast<const char*>(&secs), sizeof(secs));
 		}
 
 		// write track data
@@ -398,16 +393,11 @@ public:
 			ifstr.read(reinterpret_cast<char*>(&pt.distance), sizeof(pt.distance));
 			ifstr.read(reinterpret_cast<char*>(&pt.distance_total), sizeof(pt.distance_total));
 
-			char has_time;
-			ifstr.read(&has_time, sizeof(has_time));
-			if(has_time)
-			{
-				t_real secs{};
-				ifstr.read(reinterpret_cast<char*>(&secs), sizeof(secs));
-				pt.timept = t_timept{static_cast<t_time_ty>(secs * 1000.)
-					* std::chrono::milliseconds{1}};
-				// *pt.timept += std::chrono::hours(1);
-			}
+			t_real secs{};
+			ifstr.read(reinterpret_cast<char*>(&secs), sizeof(secs));
+			pt.timept = t_timept{static_cast<t_time_ty>(secs * 1000.)
+				* std::chrono::milliseconds{1}};
+			// pt.timept += std::chrono::hours(1);
 
 			m_points.emplace_back(std::move(pt));
 		}
@@ -462,10 +452,10 @@ public:
 		}
 		ostr << "<li>Elevation range: [ " << min_elev << ", " << max_elev << " ] m"
 			<< " (height difference: " << max_elev - min_elev << " m).</li>";
-		ostr << "<li>Total distance: " << s << " m = " << s / 1000. << " km"
+		ostr << "<li>Distance: " << s / 1000. << " km"
 			<< " (planar: " << s_planar / 1000. << " km).</li>";
-		ostr << "<li>Pace: " << (t / 60.) / (s / 1000.) << " min/km"
-			<< " (planar: " << (t / 60.) / (s_planar / 1000.) << " min/km).</li>";
+		ostr << "<li>Pace: " << get_pace_str((t / 60.) / (s / 1000.))
+			<< " (planar: " << get_pace_str((t / 60.) / (s_planar / 1000.)) << ").</li>";
 		ostr << "<li>Speed: " << s / t << " m/s" << " = " << (s / 1000.) / (t / 60. / 60.) << " km/h"
 			<< " (planar: " << s_planar / t << " m/s" << " = " << (s_planar / 1000.) / (t / 60. / 60.) << " km/h).</li>";
 
@@ -506,11 +496,9 @@ public:
 				<< std::left << std::setw(field_width) << pt.elapsed_total << " "
 				<< std::left << std::setw(field_width) << pt.distance_total << " ";
 
-			if(pt.timept)
-			{
-				std::string timestr = from_timepoint<t_clk, t_timept>(*pt.timept);
-				ostr << std::left << std::setw(25) << timestr << " ";
-			}
+			// time point
+			std::string timestr = from_timepoint<t_clk, t_timept>(pt.timept);
+			ostr << std::left << std::setw(25) << timestr << " ";
 
 			ostr << "\n";
 		}
@@ -530,8 +518,8 @@ public:
 		ostr << "Total time: " << get_time_str(t) << "\n";
 		ostr << "Speed: " << s / t << " m/s" << " = " << (s / 1000.) / (t / 60. / 60.) << " km/h\n";
 		ostr << "Planar speed: " << s_planar / t << " m/s" << " = " << (s_planar / 1000.) / (t / 60. / 60.) << " km/h\n";
-		ostr << "Pace: " << (t / 60.) / (s / 1000.) << " min/km\n";
-		ostr << "Planar pace: " << (t / 60.) / (s_planar / 1000.) << " min/km\n";
+		ostr << "Pace: " << get_pace_str((t / 60.) / (s / 1000.)) << "\n";
+		ostr << "Planar pace: " << get_pace_str((t / 60.) / (s_planar / 1000.)) << "\n";
 
 		return ostr;
 	}

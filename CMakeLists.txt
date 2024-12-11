@@ -73,6 +73,7 @@ add_executable(tracks
 	src/gui/track_infos.cpp src/gui/track_infos.h
 	src/gui/conversions.cpp src/gui/conversions.h
 	src/gui/statistics.cpp src/gui/statistics.h
+	src/gui/reports.cpp src/gui/reports.h
 
 	src/common/types.h
 

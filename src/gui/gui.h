@@ -30,6 +30,7 @@
 // dialogs
 #include "conversions.h"
 #include "statistics.h"
+#include "reports.h"
 
 #include "common/types.h"
 #include "lib/trackdb.h"
@@ -83,7 +84,7 @@ public:
 	void SaveSettings();
 
 	void SetupGUI();
-	void SetStatusMessage(const QString& msg) const;
+	void SetStatusMessage(const QString& msg, int display_ms = 0) const;
 
 	void Clear();
 	void FileNew();
@@ -102,6 +103,7 @@ public:
 	void ShowSettings(bool only_create = false);
 	void ShowConversions();
 	void ShowStatistics();
+	void ShowReports();
 	void ShowAbout();
 
 	Resources& GetResources() { return m_res; }
@@ -139,7 +141,7 @@ private:
 	Resources m_res{};
 	RecentFiles m_recent{this, 16};
 
-	std::shared_ptr<QLabel> m_statusLabel{};
+	//std::shared_ptr<QLabel> m_statusLabel{};
 	std::shared_ptr<Settings> m_settings{};
 	std::shared_ptr<About> m_about{};
 
@@ -150,6 +152,7 @@ private:
 	// dialogs
 	std::shared_ptr<Conversions> m_conversions{};
 	std::shared_ptr<Statistics> m_statistics{};
+	std::shared_ptr<Reports> m_reports{};
 
 	t_tracks m_trackdb{};
 

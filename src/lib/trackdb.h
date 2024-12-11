@@ -205,6 +205,17 @@ public:
 	}
 
 
+	t_real GetTotalDistance(bool planar = false) const
+	{
+		t_real dist{};
+
+		for(const t_track& track : m_tracks)
+			dist += track.GetTotalDistance(planar);
+
+		return dist;
+	}
+
+
 private:
 	std::vector<t_track> m_tracks{};
 

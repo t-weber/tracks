@@ -48,16 +48,21 @@ protected:
 	virtual void reject() override;
 
 	void PlotMouseMove(QMouseEvent *evt);
+	void ResetSpeedPlotRange();
 
 
 private:
 	std::shared_ptr<QCustomPlot> m_plot{};
+	std::shared_ptr<QCheckBox> m_speed_check{};
 	std::shared_ptr<QLabel> m_status{};
 	std::shared_ptr<QDialogButtonBox> m_buttonbox{};
 
 	static constexpr const t_real s_lengths[] = { 25., 20., 15., 10., 5., 0. };
 	static constexpr const t_size s_num_lengths = sizeof(s_lengths)/sizeof(s_lengths[0]);
 	std::shared_ptr<QCheckBox> m_length_checks[s_num_lengths]{};
+
+	t_real m_min_epoch{}, m_max_epoch{};
+	t_real m_min_pace{}, m_max_pace{};
 
 	const t_tracks *m_trackdb{};
 };

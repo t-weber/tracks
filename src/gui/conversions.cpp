@@ -12,6 +12,7 @@
 #include <QtCore/QSettings>
 #include <QtCore/QByteArray>
 #include <QtWidgets/QGridLayout>
+#include <QtWidgets/QPushButton>
 
 #include <sstream>
 #include <limits>
@@ -31,6 +32,11 @@ Conversions::Conversions(QWidget* parent)
 	m_plot->yAxis->setLabel("Pace (min/km)");
 
 	connect(m_plot.get(), &QCustomPlot::mouseMove, this, &Conversions::PlotMouseMove);
+
+	// plot reset button
+	QPushButton *btn_replot = new QPushButton(this);
+	btn_replot->setText("Reset Plot");
+	connect(btn_replot, &QAbstractButton::clicked, this, &Conversions::ResetSpeedPlotRange);
 
 	// plot settings
 	QLabel *min_speed_label = new QLabel{"Min. Speed:", this};
@@ -91,11 +97,12 @@ Conversions::Conversions(QWidget* parent)
 	mainlayout->setVerticalSpacing(4);
 	mainlayout->setHorizontalSpacing(4);
 	mainlayout->addWidget(m_plot.get(), 0, 0, 1, 4);
-	mainlayout->addWidget(min_speed_label, 1, 0, 1, 1);
-	mainlayout->addWidget(max_speed_label, 1, 2, 1, 1);
-	mainlayout->addWidget(m_min_speed.get(), 1, 1, 1, 1);
-	mainlayout->addWidget(m_max_speed.get(), 1, 3, 1, 1);
-	mainlayout->addWidget(panel, 2, 0, 1, 4);
+	mainlayout->addWidget(btn_replot, 1, 3, 1, 1);
+	mainlayout->addWidget(min_speed_label, 2, 0, 1, 1);
+	mainlayout->addWidget(max_speed_label, 2, 2, 1, 1);
+	mainlayout->addWidget(m_min_speed.get(), 2, 1, 1, 1);
+	mainlayout->addWidget(m_max_speed.get(), 2, 3, 1, 1);
+	mainlayout->addWidget(panel, 3, 0, 1, 4);
 
 	// restore settings
 	QSettings settings{this};
@@ -118,12 +125,31 @@ Conversions::~Conversions()
 }
 
 
+void Conversions::ResetSpeedPlotRange()
+{
+	t_real min_speed = m_min_speed->value();
+	t_real max_speed = m_max_speed->value();
+
+	m_plot->xAxis->setRange(
+		min_speed - (max_speed - min_speed) / 20.,
+		max_speed + (max_speed - min_speed) / 20.);
+
+	m_plot->yAxis->setRange(
+		m_min_pace - (m_max_pace - m_min_pace) / 20.,
+		m_max_pace + (m_max_pace - m_min_pace) / 20.);
+
+	m_plot->replot();
+}
+
+
 void Conversions::PlotSpeeds()
 {
 	std::size_t num_points = 256;
 
-	t_real min_speed = m_min_speed->value(), max_speed = m_max_speed->value();
-	t_real min_pace = std::numeric_limits<t_real>::max(), max_pace = -min_pace;
+	t_real min_speed = m_min_speed->value();
+	t_real max_speed = m_max_speed->value();
+	m_min_pace = std::numeric_limits<t_real>::max();
+	m_max_pace = -m_min_pace;
 
 	if(min_speed > max_speed)
 		std::swap(min_speed, max_speed);
@@ -141,8 +167,8 @@ void Conversions::PlotSpeeds()
 		t_real speed = std::lerp(min_speed, max_speed, t_real(pt)/t_real(num_points - 1));
 		t_real pace = speed_to_pace<t_real>(speed);
 
-		min_pace = std::min(min_pace, pace);
-		max_pace = std::max(max_pace, pace);
+		m_min_pace = std::min(m_min_pace, pace);
+		m_max_pace = std::max(m_max_pace, pace);
 
 		speeds.push_back(speed);
 		paces.push_back(pace);
@@ -156,13 +182,7 @@ void Conversions::PlotSpeeds()
 	pen.setColor(QColor{0x00, 0x00, 0xff, 0xff});
 	graph->setPen(pen);
 
-	m_plot->xAxis->setRange(
-		min_speed - (max_speed - min_speed) / 20.,
-		max_speed + (max_speed - min_speed) / 20.);
-	m_plot->yAxis->setRange(
-		min_pace - (max_pace - min_pace) / 20.,
-		max_pace + (max_pace - min_pace) / 20.);
-	m_plot->replot();
+	ResetSpeedPlotRange();
 }
 
 
@@ -176,7 +196,7 @@ void Conversions::PlotMouseMove(QMouseEvent *evt)
 
 	std::ostringstream ostr;
 	ostr.precision(g_prec_gui);
-	ostr << speed << " km/h \xe2\x89\x98 " << pace << " min/km.";
+	ostr << speed << " km/h \xe2\x89\x98 " << get_pace_str(pace) << ".";
 	m_status->setText(ostr.str().c_str());
 }
 

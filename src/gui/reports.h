@@ -1,16 +1,16 @@
 /**
- * speed conversions
+ * distance reports
  * @author Tobias Weber (orcid: 0000-0002-7230-1932)
  * @date Dec-2024
  * @license see 'LICENSE' file
  */
 
-#ifndef __TRACKS_CONVERSIONS_H__
-#define __TRACKS_CONVERSIONS_H__
+#ifndef __TRACKS_REPORTS_H__
+#define __TRACKS_REPORTS_H__
 
 #include <QtWidgets/QDialog>
 #include <QtWidgets/QLabel>
-#include <QtWidgets/QDoubleSpinBox>
+#include <QtWidgets/QCheckBox>
 #include <QtWidgets/QDialogButtonBox>
 
 // https://gcc.gnu.org/onlinedocs/gcc/Diagnostic-Pragmas.html
@@ -24,16 +24,23 @@
 #include <memory>
 
 #include "globals.h"
+#include "lib/trackdb.h"
 
 
 /**
  * widget for listing tracks
  */
-class Conversions : public QDialog
+class Reports : public QDialog
 { Q_OBJECT
 public:
-	Conversions(QWidget *parent = nullptr);
-	virtual ~Conversions();
+	Reports(QWidget *parent = nullptr);
+	virtual ~Reports();
+
+	Reports(const Reports&) = delete;
+	Reports& operator=(const Reports&) = delete;
+
+	void SetTrackDB(const t_tracks *trackdb);
+	void PlotDistances();
 
 
 protected:
@@ -41,17 +48,18 @@ protected:
 	virtual void reject() override;
 
 	void PlotMouseMove(QMouseEvent *evt);
-	void PlotSpeeds();
-	void ResetSpeedPlotRange();
+	void ResetDistPlotRange();
 
 
 private:
 	std::shared_ptr<QCustomPlot> m_plot{};
-	std::shared_ptr<QDoubleSpinBox> m_min_speed{}, m_max_speed{};
 	std::shared_ptr<QLabel> m_status{};
 	std::shared_ptr<QDialogButtonBox> m_buttonbox{};
 
-	t_real m_min_pace{}, m_max_pace{};
+	const t_tracks *m_trackdb{};
+
+	t_real m_min_epoch{}, m_max_epoch{};
+	t_real m_min_dist{}, m_max_dist{};
 };
 
 
