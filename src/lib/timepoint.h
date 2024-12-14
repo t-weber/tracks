@@ -101,7 +101,7 @@ std::string from_timepoint(const t_timept& time_pt,
  * rounds a time point to months
  */
 template<class t_clk, class t_timept = typename t_clk::time_point>
-t_timept round_timepoint(const t_timept& time_pt)
+t_timept round_timepoint(const t_timept& time_pt, bool yearly = false)
 {
 	// convert time point to std::tm
 	std::tm t{};
@@ -113,6 +113,8 @@ t_timept round_timepoint(const t_timept& time_pt)
 	t.tm_hour = 0;
 	t.tm_min = 0;
 	t.tm_sec = 0;
+	if(yearly)
+		t.tm_mon = 0;
 
 	// convert std::tm to time point
 	// mktime converts from local time, timegm from UTC

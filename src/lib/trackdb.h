@@ -29,6 +29,7 @@ public:
 	using t_TrackPoint = t_track::t_TrackPoint;
 	using t_clk = typename t_track::t_clk;
 	using t_timept = typename t_track::t_timept;
+	using t_timept_map = std::map<t_timept, std::pair<t_real /*dist*/, t_size /*# tracks*/>>;
 
 
 public:
@@ -224,22 +225,27 @@ public:
 	/**
 	 * distance of all tracks sorted by months
 	 */
-	std::map<t_timept, t_real> GetDistancePerMonth(bool planar = false) const
+	t_timept_map GetDistancePerTime(bool planar = false, bool yearly = false) const
 	{
-		std::map<t_timept, t_real> map;
+		t_timept_map map;
 
 		for(const t_track& track : m_tracks)
 		{
 			std::optional<t_timept> tp = track.GetStartTime();
 			if(!tp)
 				continue;
-			t_timept tp_rd = round_timepoint<t_clk, t_timept>(*tp);
+			t_timept tp_rd = round_timepoint<t_clk, t_timept>(*tp, yearly);
 
 			t_real dist = track.GetTotalDistance(planar);
 			if(auto iter = map.find(tp_rd); iter != map.end())
-				iter->second += dist;
+			{
+				iter->second.first += dist;  // distance
+				++iter->second.second;       // track counter
+			}
 			else
-				map.insert(std::make_pair(tp_rd, dist));
+			{
+				map.insert(std::make_pair(tp_rd, std::make_pair(dist, 1)));
+			}
 		}
 
 		return map;

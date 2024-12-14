@@ -11,6 +11,8 @@
 #include <QtWidgets/QDialog>
 #include <QtWidgets/QLabel>
 #include <QtWidgets/QCheckBox>
+#include <QtWidgets/QTableWidget>
+#include <QtWidgets/QSplitter>
 #include <QtWidgets/QDialogButtonBox>
 
 // https://gcc.gnu.org/onlinedocs/gcc/Diagnostic-Pragmas.html
@@ -22,6 +24,7 @@
 #pragma GCC diagnostic pop
 
 #include <memory>
+#include <map>
 
 #include "globals.h"
 #include "lib/trackdb.h"
@@ -41,6 +44,8 @@ public:
 
 	void SetTrackDB(const t_tracks *trackdb);
 	void PlotDistances();
+	void FillDistancesTable();
+	void CalcDistances();
 
 
 protected:
@@ -52,12 +57,16 @@ protected:
 
 
 private:
-	std::shared_ptr<QCustomPlot> m_plot{};
+	//std::shared_ptr<QCustomPlot> m_plot{};
+	QCustomPlot *m_plot{};
+	std::shared_ptr<QSplitter> m_split{};
+	std::shared_ptr<QTableWidget> m_table{};
 	std::shared_ptr<QCheckBox> m_all_tracks{}, m_cumulative{};
 	std::shared_ptr<QLabel> m_status{};
 	std::shared_ptr<QDialogButtonBox> m_buttonbox{};
 
 	const t_tracks *m_trackdb{};
+	typename t_tracks::t_timept_map m_monthly{}, m_yearly{};
 
 	t_real m_min_epoch{}, m_max_epoch{};
 	t_real m_min_dist{}, m_max_dist{};

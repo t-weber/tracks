@@ -174,7 +174,7 @@ void TracksWnd::SetupGUI()
 		if(m_statistics)
 			m_statistics->PlotSpeeds();
 		if(m_reports)
-			m_reports->PlotDistances();
+			m_reports->CalcDistances();
 
 		// refresh selected track
 		if(m_tracks)

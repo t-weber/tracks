@@ -190,17 +190,17 @@ QSize TrackInfos::sizeHint() const
 void TrackInfos::SaveSettings(QSettings& settings)
 {
 	QByteArray split{m_split->saveState()};
-	settings.setValue("track_info_split", split);
-	settings.setValue("track_info_keep_aspect", m_same_range->isChecked());
+	settings.setValue("track_info/split", split);
+	settings.setValue("track_info/keep_aspect", m_same_range->isChecked());
 }
 
 
 void TrackInfos::RestoreSettings(QSettings& settings)
 {
-	QByteArray split = settings.value("track_info_split").toByteArray();
+	QByteArray split = settings.value("track_info/split").toByteArray();
 	if(split.size())
 		m_split->restoreState(split);
 
-	if(settings.contains("track_info_keep_aspect"))
-		m_same_range->setChecked(settings.value("track_info_keep_aspect").toBool());
+	if(settings.contains("track_info/keep_aspect"))
+		m_same_range->setChecked(settings.value("track_info/keep_aspect").toBool());
 }
