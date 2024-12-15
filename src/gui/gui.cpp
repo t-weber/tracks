@@ -404,9 +404,14 @@ void TracksWnd::SetupGUI()
 	}
 
 	if(loaded_last_file)
+	{
 		m_recent.SetOpenFile(m_recent.GetLastOpenFile());
+		SetActiveFile();
+	}
 	else
+	{
 		FileNew();
+	}
 }
 
 
@@ -473,6 +478,7 @@ void TracksWnd::Clear()
 	m_tracks->GetWidget()->ClearTracks();
 	m_recent.SetOpenFile("");
 	m_recent.SetLastOpenFile("");
+	SetActiveFile();
 }
 
 
@@ -611,6 +617,7 @@ bool TracksWnd::FileLoad()
 		return this->FileLoadRecent(filename);
 	});
 
+	SetActiveFile();
 	SetWindowModified(false);
 	return true;
 }
@@ -633,6 +640,7 @@ bool TracksWnd::FileLoadRecent(const QString& filename)
 	}
 
 	m_recent.SetOpenFile(filename);
+	SetActiveFile();
 	SetWindowModified(false);
 	return true;
 }
@@ -695,6 +703,7 @@ bool TracksWnd::FileSaveAs()
 		return this->FileLoadRecent(filename);
 	});
 
+	SetActiveFile();
 	SetWindowModified(false);
 	return true;
 }
@@ -954,7 +963,9 @@ bool TracksWnd::AskUnsaved()
 				return false;
 		}
 		else if(btn == QMessageBox::Cancel)
+		{
 			return false;
+		}
 	}
 
 	return true;
@@ -1101,6 +1112,7 @@ void TracksWnd::dropEvent(QDropEvent *evt)
 
 		m_recent.SetRecentDir(file.parent_path().string().c_str());
 		m_recent.SetOpenFile(filename);
+		SetActiveFile();
 
 		m_recent.AddRecentFile(m_recent.GetOpenFile(),
 			[this](const QString& filename) -> bool
