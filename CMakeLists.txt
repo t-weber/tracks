@@ -74,11 +74,13 @@ add_executable(tracks
 	src/gui/conversions.cpp src/gui/conversions.h
 	src/gui/statistics.cpp src/gui/statistics.h
 	src/gui/reports.cpp src/gui/reports.h
+	src/gui/map.cpp src/gui/map.h
 
 	src/common/types.h
 
 	src/lib/calc.h src/lib/timepoint.h
 	src/lib/track.h src/lib/trackdb.h
+	src/lib/map.h
 
 	ext/qcustomplot.cpp ext/qcustomplot.h
 )
@@ -92,7 +94,7 @@ target_link_libraries(tracks
 
 
 # -----------------------------------------------------------------------------
-# cli
+# cli tools
 # -----------------------------------------------------------------------------
 add_executable(tracks_cli
 	src/cli/tracks.cpp
@@ -102,6 +104,15 @@ add_executable(tracks_cli
 	src/lib/track.h src/lib/trackdb.h
 )
 
-
 target_link_libraries(tracks_cli)
+
+
+add_executable(maps_cli
+	src/cli/maps.cpp
+	src/common/types.h
+
+	src/lib/map.h
+)
+
+target_link_libraries(maps_cli)
 # -----------------------------------------------------------------------------

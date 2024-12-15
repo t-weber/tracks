@@ -50,6 +50,8 @@ protected:
 	void PlotMouseMove(QMouseEvent *evt);
 	void ResetPlotRange();
 
+	void PlotMap();
+
 
 private:
 	std::shared_ptr<QSplitter> m_split{};

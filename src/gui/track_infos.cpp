@@ -7,6 +7,7 @@
 
 #include "track_infos.h"
 #include "helpers.h"
+#include "map.h"
 
 #include <QtCore/QByteArray>
 #include <QtWidgets/QGridLayout>
@@ -138,10 +139,11 @@ void TrackInfos::ShowTrack(const t_track& track)
 		longitudes.push_back(pt.longitude * t_real(180) / num::pi_v<t_real>);
 	}
 
-	// plot track
+	// plot map and track
 	if(!m_plot)
 		return;
 	m_plot->clearPlottables();
+	PlotMap();
 
 	QCPCurve *curve = new QCPCurve(m_plot->xAxis, m_plot->yAxis);
 	curve->setData(longitudes, latitudes);
@@ -152,6 +154,26 @@ void TrackInfos::ShowTrack(const t_track& track)
 	curve->setPen(pen);
 
 	ResetPlotRange();
+}
+
+
+void TrackInfos::PlotMap()
+{
+	if(!m_plot)
+		return;
+
+	// TODO
+
+	/*MapPlotter map;
+	map.Import("/home/tw/tmp/map.osm");
+	auto minmax_lon = track.GetLongitudeRange();
+	auto minmax_lat = track.GetLatitudeRange();
+	t_real lon_range = minmax_lon.second - minmax_lon.first;
+	t_real lat_range = minmax_lat.second - minmax_lat.first;
+	map.SetPlotRange(
+		minmax_lon.first - lon_range/10., minmax_lon.second + lon_range/10.,
+		minmax_lat.first - lat_range/10., minmax_lat.second + lat_range/10.);
+	map.Plot(m_plot);*/
 }
 
 
