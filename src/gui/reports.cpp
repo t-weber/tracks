@@ -98,11 +98,6 @@ Reports::Reports(QWidget* parent)
 	m_table->verticalHeader()->setDefaultSectionSize(32);
 	m_table->verticalHeader()->setVisible(false);
 
-	m_table->setColumnWidth(TAB_DATE, 150);
-	m_table->setColumnWidth(TAB_COUNT, 100);
-	m_table->setColumnWidth(TAB_DIST, 150);
-	m_table->setColumnWidth(TAB_DIST_SUM, 150);
-
 	// splitter
 	m_split = std::make_shared<QSplitter>(this);
 	m_split->setOrientation(Qt::Vertical);
@@ -171,6 +166,27 @@ Reports::Reports(QWidget* parent)
 	QByteArray split = settings.value("dlg_reports/split").toByteArray();
 	if(split.size())
 		m_split->restoreState(split);
+
+	// table column widths
+	if(settings.contains("dlg_reports/date_col"))
+		m_table->setColumnWidth(TAB_DATE, settings.value("dlg_reports/date_col").toInt());
+	else
+		m_table->setColumnWidth(TAB_DATE, 150);
+
+	if(settings.contains("dlg_reports/count_col"))
+		m_table->setColumnWidth(TAB_COUNT, settings.value("dlg_reports/count_col").toInt());
+	else
+		m_table->setColumnWidth(TAB_COUNT, 100);
+
+	if(settings.contains("dlg_reports/dist_col"))
+		m_table->setColumnWidth(TAB_DIST, settings.value("dlg_reports/dist_col").toInt());
+	else
+		m_table->setColumnWidth(TAB_DIST, 150);
+
+	if(settings.contains("dlg_reports/distsum_col"))
+		m_table->setColumnWidth(TAB_DIST_SUM, settings.value("dlg_reports/distsum_col").toInt());
+	else
+		m_table->setColumnWidth(TAB_DIST_SUM, 150);
 }
 
 
@@ -428,6 +444,15 @@ void Reports::accept()
 
 	QByteArray split{m_split->saveState()};
 	settings.setValue("dlg_reports/split", split);
+
+	if(m_table)
+	{
+		// table column widths
+		settings.setValue("dlg_reports/date_col", m_table->columnWidth(TAB_DATE));
+		settings.setValue("dlg_reports/count_col", m_table->columnWidth(TAB_COUNT));
+		settings.setValue("dlg_reports/dist_col", m_table->columnWidth(TAB_DIST));
+		settings.setValue("dlg_reports/distsum_col", m_table->columnWidth(TAB_DIST_SUM));
+	}
 
 	QDialog::accept();
 }

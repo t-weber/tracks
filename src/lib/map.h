@@ -307,7 +307,7 @@ public:
 		else if(key == "landuse" && val == "retail")
 			return std::make_tuple(true, 0xff, 0x44, 0x44);
 		else if(key == "landuse" && val == "industrial")
-			return std::make_tuple(true, 0x44, 0x44, 0xff);
+			return std::make_tuple(true, 0xee, 0xee, 0x44);
 		else if(key == "landuse" && val == "forest")
 			return std::make_tuple(true, 0x00, 0x99, 0x00);
 		else if(key == "landuse" && (val == "grass" || val == "meadow"))
