@@ -90,7 +90,7 @@ public:
 
 
 protected:
-	bool ImportVertex(const boost::property_tree::ptree& node)
+	bool ImportVertexXml(const boost::property_tree::ptree& node)
 	{
 		namespace num = std::numbers;
 
@@ -139,7 +139,7 @@ protected:
 
 
 
-	bool ImportSegment(const boost::property_tree::ptree& node)
+	bool ImportSegmentXml(const boost::property_tree::ptree& node)
 	{
 		auto id = node.get_optional<t_size>("<xmlattr>.id");
 		auto vis = node.get_optional<bool>("<xmlattr>.visible");
@@ -188,7 +188,7 @@ protected:
 
 
 
-	bool ImportMultiSegment(const boost::property_tree::ptree& node)
+	bool ImportMultiSegmentXml(const boost::property_tree::ptree& node)
 	{
 		auto id = node.get_optional<t_size>("<xmlattr>.id");
 		auto vis = node.get_optional<bool>("<xmlattr>.visible");
@@ -276,15 +276,15 @@ public:
 		{
 			// node is a vertex
 			if(node.first == "node")
-				ImportVertex(node.second);
+				ImportVertexXml(node.second);
 
 			// node is a line segment or area
 			else if(node.first == "way")
-				ImportSegment(node.second);
+				ImportSegmentXml(node.second);
 
 			// node is a relation
 			else if(node.first == "relation")
-				ImportMultiSegment(node.second);
+				ImportMultiSegmentXml(node.second);
 		}  // node iteration
 
 		return true;
