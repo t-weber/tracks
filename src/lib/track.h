@@ -106,6 +106,7 @@ public:
 			case 0: dist_func = &geo_dist<t_real>; break;
 			case 1: dist_func = &geo_dist_2<t_real, 1>; break;
 			case 2: dist_func = &geo_dist_2<t_real, 2>; break;
+			case 3: dist_func = &geo_dist_2<t_real, 3>; break;
 		}
 
 		for(t_TrackPoint& trackpt : m_points)

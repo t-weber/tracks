@@ -191,7 +191,13 @@ void Conversions::PlotMouseMove(QMouseEvent *evt)
 	if(!m_plot)
 		return;
 
-	t_real speed = m_plot->xAxis->pixelToCoord(evt->x());
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+	qreal x = evt->position().x();
+#else
+	qreal x = evt->x();
+#endif
+
+	t_real speed = m_plot->xAxis->pixelToCoord(x);
 	t_real pace = speed_to_pace<t_real>(speed);
 
 	std::ostringstream ostr;

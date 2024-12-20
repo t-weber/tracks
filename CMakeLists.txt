@@ -9,6 +9,9 @@ cmake_minimum_required(VERSION 3.5)
 project(tracks)
 
 
+option(USE_OSMIUM "use the osmium library" FALSE)
+
+
 enable_language(CXX)
 set(CMAKE_CXX_STANDARD 20)
 #set(CMAKE_VERBOSE_MAKEFILE True)
@@ -23,11 +26,34 @@ find_package(Boost REQUIRED COMPONENTS system filesystem)
 add_compile_options(${Boost_CXX_FLAGS})
 
 
+if(USE_OSMIUM)
+	find_package(ZLIB)
+	find_package(BZip2)
+	find_package(EXPAT)
+
+	set(OSMIUM_INCLUDE_DIRS ${BZIP2_INCLUDE_DIRS} ${ZLIB_INCLUDE_DIRS} ${EXPAT_INCLUDE_DIRS})
+	set(OSMIUM_LIBRARIES ${BZIP2_LIBRARIES} ${ZLIB_LIBRARIES} ${EXPAT_LIBRARIES})
+
+	add_definitions(-D_TRACKS_USE_OSMIUM_=1)
+	message("Using osmium library.")
+else()
+	set(OSMIUM_INCLUDE_DIRS "")
+	set(OSMIUM_LIBRARIES "")
+endif()
+
+
 find_package(Qt5Core REQUIRED)
 find_package(Qt5Gui REQUIRED)
 find_package(Qt5Widgets REQUIRED)
 find_package(Qt5Svg REQUIRED)
 find_package(Qt5PrintSupport REQUIRED)
+
+#find_package(Qt6Core REQUIRED)
+#find_package(Qt6Gui REQUIRED)
+#find_package(Qt6Widgets REQUIRED)
+#find_package(Qt6Svg REQUIRED)
+#find_package(Qt6PrintSupport REQUIRED)
+
 
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTOMOC ON)
@@ -45,6 +71,7 @@ endif()
 
 include_directories(
 	${PROJECT_SOURCE_DIR} ${PROJECT_SOURCE_DIR}/src
+	${OSMIUM_INCLUDE_DIRS}
 	${Boost_INCLUDE_DIRS} ${Boost_INCLUDE_DIRS}/..
 	${Qt5Svg_INCLUDE_DIRS}
 	ext/
@@ -87,6 +114,7 @@ add_executable(tracks
 
 
 target_link_libraries(tracks
+	${OSMIUM_LIBRARIES}
 	${QtTargets}
 	Boost::system Boost::filesystem
 )
@@ -114,5 +142,7 @@ add_executable(maps_cli
 	src/lib/map.h
 )
 
-target_link_libraries(maps_cli)
+target_link_libraries(maps_cli
+	${OSMIUM_LIBRARIES}
+)
 # -----------------------------------------------------------------------------

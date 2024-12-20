@@ -415,8 +415,15 @@ void Reports::PlotMouseMove(QMouseEvent *evt)
 	if(!m_plot)
 		return;
 
-	t_real epoch = m_plot->xAxis->pixelToCoord(evt->x());
-	t_real distance = m_plot->yAxis->pixelToCoord(evt->y());
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+	qreal x = evt->position().x();
+	qreal y = evt->position().y();
+#else
+	qreal x = evt->x();
+	qreal y = evt->y();
+#endif
+	t_real epoch = m_plot->xAxis->pixelToCoord(x);
+	t_real distance = m_plot->yAxis->pixelToCoord(y);
 
 	// get date string
 	auto tp = t_track::t_timept{static_cast<typename t_track::t_time_ty>(

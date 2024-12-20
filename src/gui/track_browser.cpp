@@ -208,7 +208,7 @@ void TrackBrowser::SetTrackIndex(int row, t_size idx)
 		return;
 
 	QVariant val;
-	val.setValue<t_size>(idx);
+	val.setValue(idx);
 	item->setData(TRACK_IDX, val);
 }
 

@@ -165,7 +165,7 @@ void TrackInfos::PlotMap()
 	// TODO
 
 	/*MapPlotter map;
-	map.Import("/home/tw/tmp/map.osm");
+	map.ImportXml("/home/tw/tmp/map.osm");
 	auto minmax_lon = track.GetLongitudeRange();
 	auto minmax_lat = track.GetLatitudeRange();
 	t_real lon_range = minmax_lon.second - minmax_lon.first;
@@ -194,8 +194,16 @@ void TrackInfos::PlotMouseMove(QMouseEvent *evt)
 	if(!m_plot)
 		return;
 
-	t_real longitude = m_plot->xAxis->pixelToCoord(evt->x());
-	t_real latitude = m_plot->yAxis->pixelToCoord(evt->y());
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+	qreal x = evt->position().x();
+	qreal y = evt->position().y();
+#else
+	qreal x = evt->x();
+	qreal y = evt->y();
+#endif
+
+	t_real longitude = m_plot->xAxis->pixelToCoord(x);
+	t_real latitude = m_plot->yAxis->pixelToCoord(y);
 
 	emit PlotCoordsChanged(longitude, latitude);
 }

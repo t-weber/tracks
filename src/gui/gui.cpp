@@ -823,7 +823,8 @@ void TracksWnd::ShowSettings(bool only_create)
 			"Calculation epsilon:", g_eps, 0., 1., 1e-6, 8);
 		m_settings->AddCombobox("settings/distance_function",
 			"Distance calculation:",
-			{ "Haversine Formula", "Thomas Formula", "Vincenty Formula" },
+			{ "Haversine Formula", "Thomas Formula",
+			"Vincenty Formula", "Karney Formula" },
 			g_dist_func);
 		m_settings->AddLine();
 		m_settings->AddDoubleSpinbox("settings/assume_dt",

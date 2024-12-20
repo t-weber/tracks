@@ -31,6 +31,12 @@
 #include <boost/property_tree/xml_parser.hpp>
 #include <boost/geometry.hpp>
 
+#ifdef _TRACKS_USE_OSMIUM_
+	#include <osmium/io/any_input.hpp>
+	#include <osmium/visitor.hpp>
+	#include <osmium/handler.hpp>
+#endif
+
 
 
 template<class t_real = double>
@@ -163,7 +169,7 @@ protected:
 					if(!key || !val)
 						continue;
 
-					if(*key == "landuse")
+					if(!is_background && *key == "landuse")
 						is_background = true;
 
 					seg.tags.emplace(std::make_pair(*key, *val));
@@ -236,7 +242,7 @@ public:
 	 * @see https://wiki.openstreetmap.org/wiki/OSM_XML
 	 * @see https://wiki.openstreetmap.org/wiki/Elements
 	 */
-	bool Import(const std::string& mapname)
+	bool ImportXml(const std::string& mapname)
 	{
 		namespace fs = __map_fs;
 		namespace ptree = boost::property_tree;
@@ -283,6 +289,170 @@ public:
 
 		return true;
 	}
+
+
+
+#ifdef _TRACKS_USE_OSMIUM_
+	/**
+	 * import a map from an osm or a pbf file
+	 * @see https://github.com/osmcode/libosmium/blob/master/examples/
+	 * @see https://osmcode.org/libosmium/manual.html
+	 * @see https://docs.osmcode.org/libosmium/latest/
+	 */
+	bool Import(const std::string& mapname)
+	{
+		namespace num = std::numbers;
+
+		struct OsmHandler : public osmium::handler::Handler
+		{
+			Map<t_real, t_size> *super = nullptr;
+
+			OsmHandler(Map<t_real, t_size> *super) : super{super}
+			{}
+
+			void node(const osmium::Node& node)
+			{
+				if(!node.visible())
+					return;
+
+				t_vertex vertex
+				{
+					.longitude = node.location().lon()
+						/ t_real(180) * num::pi_v<t_real>,
+					.latitude = node.location().lat()
+						/ t_real(180) * num::pi_v<t_real>,
+				};
+
+				for(const auto& tag : node.tags())
+					vertex.tags.emplace(std::make_pair(tag.key(), tag.value()));
+
+				// vertex ranges
+				super->m_min_latitude = std::min(super->m_min_latitude, vertex.latitude);
+				super->m_max_latitude = std::max(super->m_max_latitude, vertex.latitude);
+				super->m_min_longitude = std::min(super->m_min_longitude, vertex.longitude);
+				super->m_max_longitude = std::max(super->m_max_longitude, vertex.longitude);
+
+				super->m_vertices.emplace(std::make_pair(node.id(), std::move(vertex)));
+			}
+
+
+			void way(const osmium::Way& way)
+			{
+				if(!way.visible())
+					return;
+
+				t_segment seg;
+				//seg.vertex_ids.reserve(way.nodes().size());
+
+				t_size invalid_refs = 0;
+				for(const auto& node : way.nodes())
+				{
+					t_size ref = node.ref();
+					seg.vertex_ids.push_back(ref);
+
+					if(super->m_vertices.find(ref) == super->m_vertices.end())
+						++invalid_refs;
+				}
+
+				// only referring to invalid vertices?
+				if(invalid_refs == seg.vertex_ids.size())
+					return;
+
+				bool is_background = false;
+				for(const auto& tag : way.tags())
+				{
+					seg.tags.emplace(std::make_pair(tag.key(), tag.value()));
+					if(!is_background && std::string(tag.key()) == "landuse")
+						is_background = true;
+				}
+
+				if(seg.vertex_ids.size() >= 2 && *seg.vertex_ids.begin() == *seg.vertex_ids.rbegin())
+					seg.is_area = true;
+				if(is_background)
+					super->m_segments_background.emplace(std::make_pair(way.id(), std::move(seg)));
+				else
+					super->m_segments.emplace(std::make_pair(way.id(), std::move(seg)));
+			}
+
+
+			void relation(const osmium::Relation& rel)
+			{
+				t_multisegment seg;
+
+				t_size invalid_node_refs = 0;
+				t_size invalid_inner_seg_refs = 0;
+				t_size invalid_seg_refs = 0;
+
+				for(const auto& member : rel.members())
+				{
+					t_size ref = member.ref();
+
+					if(member.type() == osmium::item_type::node)
+					{
+						seg.vertex_ids.push_back(ref);
+
+						if(super->m_vertices.find(ref) == super->m_vertices.end())
+							++invalid_node_refs;
+					}
+					else if(member.type() == osmium::item_type::way && std::string(member.role()) == "inner")
+					{
+						seg.segment_inner_ids.push_back(ref);
+
+						if(super->m_segments.find(ref) == super->m_segments.end())
+							++invalid_inner_seg_refs;
+					}
+					else if(member.type() == osmium::item_type::way)
+					{
+						seg.segment_ids.push_back(ref);
+
+						if(super->m_segments.find(ref) == super->m_segments.end())
+							++invalid_seg_refs;
+					}
+				}
+
+				// only referring to invalid objects?
+				if(invalid_node_refs == seg.vertex_ids.size() &&
+					invalid_inner_seg_refs == seg.segment_inner_ids.size() &&
+					invalid_seg_refs == seg.segment_ids.size())
+					return;
+
+				for(const auto& tag : rel.tags())
+					seg.tags.emplace(std::make_pair(tag.key(), tag.value()));
+
+				super->m_multisegments.emplace(std::make_pair(rel.id(), std::move(seg)));
+			}
+
+			/*void area(const osmium::Area& area)
+			{
+			}
+
+			void tag_list(const osmium::TagList& tags)
+			{
+			}*/
+		} osm_handler{this};
+
+		{
+			osmium::io::Reader osm{mapname, osmium::osm_entity_bits::node};
+			osmium::apply(osm, osm_handler);
+		}
+		{
+			osmium::io::Reader osm{mapname, osmium::osm_entity_bits::way};
+			osmium::apply(osm, osm_handler);
+		}
+		{
+			osmium::io::Reader osm{mapname, osmium::osm_entity_bits::relation};
+			osmium::apply(osm, osm_handler);
+		}
+
+		return true;
+	}
+#else
+	bool Import(const std::string& mapname)
+	{
+		std::cerr << "Cannot import \"" << mapname << "\" because osmium support is disabled." << std::endl;
+		return false;
+	}
+#endif  // _TRACKS_USE_OSMIUM_
 
 
 
@@ -377,7 +547,7 @@ public:
 	 * write an svg file
 	 * @see https://github.com/boostorg/geometry/tree/develop/example
 	 */
-	bool ExportSvg(const std::string& filename) const
+	bool ExportSvg(const std::string& filename, t_real scale = 1) const
 	{
 		namespace geo = boost::geometry;
 		namespace num = std::numbers;
@@ -392,8 +562,10 @@ public:
 			return false;
 
 		t_svg svg(ofstr,
-			64. / (m_max_longitude - m_min_longitude) / t_real(180) * num::pi_v<t_real>,
-			64. / (m_max_latitude - m_min_latitude) / t_real(180) * num::pi_v<t_real>);
+			scale * 64. / ((m_max_longitude - m_min_longitude)
+				* t_real(180) / num::pi_v<t_real>),
+			scale * 64. / ((m_max_latitude - m_min_latitude)
+				* t_real(180) / num::pi_v<t_real>));
 
 
 		// draw area

@@ -8,26 +8,48 @@
 #include "common/types.h"
 #include "lib/map.h"
 
+#include <sstream>
+
 
 int main(int argc, char **argv)
 {
 	if(argc <= 2)
 	{
-		std::cerr << "Please give an osm input and an svg output file name." << std::endl;
+		std::cerr << "Please give an osm input and an svg output file name.\n"
+			<< "Options:\n"
+			<< "\t--xml    \t\tuse internal xml loader\n"
+			<< "\t--scale 1\t\tsvg scaling factor\n"
+			<< std::endl;
 		return -1;
+	}
+
+	bool use_xml_loader = false;
+	t_real svg_scale = 1.;
+	for(int i = 1; i < argc; ++i)
+	{
+		if(std::string(argv[i]) == "--xml")
+			use_xml_loader = true;
+		else if(std::string(argv[i]) == "--scale" && i + 1 < argc)
+			std::istringstream{argv[i+1]} >> svg_scale;
 	}
 
 	try
 	{
 		Map<t_real, t_size> map;
 
-		if(!map.Import(argv[1]))
+		if(use_xml_loader && !map.ImportXml(argv[1]))
 		{
 			std::cerr << "Could not read \"" << argv[1] << "\"." << std::endl;
 			return -1;
 		}
 
-		if(!map.ExportSvg(argv[2]))
+		if(!use_xml_loader && !map.Import(argv[1]))
+		{
+			std::cerr << "Could not read \"" << argv[1] << "\"." << std::endl;
+			return -1;
+		}
+
+		if(!map.ExportSvg(argv[2], svg_scale))
 		{
 			std::cerr << "Could not write \"" << argv[2] << "\"." << std::endl;
 			return -1;
