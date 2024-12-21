@@ -175,6 +175,8 @@ void TracksWnd::SetupGUI()
 			m_statistics->PlotSpeeds();
 		if(m_reports)
 			m_reports->CalcDistances();
+		if(m_summary)
+			m_summary->FillTable();
 
 		// refresh selected track
 		if(m_tracks)
@@ -199,11 +201,16 @@ void TracksWnd::SetupGUI()
 	QAction *actionReports = new QAction{iconReports, "Distance Reports...", this};
 	connect(actionReports, &QAction::triggered, this, &TracksWnd::ShowReports);
 
+	QIcon iconSummary = QIcon::fromTheme("x-office-spreadsheet");
+	QAction *actionSummary = new QAction{iconSummary, "Track Summary...", this};
+	connect(actionSummary, &QAction::triggered, this, &TracksWnd::ShowSummary);
+
 	menuTracks->addAction(actionRecalc);
 	menuTracks->addAction(actionResort);
 	menuTracks->addSeparator();
 	menuTracks->addAction(actionStatistics);
 	menuTracks->addAction(actionReports);
+	menuTracks->addAction(actionSummary);
 	// ------------------------------------------------------------------------
 
 
@@ -214,6 +221,7 @@ void TracksWnd::SetupGUI()
 	toolbarTracks->setObjectName("TracksToolbar");
 	toolbarTracks->addAction(actionStatistics);
 	toolbarTracks->addAction(actionReports);
+	toolbarTracks->addAction(actionSummary);
 
 	addToolBar(toolbarTracks);
 	// ------------------------------------------------------------------------
@@ -903,6 +911,21 @@ void TracksWnd::ShowReports()
 	}
 
 	show_dialog(m_reports.get());
+}
+
+
+/**
+ * show track summary dialog
+ */
+void TracksWnd::ShowSummary()
+{
+	if(!m_summary)
+	{
+		m_summary = std::make_shared<Summary>(this);
+		m_summary->SetTrackDB(&m_trackdb);
+	}
+
+	show_dialog(m_summary.get());
 }
 
 

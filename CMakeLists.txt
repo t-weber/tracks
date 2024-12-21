@@ -101,6 +101,7 @@ add_executable(tracks
 	src/gui/conversions.cpp src/gui/conversions.h
 	src/gui/statistics.cpp src/gui/statistics.h
 	src/gui/reports.cpp src/gui/reports.h
+	src/gui/summary.cpp src/gui/summary.h
 	src/gui/map.cpp src/gui/map.h
 
 	src/common/types.h

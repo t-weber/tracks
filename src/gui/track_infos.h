@@ -48,6 +48,7 @@ protected:
 	virtual QSize sizeHint() const override;
 
 	void PlotMouseMove(QMouseEvent *evt);
+	void CalcPlotRange();
 	void ResetPlotRange();
 
 	void PlotMap();
@@ -59,8 +60,13 @@ private:
 	std::shared_ptr<QTextEdit> m_infos{};
 	std::shared_ptr<QCheckBox> m_same_range{};
 
+	// track coordinate range
 	t_real m_min_long{}, m_max_long{};
 	t_real m_min_lat{}, m_max_lat{};
+
+	// plotted coordinate range
+	t_real m_min_long_plot{}, m_max_long_plot{};
+	t_real m_min_lat_plot{}, m_max_lat_plot{};
 
 
 signals:

@@ -72,7 +72,7 @@ TrackInfos::~TrackInfos()
 }
 
 
-void TrackInfos::ResetPlotRange()
+void TrackInfos::CalcPlotRange()
 {
 	if(!m_plot || !m_same_range)
 		return;
@@ -80,41 +80,53 @@ void TrackInfos::ResetPlotRange()
 	t_real aspect = t_real(m_plot->viewport().height()) /
 		t_real(m_plot->viewport().width());
 
-	t_real min_long = m_min_long;
-	t_real max_long = m_max_long;
-	t_real min_lat = m_min_lat;
-	t_real max_lat = m_max_lat;
+	m_min_long_plot = m_min_long;
+	m_max_long_plot = m_max_long;
+	m_min_lat_plot = m_min_lat;
+	m_max_lat_plot = m_max_lat;
 
-	t_real range_long = max_long - min_long;
-	t_real range_lat = max_lat - min_lat;
+	t_real range_long = m_max_long - m_min_long;
+	t_real range_lat = m_max_lat - m_min_lat;
 
 	if(m_same_range->isChecked())
 	{
 		if(range_long*aspect > range_lat)
 		{
-			t_real mid_lat = min_lat + range_lat * 0.5;
+			t_real mid_lat = m_min_lat_plot + range_lat * 0.5;
 
 			range_lat = range_long * aspect;
-			min_lat = mid_lat - range_lat * 0.5;
-			max_lat = mid_lat + range_lat * 0.5;
+			m_min_lat_plot = mid_lat - range_lat * 0.5;
+			m_max_lat_plot = mid_lat + range_lat * 0.5;
 		}
 		else if(range_long*aspect < range_lat)
 		{
-			t_real mid_long = min_long + range_long * 0.5;
+			t_real mid_long = m_min_long_plot + range_long * 0.5;
 
 			range_long = range_lat / aspect;
-			min_long = mid_long - range_long * 0.5;
-			max_long = mid_long + range_long * 0.5;
+			m_min_long_plot = mid_long - range_long * 0.5;
+			m_max_long_plot = mid_long + range_long * 0.5;
 		}
 	}
+}
+
+
+void TrackInfos::ResetPlotRange()
+{
+	if(!m_plot || !m_same_range)
+		return;
+
+	CalcPlotRange();
+
+	t_real range_long = m_max_long_plot - m_min_long_plot;
+	t_real range_lat = m_max_lat_plot - m_min_lat_plot;
 
 	m_plot->xAxis->setRange(
-		(min_long - range_long / 20.) * t_real(180) / num::pi_v<t_real>,
-		(max_long + range_long / 20.) * t_real(180) / num::pi_v<t_real>);
+		(m_min_long_plot - range_long / 20.) * t_real(180) / num::pi_v<t_real>,
+		(m_max_long_plot + range_long / 20.) * t_real(180) / num::pi_v<t_real>);
 
 	m_plot->yAxis->setRange(
-		(min_lat - range_lat / 20.) * t_real(180) / num::pi_v<t_real>,
-		(max_lat + range_lat / 20.) * t_real(180) / num::pi_v<t_real>);
+		(m_min_lat_plot - range_lat / 20.) * t_real(180) / num::pi_v<t_real>,
+		(m_max_lat_plot + range_lat / 20.) * t_real(180) / num::pi_v<t_real>);
 
 	m_plot->replot();
 }
@@ -128,6 +140,7 @@ void TrackInfos::ShowTrack(const t_track& track)
 	// prepare track plot
 	std::tie(m_min_lat, m_max_lat) = track.GetLatitudeRange();
 	std::tie(m_min_long, m_max_long) = track.GetLongitudeRange();
+	CalcPlotRange();
 
 	QVector<t_real> latitudes, longitudes;
 	latitudes.reserve(track.GetPoints().size());
@@ -143,6 +156,7 @@ void TrackInfos::ShowTrack(const t_track& track)
 	if(!m_plot)
 		return;
 	m_plot->clearPlottables();
+
 	PlotMap();
 
 	QCPCurve *curve = new QCPCurve(m_plot->xAxis, m_plot->yAxis);
@@ -163,17 +177,19 @@ void TrackInfos::PlotMap()
 		return;
 
 	// TODO
+	/*t_real lon_range = m_max_long_plot - m_min_long_plot;
+	t_real lat_range = m_max_lat_plot - m_min_lat_plot;
 
-	/*MapPlotter map;
-	map.ImportXml("/home/tw/tmp/map.osm");
-	auto minmax_lon = track.GetLongitudeRange();
-	auto minmax_lat = track.GetLatitudeRange();
-	t_real lon_range = minmax_lon.second - minmax_lon.first;
-	t_real lat_range = minmax_lat.second - minmax_lat.first;
-	map.SetPlotRange(
-		minmax_lon.first - lon_range/10., minmax_lon.second + lon_range/10.,
-		minmax_lat.first - lat_range/10., minmax_lat.second + lat_range/10.);
-	map.Plot(m_plot);*/
+	MapPlotter map;
+	if(map.Import("0.osm.pbf",
+		m_min_long_plot, m_max_long_plot,
+		m_min_lat_plot, m_max_lat_plot))
+	{
+		map.SetPlotRange(
+			m_min_long_plot - lon_range/10., m_max_long_plot + lon_range/10.,
+			m_min_lat_plot - lat_range/10., m_max_lat_plot + lat_range/10.);
+		map.Plot(m_plot);
+	}*/
 }
 
 

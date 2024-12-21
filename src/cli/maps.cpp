@@ -25,6 +25,9 @@ int main(int argc, char **argv)
 
 	bool use_xml_loader = false;
 	t_real svg_scale = 1.;
+	t_real min_lon = -10., max_lon = 10.;
+	t_real min_lat = -10., max_lat = 10.;
+
 	for(int i = 1; i < argc; ++i)
 	{
 		if(std::string(argv[i]) == "--xml")
@@ -43,7 +46,7 @@ int main(int argc, char **argv)
 			return -1;
 		}
 
-		if(!use_xml_loader && !map.Import(argv[1]))
+		if(!use_xml_loader && !map.Import(argv[1], min_lon, max_lon, min_lat, max_lat))
 		{
 			std::cerr << "Could not read \"" << argv[1] << "\"." << std::endl;
 			return -1;

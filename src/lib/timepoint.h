@@ -124,7 +124,7 @@ t_timept round_timepoint(const t_timept& time_pt, bool yearly = false)
 
 
 /**
- * converts a time point to a local time string
+ * extract the date from a time point
  */
 template<class t_clk, class t_timept = typename t_clk::time_point, class t_epoch = double>
 std::tuple<int, int, int> date_from_epoch(t_epoch epoch)
@@ -137,6 +137,25 @@ std::tuple<int, int, int> date_from_epoch(t_epoch epoch)
 	boost::date_time::c_time::localtime(&tt, &t);
 
 	return std::make_tuple(t.tm_year + 1900, t.tm_mon + 1, t.tm_mday);
+}
+
+
+
+/**
+ * extract the date and time from a time point
+ */
+template<class t_clk, class t_timept = typename t_clk::time_point, class t_epoch = double>
+std::tuple<int, int, int, int, int, int> date_time_from_epoch(t_epoch epoch)
+{
+	t_timept time_pt = t_timept{static_cast<typename t_clk::rep>(
+		epoch) * std::chrono::seconds{1}};
+
+	std::tm t{};
+	std::time_t tt = t_clk::to_time_t(time_pt);
+	boost::date_time::c_time::localtime(&tt, &t);
+
+	return std::make_tuple(t.tm_year + 1900, t.tm_mon + 1, t.tm_mday,
+		t.tm_hour, t.tm_min, t.tm_sec);
 }
 
 

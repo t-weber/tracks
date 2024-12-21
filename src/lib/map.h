@@ -299,28 +299,47 @@ public:
 	 * @see https://osmcode.org/libosmium/manual.html
 	 * @see https://docs.osmcode.org/libosmium/latest/
 	 */
-	bool Import(const std::string& mapname)
+	bool Import(const std::string& mapname,
+		t_real min_longitude = -10., t_real max_longitude = 10.,
+		t_real min_latitude = -10., t_real max_latitude = 10.)
 	{
 		namespace num = std::numbers;
 
 		struct OsmHandler : public osmium::handler::Handler
 		{
+		private:
 			Map<t_real, t_size> *super = nullptr;
+			const t_real *min_lon = nullptr, *max_lon = nullptr;
+			const t_real *min_lat = nullptr, *max_lat = nullptr;
 
-			OsmHandler(Map<t_real, t_size> *super) : super{super}
+
+		public:
+			OsmHandler(Map<t_real, t_size> *super,
+				const t_real *min_lon, const t_real *max_lon,
+				const t_real *min_lat, const t_real *max_lat)
+				: super{super},
+					min_lon{min_lon}, max_lon{max_lon},
+					min_lat{min_lat}, max_lat{max_lat}
 			{}
+
 
 			void node(const osmium::Node& node)
 			{
 				if(!node.visible())
 					return;
 
+				t_real lon = node.location().lon() / t_real(180) * num::pi_v<t_real>;
+				t_real lat = node.location().lat() / t_real(180) * num::pi_v<t_real>;
+
+				// is the vertex within requested bounds?
+				if(lon < *min_lon || lon > *max_lon ||
+					lat < *min_lat || lat > *max_lat)
+					return;
+
 				t_vertex vertex
 				{
-					.longitude = node.location().lon()
-						/ t_real(180) * num::pi_v<t_real>,
-					.latitude = node.location().lat()
-						/ t_real(180) * num::pi_v<t_real>,
+					.longitude = lon,
+					.latitude = lat,
 				};
 
 				for(const auto& tag : node.tags())
@@ -429,25 +448,17 @@ public:
 			void tag_list(const osmium::TagList& tags)
 			{
 			}*/
-		} osm_handler{this};
+		} osm_handler{this, &min_longitude, &max_longitude, &min_latitude, &max_latitude};
 
-		{
-			osmium::io::Reader osm{mapname, osmium::osm_entity_bits::node};
-			osmium::apply(osm, osm_handler);
-		}
-		{
-			osmium::io::Reader osm{mapname, osmium::osm_entity_bits::way};
-			osmium::apply(osm, osm_handler);
-		}
-		{
-			osmium::io::Reader osm{mapname, osmium::osm_entity_bits::relation};
-			osmium::apply(osm, osm_handler);
-		}
+		osmium::io::Reader osm{mapname};
+		osmium::apply(osm, osm_handler);
 
 		return true;
 	}
 #else
-	bool Import(const std::string& mapname)
+	bool Import(const std::string& mapname,
+		t_real = -10., t_real = 10.,
+		t_real = -10., t_real = 10.)
 	{
 		std::cerr << "Cannot import \"" << mapname << "\" because osmium support is disabled." << std::endl;
 		return false;

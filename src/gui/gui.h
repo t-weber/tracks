@@ -31,6 +31,7 @@
 #include "conversions.h"
 #include "statistics.h"
 #include "reports.h"
+#include "summary.h"
 
 #include "common/types.h"
 #include "lib/trackdb.h"
@@ -104,6 +105,7 @@ public:
 	void ShowConversions();
 	void ShowStatistics();
 	void ShowReports();
+	void ShowSummary();
 	void ShowAbout();
 
 	Resources& GetResources() { return m_res; }
@@ -153,6 +155,7 @@ private:
 	std::shared_ptr<Conversions> m_conversions{};
 	std::shared_ptr<Statistics> m_statistics{};
 	std::shared_ptr<Reports> m_reports{};
+	std::shared_ptr<Summary> m_summary{};
 
 	t_tracks m_trackdb{};
 

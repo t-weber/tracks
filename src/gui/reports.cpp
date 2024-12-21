@@ -94,8 +94,8 @@ Reports::Reports(QWidget* parent)
 	m_table->setHorizontalHeaderItem(TAB_DIST, new QTableWidgetItem{"Distance"});
 	m_table->setHorizontalHeaderItem(TAB_DIST_SUM, new QTableWidgetItem{"Distance Sum"});
 
-	m_table->horizontalHeader()->setDefaultSectionSize(200);
-	m_table->verticalHeader()->setDefaultSectionSize(32);
+	m_table->horizontalHeader()->setDefaultSectionSize(150);
+	m_table->verticalHeader()->setDefaultSectionSize(24);
 	m_table->verticalHeader()->setVisible(false);
 
 	// splitter
