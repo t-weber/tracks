@@ -9,6 +9,7 @@
 #define __TRACKS_MAP_FILE_H__
 
 #include <sstream>
+#include <iostream>
 #include <iomanip>
 #include <numbers>
 #include <limits>
@@ -266,7 +267,7 @@ public:
 		m_min_latitude = std::numeric_limits<t_real>::max();
 		m_max_latitude = -m_min_latitude;
 		m_min_longitude = std::numeric_limits<t_real>::max();
-		m_max_longitude = -m_min_latitude;
+		m_max_longitude = -m_min_longitude;
 
 		const auto& map_nodes = osm->get_child_optional("");
 		if(!map_nodes)
@@ -304,6 +305,12 @@ public:
 		t_real min_latitude = -10., t_real max_latitude = 10.)
 	{
 		namespace num = std::numbers;
+
+		// reset vertex ranges
+		m_min_latitude = std::numeric_limits<t_real>::max();
+		m_max_latitude = -m_min_latitude;
+		m_min_longitude = std::numeric_limits<t_real>::max();
+		m_max_longitude = -m_min_longitude;
 
 		struct OsmHandler : public osmium::handler::Handler
 		{
@@ -560,28 +567,53 @@ public:
 	 */
 	bool ExportSvg(const std::string& filename, t_real scale = 1) const
 	{
+		std::ofstream ofstr(filename);
+		if(!ofstr)
+			return false;
+
+		return ExportSvg(ofstr, scale);
+	}
+
+
+
+	/**
+	 * write an svg stream
+	 * @see https://github.com/boostorg/geometry/tree/develop/example
+	 */
+	bool ExportSvg(std::ostream& ostr, t_real scale = 1) const
+	{
 		namespace geo = boost::geometry;
 		namespace num = std::numbers;
 
 		using t_vert = geo::model::point<t_real, 2, geo::cs::cartesian>;
 		using t_line = geo::model::linestring<t_vert, std::vector>;
 		using t_poly = geo::model::polygon<t_vert, true /*cw*/, false /*closed*/, std::vector>;
-		using t_svg = geo::svg_mapper<t_vert>;
+		using t_box = geo::model::box<t_vert>;
+		using t_svg = geo::svg_mapper<t_vert, false, t_real>;
 
-		std::ofstream ofstr(filename);
-		if(!ofstr)
-			return false;
+		//t_svg svg(ostr,
+		//	scale * (m_max_longitude - m_min_longitude) * t_real(180) / num::pi_v<t_real>,
+		//	scale * (m_max_latitude - m_min_latitude) * t_real(180) / num::pi_v<t_real>);
+		int w = static_cast<int>(5000 * scale);
+		int h = static_cast<int>(5000 * scale);
+		t_svg svg(ostr, w, h,
+			"width=\"" + std::to_string(w) + "px\" "
+			"height=\"" + std::to_string(h) + "px\"");
 
-		t_svg svg(ofstr,
-			scale * 64. / ((m_max_longitude - m_min_longitude)
-				* t_real(180) / num::pi_v<t_real>),
-			scale * 64. / ((m_max_latitude - m_min_latitude)
-				* t_real(180) / num::pi_v<t_real>));
-
+		t_box frame(
+			t_vert{
+				m_min_longitude * t_real(180) / num::pi_v<t_real>,
+				m_min_latitude * t_real(180) / num::pi_v<t_real> },
+			t_vert{
+				m_max_longitude * t_real(180) / num::pi_v<t_real>,
+				m_max_latitude * t_real(180) / num::pi_v<t_real> });
+		svg.add(frame);
+		//svg.map(frame, "stroke:#ff0000; stroke-width:0.01px; fill:none;");
 
 		// draw area
 		std::unordered_set<t_size> seg_already_drawn;
-		auto draw_seg = [this, &seg_already_drawn, &svg](t_size id, const t_segment *seg = nullptr)
+		auto draw_seg = [this, &seg_already_drawn, &svg]
+			(t_size id, const t_segment *seg = nullptr)
 		{
 			auto id_iter = seg_already_drawn.find(id);
 			if(id_iter != seg_already_drawn.end())
@@ -626,7 +658,7 @@ public:
 					break;
 			}
 
-			svg.add(poly);
+			//svg.add(poly);
 			svg.map(poly, "stroke:" + line_col +
 				"; stroke-width:" + std::to_string(line_width) + "px" +
 				"; fill:" + fill_col + ";", 1.);
@@ -687,13 +719,42 @@ public:
 					break;
 			}
 
-			svg.add(line);
+			//svg.add(line);
 			svg.map(line, "stroke:" + line_col +
 				"; stroke-width:" + std::to_string(line_width) + "px"
 				"; fill:" + fill_col + ";", 1.);
 		}
 
+		// draw track
+		for(const t_vertex& vertex : m_track)
+		{
+			t_line line;
+
+			t_vert vert{
+				vertex.longitude * t_real(180) / num::pi_v<t_real>,
+				vertex.latitude * t_real(180) / num::pi_v<t_real>};
+			line.push_back(vert);
+
+			std::string line_col = "#ffff00";
+			t_real line_width = 8.;
+
+			//svg.add(line);
+			svg.map(line, "stroke:" + line_col +
+				"; stroke-width:" + std::to_string(line_width) + "px"
+				"; fill:none;", 1.);
+		}
+
 		return true;
+	}
+
+
+
+	/**
+	 * set a track to be displayed together with the map
+	 */
+	void SetTrack(const std::vector<t_vertex>& track)
+	{
+		m_track = track;
 	}
 
 
@@ -710,6 +771,8 @@ protected:
 
 	t_real m_min_latitude{}, m_max_latitude{};
 	t_real m_min_longitude{}, m_max_longitude{};
+
+	std::vector<t_vertex> m_track{};
 };
 
 

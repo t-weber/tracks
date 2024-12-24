@@ -14,6 +14,7 @@
 #include <QtWidgets/QTextEdit>
 #include <QtWidgets/QCheckBox>
 #include <QtWidgets/QSplitter>
+#include <QtSvg/QSvgWidget>
 
 // https://gcc.gnu.org/onlinedocs/gcc/Diagnostic-Pragmas.html
 #pragma GCC diagnostic push
@@ -56,9 +57,10 @@ protected:
 
 private:
 	std::shared_ptr<QSplitter> m_split{};
-	std::shared_ptr<QCustomPlot> m_plot{};
 	std::shared_ptr<QTextEdit> m_infos{};
 	std::shared_ptr<QCheckBox> m_same_range{};
+	std::shared_ptr<QCustomPlot> m_plot{};
+	std::shared_ptr<QSvgWidget> m_map{};
 
 	// track coordinate range
 	t_real m_min_long{}, m_max_long{};

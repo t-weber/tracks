@@ -55,7 +55,7 @@ Reports::Reports(QWidget* parent)
 	// "all tracks" checkbox
 	m_all_tracks = std::make_shared<QCheckBox>(plot_panel);
 	m_all_tracks->setText("Per Track");
-	m_all_tracks->setToolTip("Show the distances from all tracks individually.");
+	m_all_tracks->setToolTip("Show the distances from all tracks individually. Otherwise show monthly distances.");
 	m_all_tracks->setChecked(false);
 	connect(m_all_tracks.get(), &QCheckBox::toggled, this, &Reports::PlotDistances);
 
@@ -281,17 +281,32 @@ void Reports::CalcDistances()
 }
 
 
-
 void Reports::ResetDistPlotRange()
 {
-	m_plot->xAxis->setRange(
-		m_min_epoch - (m_max_epoch - m_min_epoch) / 20.,
-		m_max_epoch + (m_max_epoch - m_min_epoch) / 20.);
+	bool all_tracks = m_all_tracks && m_all_tracks->isChecked();
 
-	m_plot->yAxis->setRange(
-		m_min_dist - (m_max_dist - m_min_dist) / 20.,
-		m_max_dist + (m_max_dist - m_min_dist) / 20.);
+	t_real xmin = m_min_epoch;
+	t_real xmax = m_max_epoch;
 
+	t_real ymin = m_min_dist;
+	t_real ymax = m_max_dist + (m_max_dist - m_min_dist) / 20.;
+
+	if(all_tracks)
+	{
+		xmin -= (m_max_epoch - m_min_epoch) / 20.;
+		xmax += (m_max_epoch - m_min_epoch) / 20.;
+		ymin -= (m_max_dist - m_min_dist) / 20.;
+	}
+	else
+	{
+		t_real month = 30. * 24. * 60. * 60.;
+
+		xmin -= month;
+		xmax += month;
+	}
+
+	m_plot->xAxis->setRange(xmin, xmax);
+	m_plot->yAxis->setRange(ymin, ymax);
 	m_plot->replot();
 }
 
@@ -312,9 +327,10 @@ void Reports::PlotDistances()
 	t_real total_dist = 0.;
 
 	bool cumulative = m_cumulative && m_cumulative->isChecked();
+	bool all_tracks = m_all_tracks && m_all_tracks->isChecked();
 
 	// show sum for all tracks
-	if(m_all_tracks && m_all_tracks->isChecked())
+	if(all_tracks)
 	{
 		const t_size num_tracks = m_trackdb->GetTrackCount();
 		epochs.reserve(num_tracks);
@@ -403,8 +419,30 @@ void Reports::PlotDistances()
 		//graph->setBrush(brush);
 	};
 
+	// create bar graph
+	auto add_bars = [this](const QVector<t_real>& epochs, const QVector<t_real>& dists)
+	{
+		QCPBars *graph = new QCPBars(m_plot->xAxis, m_plot->yAxis);
+		graph->setWidth(30. * 24. * 60. * 60.);
+
+		QPen pen = graph->pen();
+		pen.setWidthF(2.);
+		pen.setColor(QColor{0, 0, 0xff, 0xff});
+
+		QBrush brush = graph->brush();
+		brush.setStyle(Qt::SolidPattern);
+		brush.setColor(QColor{0, 0, 0xff, 0x99});
+
+		graph->setData(epochs, dists, true);
+		graph->setPen(pen);
+		graph->setBrush(brush);
+	};
+
 	// plot distances
-	add_graph(epochs, dists);
+	if(all_tracks)
+		add_graph(epochs, dists);
+	else
+		add_bars(epochs, dists);
 
 	ResetDistPlotRange();
 }

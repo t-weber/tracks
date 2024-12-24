@@ -197,7 +197,7 @@ void TracksWnd::SetupGUI()
 	QAction *actionStatistics = new QAction{iconStatistics, "Pace Statistics...", this};
 	connect(actionStatistics, &QAction::triggered, this, &TracksWnd::ShowStatistics);
 
-	QIcon iconReports = QIcon::fromTheme("applications-graphics");
+	QIcon iconReports = QIcon::fromTheme("x-office-presentation");
 	QAction *actionReports = new QAction{iconReports, "Distance Reports...", this};
 	connect(actionReports, &QAction::triggered, this, &TracksWnd::ShowReports);
 

@@ -10,9 +10,11 @@
 #include "map.h"
 
 #include <QtCore/QByteArray>
+#include <QtWidgets/QTabWidget>
 #include <QtWidgets/QGridLayout>
 #include <QtWidgets/QPushButton>
 
+#include <sstream>
 #include <numbers>
 namespace num = std::numbers;
 
@@ -20,8 +22,13 @@ namespace num = std::numbers;
 TrackInfos::TrackInfos(QWidget* parent)
 	: QWidget(parent)
 {
-	QWidget *plot_panel = new QWidget(this);
+	QTabWidget *tab = new QTabWidget(this);
+	QWidget *plot_panel = new QWidget(tab);
+	QWidget *map_panel = new QWidget(tab);
+	tab->addTab(plot_panel, "Track");
+	//tab->addTab(map_panel, "Map");  // TODO
 
+	// track plot panel
 	m_plot = std::make_shared<QCustomPlot>(plot_panel);
 	m_plot->setSelectionRectMode(QCP::srmZoom);
 	m_plot->setInteraction(QCP::Interaction(int(QCP::iRangeZoom) | int(QCP::iRangeDrag)));
@@ -40,19 +47,29 @@ TrackInfos::TrackInfos(QWidget* parent)
 	connect(btn_replot, &QAbstractButton::clicked, this, &TrackInfos::ResetPlotRange);
 
 	QGridLayout *plot_panel_layout = new QGridLayout(plot_panel);
-	plot_panel_layout->setContentsMargins(0, 0, 0, 0);
-	plot_panel_layout->setVerticalSpacing(0);
-	plot_panel_layout->setHorizontalSpacing(0);
+	plot_panel_layout->setContentsMargins(4, 4, 4, 4);
+	plot_panel_layout->setVerticalSpacing(4);
+	plot_panel_layout->setHorizontalSpacing(4);
 	plot_panel_layout->addWidget(m_plot.get(), 0, 0, 1, 4);
 	plot_panel_layout->addWidget(m_same_range.get(), 1, 0, 1, 1);
 	plot_panel_layout->addWidget(btn_replot, 1, 3, 1, 1);
 
+	// map plot panel
+	m_map = std::make_shared<QSvgWidget>(map_panel);
+
+	QGridLayout *map_panel_layout = new QGridLayout(map_panel);
+	map_panel_layout->setContentsMargins(4, 4, 4, 4);
+	map_panel_layout->setVerticalSpacing(4);
+	map_panel_layout->setHorizontalSpacing(4);
+	map_panel_layout->addWidget(m_map.get(), 0, 0, 1, 1);
+
+	// text infos
 	m_infos = std::make_shared<QTextEdit>(this);
 	m_infos->setReadOnly(true);
 
 	m_split = std::make_shared<QSplitter>(this);
 	m_split->setOrientation(Qt::Vertical);
-	m_split->addWidget(plot_panel);
+	m_split->addWidget(tab);
 	m_split->addWidget(m_infos.get());
 	m_split->setStretchFactor(0, 10);
 	m_split->setStretchFactor(1, 1);
@@ -173,12 +190,31 @@ void TrackInfos::ShowTrack(const t_track& track)
 
 void TrackInfos::PlotMap()
 {
-	if(!m_plot)
+	// TODO
+	return;
+
+	if(!m_map)
 		return;
 
-	// TODO
-	/*t_real lon_range = m_max_long_plot - m_min_long_plot;
+	t_real lon_range = m_max_long_plot - m_min_long_plot;
 	t_real lat_range = m_max_lat_plot - m_min_lat_plot;
+
+	t_map map;
+	if(map.Import("0.osm.pbf",
+		m_min_long_plot, m_max_long_plot,
+		m_min_lat_plot, m_max_lat_plot))
+	{
+		std::ostringstream ostr;
+		map.ExportSvg(ostr);
+
+		m_map->load(
+			QByteArray{ostr.str().c_str(),
+			static_cast<int>(ostr.str().size())});
+	}
+
+
+	/*if(!m_plot)
+		return;
 
 	MapPlotter map;
 	if(map.Import("0.osm.pbf",

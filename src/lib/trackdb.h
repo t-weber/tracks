@@ -26,7 +26,7 @@ class MultipleTracks
 {
 public:
 	using t_track = SingleTrack<t_real, t_size>;
-	using t_TrackPoint = t_track::t_TrackPoint;
+	using t_TrackPoint = typename t_track::t_TrackPoint;
 	using t_clk = typename t_track::t_clk;
 	using t_timept = typename t_track::t_timept;
 	using t_timept_map = std::map<t_timept, std::pair<t_real /*dist*/, t_size /*# tracks*/>>;
