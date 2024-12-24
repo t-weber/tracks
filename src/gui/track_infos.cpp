@@ -8,11 +8,14 @@
 #include "track_infos.h"
 #include "helpers.h"
 #include "map.h"
+namespace fs = __map_fs;
 
 #include <QtCore/QByteArray>
 #include <QtWidgets/QTabWidget>
 #include <QtWidgets/QGridLayout>
 #include <QtWidgets/QPushButton>
+#include <QtWidgets/QFileDialog>
+#include <QtSvg/QSvgRenderer>
 
 #include <sstream>
 #include <numbers>
@@ -57,12 +60,31 @@ TrackInfos::TrackInfos(QWidget* parent) : QWidget{parent}
 
 	// map plot panel
 	m_map = std::make_shared<QSvgWidget>(map_panel);
+	//m_map->renderer()->setAnimationEnabled(false);
+	m_map->renderer()->setAspectRatioMode(Qt::KeepAspectRatio);
+
+	m_mapfile = std::make_shared<QLineEdit>(map_panel);
+	m_mapfile->setPlaceholderText("Map File (.osm or .osm.pbf)");
+	m_mapfile->setToolTip("Map file to draw.");
+
+	QPushButton *btn_browse_map = new QPushButton(map_panel);
+	btn_browse_map->setText("Select Map...");
+	btn_browse_map->setToolTip("Select a map file to draw.");
+	connect(btn_browse_map, &QAbstractButton::clicked, this, &TrackInfos::SelectMap);
+
+	QPushButton *btn_calc_map = new QPushButton(map_panel);
+	btn_calc_map->setText("Calculate Map");
+	btn_calc_map->setToolTip("Calculate the map for the current track.");
+	connect(btn_calc_map, &QAbstractButton::clicked, this, &TrackInfos::PlotMap);
 
 	QGridLayout *map_panel_layout = new QGridLayout(map_panel);
 	map_panel_layout->setContentsMargins(4, 4, 4, 4);
 	map_panel_layout->setVerticalSpacing(4);
 	map_panel_layout->setHorizontalSpacing(4);
-	map_panel_layout->addWidget(m_map.get(), 0, 0, 1, 1);
+	map_panel_layout->addWidget(m_map.get(), 0, 0, 1, 4);
+	map_panel_layout->addWidget(m_mapfile.get(), 1, 0, 1, 2);
+	map_panel_layout->addWidget(btn_browse_map, 1, 2, 1, 1);
+	map_panel_layout->addWidget(btn_calc_map, 1, 3, 1, 1);
 
 	// text infos
 	m_infos = std::make_shared<QTextEdit>(this);
@@ -150,8 +172,13 @@ void TrackInfos::ResetPlotRange()
 }
 
 
+/**
+ * show the current track in the plotter
+ */
 void TrackInfos::ShowTrack(const t_track& track)
 {
+	m_track = &track;
+
 	// print track infos
 	m_infos->setHtml(track.PrintHtml(g_prec_gui).c_str());
 
@@ -175,9 +202,9 @@ void TrackInfos::ShowTrack(const t_track& track)
 		return;
 	m_plot->clearPlottables();
 
-#ifdef _TRACKS_USE_OSMIUM_
-	PlotMap(track);
-#endif
+//#ifdef _TRACKS_USE_OSMIUM_
+//	PlotMap();
+//#endif
 
 	QCPCurve *curve = new QCPCurve(m_plot->xAxis, m_plot->yAxis);
 	curve->setData(longitudes, latitudes);
@@ -191,9 +218,44 @@ void TrackInfos::ShowTrack(const t_track& track)
 }
 
 
-void TrackInfos::PlotMap(const t_track& track)
+/**
+ * browse for map files
+ */
+void TrackInfos::SelectMap()
+{
+	auto filedlg = std::make_shared<QFileDialog>(
+		this, "Load Map File", m_mapdir.c_str(),
+		"Map Files (*.osm *.pbf);;All Files (* *.*)");
+	filedlg->setAcceptMode(QFileDialog::AcceptOpen);
+	filedlg->setDefaultSuffix(".pbf");
+	filedlg->setFileMode(QFileDialog::ExistingFile);
+
+	if(!filedlg->exec())
+		return;
+
+	QStringList files = filedlg->selectedFiles();
+	if(files.size() == 0 || files[0] == "")
+		return;
+
+	m_mapfile->setText(files[0]);
+
+	fs::path file{files[0].toStdString()};
+	m_mapdir = file.parent_path().string();
+}
+
+
+/**
+ * render an image of the map corresponding to the current track
+ */
+void TrackInfos::PlotMap()
 {
 	if(!m_map)
+		return;
+
+	// clear map
+	m_map->load(QByteArray{});
+
+	if(m_mapfile->text() == "")
 		return;
 
 	t_real lon_range = m_max_long_plot - m_min_long_plot;
@@ -201,16 +263,19 @@ void TrackInfos::PlotMap(const t_track& track)
 
 	// track
 	std::vector<typename t_map::t_vertex> thetrack;
-	thetrack.reserve(track.GetPoints().size());
-	for(const t_track_pt& pt : track.GetPoints())
+	if(m_track)
 	{
-		typename t_map::t_vertex vert
+		thetrack.reserve(m_track->GetPoints().size());
+		for(const t_track_pt& pt : m_track->GetPoints())
 		{
-			.longitude = pt.longitude,
-			.latitude = pt.latitude,
-		};
+			typename t_map::t_vertex vert
+			{
+				.longitude = pt.longitude,
+				.latitude = pt.latitude,
+			};
 
-		thetrack.emplace_back(std::move(vert));
+			thetrack.emplace_back(std::move(vert));
+		}
 	}
 
 	// map
@@ -218,15 +283,15 @@ void TrackInfos::PlotMap(const t_track& track)
 	map.SetTrack(std::move(thetrack));
 
 	// cut out a map that has some margins around the actual data area
-	if(map.Import("0.osm.pbf",
+	if(map.Import(m_mapfile->text().toStdString(),
 		m_min_long_plot - lon_range/10., m_max_long_plot + lon_range/10.,
 		m_min_lat_plot - lat_range/10., m_max_lat_plot + lat_range/10.))
 	{
 		// plot the data area
 		std::ostringstream ostr;
 		map.ExportSvg(ostr, 1.,
-			m_min_long_plot, m_max_long_plot,
-			m_min_lat_plot, m_max_lat_plot);
+			m_min_long_plot - lon_range/20., m_max_long_plot + lon_range/20.,
+			m_min_lat_plot - lat_range/20., m_max_lat_plot + lat_range/20.);
 
 		m_map->load(
 			QByteArray{ostr.str().c_str(),
@@ -234,11 +299,8 @@ void TrackInfos::PlotMap(const t_track& track)
 	}
 
 
-	/*if(!m_plot)
-		return;
-
-	MapPlotter map;
-	if(map.Import("0.osm.pbf",
+	/*MapPlotter map;
+	if(map.Import(m_mapfile->text().toStdString(),
 		m_min_long_plot, m_max_long_plot,
 		m_min_lat_plot, m_max_lat_plot))
 	{
@@ -252,13 +314,14 @@ void TrackInfos::PlotMap(const t_track& track)
 
 void TrackInfos::Clear()
 {
+	m_track = nullptr;
+	m_infos->clear();
+
 	if(!m_plot)
 		return;
 
 	m_plot->clearPlottables();
 	m_plot->replot();
-
-	m_infos->clear();
 }
 
 
@@ -295,6 +358,7 @@ void TrackInfos::SaveSettings(QSettings& settings)
 	QByteArray split{m_split->saveState()};
 	settings.setValue("track_info/split", split);
 	settings.setValue("track_info/keep_aspect", m_same_range->isChecked());
+	settings.setValue("track_info/recent_maps", m_mapdir.c_str());
 }
 
 
@@ -306,4 +370,7 @@ void TrackInfos::RestoreSettings(QSettings& settings)
 
 	if(settings.contains("track_info/keep_aspect"))
 		m_same_range->setChecked(settings.value("track_info/keep_aspect").toBool());
+
+	if(settings.contains("track_info/recent_maps"))
+		m_mapdir = settings.value("track_info/recent_maps").toString().toStdString();
 }

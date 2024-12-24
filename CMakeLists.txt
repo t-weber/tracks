@@ -9,7 +9,7 @@ cmake_minimum_required(VERSION 3.5)
 project(tracks)
 
 
-option(USE_OSMIUM "use the osmium library" FALSE)
+option(USE_OSMIUM "use the osmium library" TRUE)
 
 
 enable_language(CXX)

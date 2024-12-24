@@ -14,6 +14,7 @@
 #include <QtWidgets/QTextEdit>
 #include <QtWidgets/QCheckBox>
 #include <QtWidgets/QSplitter>
+#include <QtWidgets/QLineEdit>
 #include <QtSvg/QSvgWidget>
 
 // https://gcc.gnu.org/onlinedocs/gcc/Diagnostic-Pragmas.html
@@ -52,13 +53,15 @@ protected:
 	void CalcPlotRange();
 	void ResetPlotRange();
 
-	void PlotMap(const t_track& track);
+	void SelectMap();
+	void PlotMap();
 
 
 private:
 	std::shared_ptr<QSplitter> m_split{};
 	std::shared_ptr<QTextEdit> m_infos{};
 	std::shared_ptr<QCheckBox> m_same_range{};
+	std::shared_ptr<QLineEdit> m_mapfile{};
 	std::shared_ptr<QCustomPlot> m_plot{};
 	std::shared_ptr<QSvgWidget> m_map{};
 
@@ -69,6 +72,12 @@ private:
 	// plotted coordinate range
 	t_real m_min_long_plot{}, m_max_long_plot{};
 	t_real m_min_lat_plot{}, m_max_lat_plot{};
+
+	// currently selected track
+	const t_track *m_track{};
+
+	// directory with recently used map files
+	std::string m_mapdir{};
 
 
 signals:

@@ -646,7 +646,8 @@ public:
 		// draw area
 		std::unordered_set<t_size> seg_already_drawn;
 		auto draw_seg = [this, &seg_already_drawn, &svg]
-			(t_size id, const t_segment *seg = nullptr)
+			(t_size id, const t_segment *seg = nullptr,
+			const std::unordered_map<std::string, std::string>* more_tags = nullptr)
 		{
 			auto id_iter = seg_already_drawn.find(id);
 			if(id_iter != seg_already_drawn.end())
@@ -683,12 +684,28 @@ public:
 			t_real line_width = 2.;
 			bool found = false;
 
-			for(const auto& [ tag_key, tag_val ] : seg->tags)
+			if(more_tags)
 			{
-				std::tie(found, fill_col) =
-					GetSurfaceColourString(tag_key, tag_val, "#ffffff");
-				if(found)
-					break;
+				// search additional tag map for colour
+				for(const auto& [ tag_key, tag_val ] : *more_tags)
+				{
+					std::tie(found, fill_col) =
+						GetSurfaceColourString(tag_key, tag_val, "#ffffff");
+					if(found)
+						break;
+				}
+			}
+
+			if(!found)
+			{
+				// search tag map for colour
+				for(const auto& [ tag_key, tag_val ] : seg->tags)
+				{
+					std::tie(found, fill_col) =
+						GetSurfaceColourString(tag_key, tag_val, "#ffffff");
+					if(found)
+						break;
+				}
 			}
 
 			//svg.add(poly);
@@ -705,9 +722,9 @@ public:
 		for(const auto& [ multiseg_id, multiseg ] : m_multisegments)
 		{
 			for(const t_size id : multiseg.segment_ids)
-				draw_seg(id);
+				draw_seg(id, nullptr, &multiseg.tags);
 			for(const t_size id : multiseg.segment_inner_ids)
-				draw_seg(id);
+				draw_seg(id, nullptr, &multiseg.tags);
 		}
 
 		// draw areas
