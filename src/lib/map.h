@@ -455,10 +455,22 @@ public:
 			void tag_list(const osmium::TagList& tags)
 			{
 			}*/
-		} osm_handler{this, &min_longitude, &max_longitude, &min_latitude, &max_latitude};
+		};
 
-		osmium::io::Reader osm{mapname};
-		osmium::apply(osm, osm_handler);
+		try
+		{
+			OsmHandler osm_handler{this,
+				&min_longitude, &max_longitude,
+				&min_latitude, &max_latitude};
+
+			osmium::io::Reader osm{mapname};
+			osmium::apply(osm, osm_handler);
+		}
+		catch(const std::exception& ex)
+		{
+			std::cerr << ex.what() << std::endl;
+			return false;
+		}
 
 		return true;
 	}
@@ -467,7 +479,9 @@ public:
 		t_real = -10., t_real = 10.,
 		t_real = -10., t_real = 10.)
 	{
-		std::cerr << "Cannot import \"" << mapname << "\" because osmium support is disabled." << std::endl;
+		std::cerr << "Cannot import \"" << mapname
+			<< "\" because osmium support is disabled."
+			<< std::endl;
 		return false;
 	}
 #endif  // _TRACKS_USE_OSMIUM_
@@ -495,7 +509,7 @@ public:
 		else if(key == "landuse" && val == "retail")
 			return std::make_tuple(true, 0xff, 0x44, 0x44);
 		else if(key == "landuse" && val == "industrial")
-			return std::make_tuple(true, 0xee, 0xee, 0x44);
+			return std::make_tuple(true, 0xaa, 0xaa, 0x44);
 		else if(key == "landuse" && val == "forest")
 			return std::make_tuple(true, 0x00, 0x99, 0x00);
 		else if(key == "landuse" && (val == "grass" || val == "meadow"))
@@ -726,17 +740,19 @@ public:
 		}
 
 		// draw track
+		t_line line;
 		for(const t_vertex& vertex : m_track)
 		{
-			t_line line;
-
 			t_vert vert{
 				vertex.longitude * t_real(180) / num::pi_v<t_real>,
 				vertex.latitude * t_real(180) / num::pi_v<t_real>};
 			line.push_back(vert);
+		}
 
+		if(m_track.size())
+		{
 			std::string line_col = "#ffff00";
-			t_real line_width = 8.;
+			t_real line_width = 16.;
 
 			//svg.add(line);
 			svg.map(line, "stroke:" + line_col +
@@ -752,9 +768,9 @@ public:
 	/**
 	 * set a track to be displayed together with the map
 	 */
-	void SetTrack(const std::vector<t_vertex>& track)
+	void SetTrack(std::vector<t_vertex>&& track)
 	{
-		m_track = track;
+		m_track = std::forward<std::vector<t_vertex>&&>(track);
 	}
 
 

@@ -52,7 +52,7 @@ protected:
 	void CalcPlotRange();
 	void ResetPlotRange();
 
-	void PlotMap();
+	void PlotMap(const t_track& track);
 
 
 private:

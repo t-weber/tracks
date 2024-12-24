@@ -26,7 +26,7 @@ TrackInfos::TrackInfos(QWidget* parent)
 	QWidget *plot_panel = new QWidget(tab);
 	QWidget *map_panel = new QWidget(tab);
 	tab->addTab(plot_panel, "Track");
-	//tab->addTab(map_panel, "Map");  // TODO
+	tab->addTab(map_panel, "Map");
 
 	// track plot panel
 	m_plot = std::make_shared<QCustomPlot>(plot_panel);
@@ -174,7 +174,7 @@ void TrackInfos::ShowTrack(const t_track& track)
 		return;
 	m_plot->clearPlottables();
 
-	PlotMap();
+	PlotMap(track);
 
 	QCPCurve *curve = new QCPCurve(m_plot->xAxis, m_plot->yAxis);
 	curve->setData(longitudes, latitudes);
@@ -188,10 +188,9 @@ void TrackInfos::ShowTrack(const t_track& track)
 }
 
 
-void TrackInfos::PlotMap()
+void TrackInfos::PlotMap(const t_track& track)
 {
-	// TODO
-	return;
+	return;  // TODO
 
 	if(!m_map)
 		return;
@@ -199,7 +198,24 @@ void TrackInfos::PlotMap()
 	t_real lon_range = m_max_long_plot - m_min_long_plot;
 	t_real lat_range = m_max_lat_plot - m_min_lat_plot;
 
+	// track
+	std::vector<typename t_map::t_vertex> thetrack;
+	thetrack.reserve(track.GetPoints().size());
+	for(const t_track_pt& pt : track.GetPoints())
+	{
+		typename t_map::t_vertex vert
+		{
+			.longitude = pt.longitude,
+			.latitude = pt.latitude,
+		};
+
+		thetrack.emplace_back(std::move(vert));
+	}
+
+	// map
 	t_map map;
+	map.SetTrack(std::move(thetrack));
+
 	if(map.Import("0.osm.pbf",
 		m_min_long_plot, m_max_long_plot,
 		m_min_lat_plot, m_max_lat_plot))

@@ -117,11 +117,13 @@ geo_dist_2(t_real lat1, t_real lat2,
 		using t_strat = geo::strategy::distance::vincenty<geo::srs::spheroid<t_real>>;
 		dist = geo::distance<t_pt, t_pt, t_strat>(pt1, pt2, t_strat{});
 	}
-	/*else if constexpr(STRATEGY == 3)
+#if BOOST_VERSION > 107400
+	else if constexpr(STRATEGY == 3)
 	{
 		using t_strat = geo::strategy::distance::karney<geo::srs::spheroid<t_real>>;
 		dist = geo::distance<t_pt, t_pt, t_strat>(pt1, pt2, t_strat{});
-	}*/
+	}
+#endif
 	else
 	{
 		t_real rad = earth_radius<t_real>((lat1 + lat2) / t_real(2));
