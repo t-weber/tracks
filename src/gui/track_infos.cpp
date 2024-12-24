@@ -19,14 +19,15 @@
 namespace num = std::numbers;
 
 
-TrackInfos::TrackInfos(QWidget* parent)
-	: QWidget(parent)
+TrackInfos::TrackInfos(QWidget* parent) : QWidget{parent}
 {
 	QTabWidget *tab = new QTabWidget(this);
 	QWidget *plot_panel = new QWidget(tab);
 	QWidget *map_panel = new QWidget(tab);
 	tab->addTab(plot_panel, "Track");
+#ifdef _TRACKS_USE_OSMIUM_
 	tab->addTab(map_panel, "Map");
+#endif
 
 	// track plot panel
 	m_plot = std::make_shared<QCustomPlot>(plot_panel);
@@ -91,22 +92,22 @@ TrackInfos::~TrackInfos()
 
 void TrackInfos::CalcPlotRange()
 {
+	m_min_long_plot = m_min_long;
+	m_max_long_plot = m_max_long;
+	m_min_lat_plot = m_min_lat;
+	m_max_lat_plot = m_max_lat;
+
 	if(!m_plot || !m_same_range)
 		return;
 
 	t_real aspect = t_real(m_plot->viewport().height()) /
 		t_real(m_plot->viewport().width());
 
-	m_min_long_plot = m_min_long;
-	m_max_long_plot = m_max_long;
-	m_min_lat_plot = m_min_lat;
-	m_max_lat_plot = m_max_lat;
-
-	t_real range_long = m_max_long - m_min_long;
-	t_real range_lat = m_max_lat - m_min_lat;
-
 	if(m_same_range->isChecked())
 	{
+		t_real range_long = m_max_long - m_min_long;
+		t_real range_lat = m_max_lat - m_min_lat;
+
 		if(range_long*aspect > range_lat)
 		{
 			t_real mid_lat = m_min_lat_plot + range_lat * 0.5;
@@ -129,10 +130,10 @@ void TrackInfos::CalcPlotRange()
 
 void TrackInfos::ResetPlotRange()
 {
+	CalcPlotRange();
+
 	if(!m_plot || !m_same_range)
 		return;
-
-	CalcPlotRange();
 
 	t_real range_long = m_max_long_plot - m_min_long_plot;
 	t_real range_lat = m_max_lat_plot - m_min_lat_plot;
@@ -174,7 +175,9 @@ void TrackInfos::ShowTrack(const t_track& track)
 		return;
 	m_plot->clearPlottables();
 
+#ifdef _TRACKS_USE_OSMIUM_
 	PlotMap(track);
+#endif
 
 	QCPCurve *curve = new QCPCurve(m_plot->xAxis, m_plot->yAxis);
 	curve->setData(longitudes, latitudes);
@@ -190,8 +193,6 @@ void TrackInfos::ShowTrack(const t_track& track)
 
 void TrackInfos::PlotMap(const t_track& track)
 {
-	return;  // TODO
-
 	if(!m_map)
 		return;
 
@@ -216,12 +217,16 @@ void TrackInfos::PlotMap(const t_track& track)
 	t_map map;
 	map.SetTrack(std::move(thetrack));
 
+	// cut out a map that has some margins around the actual data area
 	if(map.Import("0.osm.pbf",
-		m_min_long_plot, m_max_long_plot,
-		m_min_lat_plot, m_max_lat_plot))
+		m_min_long_plot - lon_range/10., m_max_long_plot + lon_range/10.,
+		m_min_lat_plot - lat_range/10., m_max_lat_plot + lat_range/10.))
 	{
+		// plot the data area
 		std::ostringstream ostr;
-		map.ExportSvg(ostr);
+		map.ExportSvg(ostr, 1.,
+			m_min_long_plot, m_max_long_plot,
+			m_min_lat_plot, m_max_lat_plot);
 
 		m_map->load(
 			QByteArray{ostr.str().c_str(),

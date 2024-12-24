@@ -17,6 +17,7 @@
 #include <list>
 #include <vector>
 #include <tuple>
+#include <optional>
 #include <unordered_map>
 #include <unordered_set>
 
@@ -594,7 +595,9 @@ public:
 	 * write an svg stream
 	 * @see https://github.com/boostorg/geometry/tree/develop/example
 	 */
-	bool ExportSvg(std::ostream& ostr, t_real scale = 1) const
+	bool ExportSvg(std::ostream& ostr, t_real scale = 1,
+		std::optional<t_real> min_lon = std::nullopt, std::optional<t_real> max_lon = std::nullopt,
+		std::optional<t_real> min_lat = std::nullopt, std::optional<t_real> max_lat = std::nullopt) const
 	{
 		namespace geo = boost::geometry;
 		namespace num = std::numbers;
@@ -605,9 +608,25 @@ public:
 		using t_box = geo::model::box<t_vert>;
 		using t_svg = geo::svg_mapper<t_vert, false, t_real>;
 
+		// actual bounds from data
+		t_real max_longitude = m_max_longitude;
+		t_real min_longitude = m_min_longitude;
+		t_real max_latitude = m_max_latitude;
+		t_real min_latitude = m_min_latitude;
+
+		// bounds for plot (which may be lower than the data bounds)
+		if(min_lon)
+			min_longitude = *min_lon;
+		if(min_lat)
+			min_latitude = *min_lat;
+		if(max_lon)
+			max_longitude = *max_lon;
+		if(max_lat)
+			max_latitude = *max_lat;
+
 		//t_svg svg(ostr,
-		//	scale * (m_max_longitude - m_min_longitude) * t_real(180) / num::pi_v<t_real>,
-		//	scale * (m_max_latitude - m_min_latitude) * t_real(180) / num::pi_v<t_real>);
+		//	scale * (max_longitude - min_longitude) * t_real(180) / num::pi_v<t_real>,
+		//	scale * (max_latitude - min_latitude) * t_real(180) / num::pi_v<t_real>);
 		int w = static_cast<int>(5000 * scale);
 		int h = static_cast<int>(5000 * scale);
 		t_svg svg(ostr, w, h,
@@ -616,11 +635,11 @@ public:
 
 		t_box frame(
 			t_vert{
-				m_min_longitude * t_real(180) / num::pi_v<t_real>,
-				m_min_latitude * t_real(180) / num::pi_v<t_real> },
+				min_longitude * t_real(180) / num::pi_v<t_real>,
+				min_latitude * t_real(180) / num::pi_v<t_real> },
 			t_vert{
-				m_max_longitude * t_real(180) / num::pi_v<t_real>,
-				m_max_latitude * t_real(180) / num::pi_v<t_real> });
+				max_longitude * t_real(180) / num::pi_v<t_real>,
+				max_latitude * t_real(180) / num::pi_v<t_real> });
 		svg.add(frame);
 		//svg.map(frame, "stroke:#ff0000; stroke-width:0.01px; fill:none;");
 
@@ -714,7 +733,7 @@ public:
 				line.push_back(vert);
 			}
 
-			std::string line_col = "#000000";
+			std::string line_col = "#222222";
 			std::string fill_col = "none";
 			t_real line_width = 8.;
 			bool found_width = false, found_col = false;
@@ -727,7 +746,7 @@ public:
 
 				if(!found_col)
 					std::tie(found_col, line_col) =
-						GetSurfaceColourString(tag_key, tag_val, "#000000");
+						GetSurfaceColourString(tag_key, tag_val, "#222222");
 
 				if(found_width && found_col)
 					break;
@@ -751,13 +770,11 @@ public:
 
 		if(m_track.size())
 		{
-			std::string line_col = "#ffff00";
-			t_real line_width = 16.;
-
 			//svg.add(line);
-			svg.map(line, "stroke:" + line_col +
-				"; stroke-width:" + std::to_string(line_width) + "px"
-				"; fill:none;", 1.);
+			svg.map(line, "stroke:#000000; "
+				"stroke-width:48px; fill:none;", 1.);
+			svg.map(line, "stroke:#ffff00; "
+				"stroke-width:24px; fill:none;", 1.);
 		}
 
 		return true;
