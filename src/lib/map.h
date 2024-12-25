@@ -35,7 +35,9 @@
 #include <boost/property_tree/xml_parser.hpp>
 #include <boost/geometry.hpp>
 
-#ifdef _TRACKS_USE_OSMIUM_
+#if __has_include(<osmium/handler.hpp>) && defined(_TRACKS_CFG_USE_OSMIUM_)
+	#define _TRACKS_USE_OSMIUM_ 1
+
 	#include <osmium/io/any_input.hpp>
 	#include <osmium/visitor.hpp>
 	#include <osmium/handler.hpp>
@@ -570,12 +572,12 @@ public:
 			return std::make_tuple(true, 0xff, 0x44, 0x44);
 		else if(key == "landuse" && val == "industrial")
 			return std::make_tuple(true, 0xaa, 0xaa, 0x44);
-		else if(key == "landuse" && val == "farmland")
-			return std::make_tuple(true, 0x88, 0x33, 0x22);
 		else if(key == "landuse" && val == "forest")
 			return std::make_tuple(true, 0x00, 0x99, 0x00);
 		else if(key == "landuse" && (val == "grass" || val == "meadow"))
 			return std::make_tuple(true, 0x44, 0xff, 0x44);
+		else if(key == "landuse" && (val == "farmland" || val == "farmyard"))
+			return std::make_tuple(true, 0x88, 0x33, 0x22);
 		else if(key == "waterway" && val == "river")
 			return std::make_tuple(true, 0x55, 0x55, 0xff);
 		else if(key == "building" /*&& val == "yes"*/)

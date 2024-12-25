@@ -9,12 +9,12 @@
 #include "helpers.h"
 namespace fs = __map_fs;
 
-#include <QtCore/QByteArray>
 #include <QtWidgets/QTabWidget>
 #include <QtWidgets/QGridLayout>
 #include <QtWidgets/QPushButton>
 #include <QtWidgets/QFileDialog>
 #include <QtWidgets/QProgressDialog>
+#include <QtWidgets/QMessageBox>
 #include <QtSvg/QSvgRenderer>
 
 #include <sstream>
@@ -66,6 +66,14 @@ TrackInfos::TrackInfos(QWidget* parent) : QWidget{parent}
 	//m_map->renderer()->setAnimationEnabled(false);
 	m_map->renderer()->setAspectRatioMode(Qt::KeepAspectRatio);
 
+	m_map_context = std::make_shared<QMenu>(map_panel);
+
+	QIcon iconSaveSvg = QIcon::fromTheme("image-x-generic");
+	QAction *actionSaveSvg = new QAction(iconSaveSvg, "Save Image...", m_map_context.get());
+	connect(actionSaveSvg, &QAction::triggered, this, &TrackInfos::SaveMapSvg);
+
+	m_map_context->addAction(actionSaveSvg);
+
 	m_mapfile = std::make_shared<QLineEdit>(map_panel);
 	m_mapfile->setPlaceholderText("Map File (.osm or .osm.pbf)");
 	m_mapfile->setToolTip("Map file to draw.");
@@ -108,6 +116,7 @@ TrackInfos::TrackInfos(QWidget* parent) : QWidget{parent}
 
 	connect(m_plot.get(), &QCustomPlot::mouseMove, this, &TrackInfos::PlotMouseMove);
 	connect(m_map.get(), &MapDrawer::MouseMoved, this, &TrackInfos::MapMouseMove);
+	connect(m_map.get(), &MapDrawer::MousePressed, this, &TrackInfos::MapMouseClick);
 }
 
 
@@ -259,7 +268,8 @@ void TrackInfos::PlotMap()
 		return;
 
 	// clear map
-	m_map->load(QByteArray{});
+	m_map_image.clear();
+	m_map->load(m_map_image);
 
 	if(m_mapfile->text() == "")
 		return;
@@ -317,9 +327,8 @@ void TrackInfos::PlotMap()
 			m_min_long_plot - lon_range/20., m_max_long_plot + lon_range/20.,
 			m_min_lat_plot - lat_range/20., m_max_lat_plot + lat_range/20.);
 
-		m_map->load(
-			QByteArray{ostr.str().c_str(),
-			static_cast<int>(ostr.str().size())});
+		m_map_image = QByteArray{ostr.str().c_str(), static_cast<int>(ostr.str().size())};
+		m_map->load(m_map_image);
 	}
 
 
@@ -336,6 +345,46 @@ void TrackInfos::PlotMap()
 }
 
 
+/**
+ * save the map as an svg image
+ */
+void TrackInfos::SaveMapSvg()
+{
+	if(!m_map || m_map_image.size() == 0)
+	{
+		QMessageBox::warning(this, "Warning", "No map is loaded.");
+		return;
+	}
+
+	auto filedlg = std::make_shared<QFileDialog>(
+		this, "Save Map as Image", m_svgdir.c_str(),
+		"SVG Files (*.svg)");
+	filedlg->setAcceptMode(QFileDialog::AcceptSave);
+	filedlg->setDefaultSuffix("svg");
+	filedlg->selectFile("map");
+	filedlg->setFileMode(QFileDialog::AnyFile);
+
+	if(!filedlg->exec())
+		return;
+
+	QStringList files = filedlg->selectedFiles();
+	if(files.size() == 0 || files[0] == "")
+		return;
+
+	std::ofstream ofstr{files[0].toStdString()};
+	if(!ofstr)
+	{
+		QMessageBox::critical(this, "Error",
+			QString("File \"%1\" could not be saved.").arg(files[0]));
+		return;
+	}
+	ofstr.write(m_map_image.data(), m_map_image.size());
+
+	fs::path file{files[0].toStdString()};
+	m_svgdir = file.parent_path().string();
+}
+
+
 void TrackInfos::Clear()
 {
 	m_track = nullptr;
@@ -348,7 +397,10 @@ void TrackInfos::Clear()
 	}
 
 	if(m_map)
-		m_map->load(QByteArray{});
+	{
+		m_map_image.clear();
+		m_map->load(m_map_image);
+	}
 }
 
 
@@ -410,6 +462,31 @@ void TrackInfos::MapMouseMove(QMouseEvent *evt)
 }
 
 
+/**
+ * the mouse has been clicked in the map widget
+ */
+void TrackInfos::MapMouseClick(QMouseEvent *evt)
+{
+	if(!m_map)
+		return;
+
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+	QPoint pos = evt->position();
+#else
+	QPoint pos = evt->pos();
+#endif
+
+	if(evt->buttons() & Qt::RightButton)
+	{
+		QPoint posGlobal = m_map->mapToGlobal(pos);
+		posGlobal.rx() += 4;
+		posGlobal.ry() += 4;
+
+		m_map_context->popup(posGlobal);
+	}
+}
+
+
 QSize TrackInfos::sizeHint() const
 {
 	QSize size = QWidget::sizeHint();
@@ -424,6 +501,7 @@ void TrackInfos::SaveSettings(QSettings& settings)
 	settings.setValue("track_info/split", split);
 	settings.setValue("track_info/keep_aspect", m_same_range->isChecked());
 	settings.setValue("track_info/recent_maps", m_mapdir.c_str());
+	settings.setValue("track_info/recent_svgs", m_svgdir.c_str());
 }
 
 
@@ -438,4 +516,7 @@ void TrackInfos::RestoreSettings(QSettings& settings)
 
 	if(settings.contains("track_info/recent_maps"))
 		m_mapdir = settings.value("track_info/recent_maps").toString().toStdString();
+
+	if(settings.contains("track_info/recent_svgs"))
+		m_svgdir = settings.value("track_info/recent_svgs").toString().toStdString();
 }

@@ -56,10 +56,12 @@ public:
 
 protected:
 	virtual void mouseMoveEvent(QMouseEvent *evt) override;
+	virtual void mousePressEvent(QMouseEvent *evt) override;
 
 
 signals:
 	void MouseMoved(QMouseEvent *);
+	void MousePressed(QMouseEvent *);
 };
 // --------------------------------------------------------------------------------
 

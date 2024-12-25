@@ -15,6 +15,7 @@
 #include <QtWidgets/QCheckBox>
 #include <QtWidgets/QSplitter>
 #include <QtWidgets/QLineEdit>
+#include <QtWidgets/QMenu>
 
 // https://gcc.gnu.org/onlinedocs/gcc/Diagnostic-Pragmas.html
 #pragma GCC diagnostic push
@@ -54,8 +55,10 @@ protected:
 	void ResetPlotRange();
 
 	void MapMouseMove(QMouseEvent *evt);
+	void MapMouseClick(QMouseEvent *evt);
 	void SelectMap();
 	void PlotMap();
+	void SaveMapSvg();
 
 
 private:
@@ -65,6 +68,10 @@ private:
 	std::shared_ptr<QLineEdit> m_mapfile{};
 	std::shared_ptr<QCustomPlot> m_plot{};
 	std::shared_ptr<MapDrawer> m_map{};
+	std::shared_ptr<QMenu> m_map_context{};
+
+	// svg image of the map
+	QByteArray m_map_image{};
 
 	// track coordinate range
 	t_real m_min_long{}, m_max_long{};
@@ -79,6 +86,9 @@ private:
 
 	// directory with recently used map files
 	std::string m_mapdir{};
+
+	// directory with recently used svg files
+	std::string m_svgdir{};
 
 
 signals:

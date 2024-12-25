@@ -14,11 +14,27 @@
 #include <QtWidgets/QPushButton>
 #include <QtWidgets/QSpacerItem>
 
+#include <string>
+
+// get qcustomplot version string
+// https://gcc.gnu.org/onlinedocs/gcc/Diagnostic-Pragmas.html
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wall"
+#pragma GCC diagnostic ignored "-Wextra"
+#pragma GCC diagnostic ignored "-Weffc++"
+#include <qcustomplot.h>
+#pragma GCC diagnostic pop
+
+// get boost version string
 #include <boost/config.hpp>
 #include <boost/version.hpp>
 #include <boost/algorithm/string.hpp>
 
-#include <string>
+// get osmium version string
+#if __has_include(<osmium/version.hpp>) && defined(_TRACKS_CFG_USE_OSMIUM_)
+	#define _HAS_OSMIUM_VERSTR_
+	#include <osmium/version.hpp>
+#endif
 
 
 /**
@@ -79,6 +95,10 @@ About::About(QWidget *parent, const QIcon *progIcon)
 		alg::replace_all_copy<std::string>(BOOST_LIB_VERSION, "_", ".").c_str(),
 		"https://www.boost.org");
 	AddItem("Qt version", QT_VERSION_STR, "https://www.qt.io");
+	AddItem("QCustomPlot version", QCUSTOMPLOT_VERSION_STR, "https://www.qcustomplot.com");
+#ifdef _HAS_OSMIUM_VERSTR_
+	AddItem("Osmium version", LIBOSMIUM_VERSION_STRING, "https://github.com/osmcode/libosmium");
+#endif
 
 	AddSpacer(10);
 

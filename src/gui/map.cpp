@@ -115,4 +115,10 @@ void MapDrawer::mouseMoveEvent(QMouseEvent *evt)
 {
 	emit MouseMoved(evt);
 }
+
+
+void MapDrawer::mousePressEvent(QMouseEvent *evt)
+{
+	emit MousePressed(evt);
+}
 // --------------------------------------------------------------------------------
