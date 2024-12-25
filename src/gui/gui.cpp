@@ -836,7 +836,9 @@ void TracksWnd::ShowSettings(bool only_create)
 			g_dist_func);
 		m_settings->AddLine();
 		m_settings->AddDoubleSpinbox("settings/assume_dt",
-			"Assumed time interval:", g_assume_dt, 0., 99., 1., 1);
+			"Assumed time interval (s):", g_assume_dt, 0.1, 99., 1., 1);
+		m_settings->AddDoubleSpinbox("settings/map_scale",
+			"Map scaling factor:", g_map_scale, 0.01, 99., 1., 2);
 		m_settings->AddLine();
 		m_settings->AddCheckbox("settings/load_last_file",
 			"Reload last file on startup", g_reload_last);
@@ -864,6 +866,8 @@ void TracksWnd::ApplySettings()
 		value<decltype(g_dist_func)>();
 	g_assume_dt = m_settings->GetValue("settings/assume_dt").
 		value<decltype(g_assume_dt)>();
+	g_map_scale = m_settings->GetValue("settings/map_scale").
+		value<decltype(g_map_scale)>();
 	g_reload_last = m_settings->GetValue("settings/load_last_file").
 		value<decltype(g_reload_last)>();
 

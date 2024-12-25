@@ -11,6 +11,7 @@
 namespace num = std::numbers;
 
 
+// --------------------------------------------------------------------------------
 MapPlotter::MapPlotter()
 {
 }
@@ -94,3 +95,24 @@ bool MapPlotter::Plot(std::shared_ptr<QCustomPlot> plot) const
 
 	return true;
 }
+// --------------------------------------------------------------------------------
+
+
+
+// --------------------------------------------------------------------------------
+MapDrawer::MapDrawer(QWidget *parent) : QSvgWidget{parent}
+{
+	setMouseTracking(true);
+}
+
+
+MapDrawer::~MapDrawer()
+{
+}
+
+
+void MapDrawer::mouseMoveEvent(QMouseEvent *evt)
+{
+	emit MouseMoved(evt);
+}
+// --------------------------------------------------------------------------------

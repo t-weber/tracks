@@ -42,4 +42,8 @@ extern int g_dist_func;
 extern t_real g_assume_dt;
 
 
+// xml scaling factor
+extern t_real g_map_scale;
+
+
 #endif

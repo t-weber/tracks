@@ -7,7 +7,6 @@
 
 #include "track_infos.h"
 #include "helpers.h"
-#include "map.h"
 namespace fs = __map_fs;
 
 #include <QtCore/QByteArray>
@@ -19,6 +18,7 @@ namespace fs = __map_fs;
 #include <QtSvg/QSvgRenderer>
 
 #include <sstream>
+#include <cmath>
 #include <numbers>
 namespace num = std::numbers;
 
@@ -62,7 +62,7 @@ TrackInfos::TrackInfos(QWidget* parent) : QWidget{parent}
 	plot_panel_layout->addWidget(btn_replot, 1, 3, 1, 1);
 
 	// map plot panel
-	m_map = std::make_shared<QSvgWidget>(map_panel);
+	m_map = std::make_shared<MapDrawer>(map_panel);
 	//m_map->renderer()->setAnimationEnabled(false);
 	m_map->renderer()->setAspectRatioMode(Qt::KeepAspectRatio);
 
@@ -107,6 +107,7 @@ TrackInfos::TrackInfos(QWidget* parent) : QWidget{parent}
 	main_layout->addWidget(m_split.get(), 0, 0, 1, 1);
 
 	connect(m_plot.get(), &QCustomPlot::mouseMove, this, &TrackInfos::PlotMouseMove);
+	connect(m_map.get(), &MapDrawer::MouseMoved, this, &TrackInfos::MapMouseMove);
 }
 
 
@@ -312,7 +313,7 @@ void TrackInfos::PlotMap()
 	{
 		// plot the data area
 		std::ostringstream ostr;
-		map.ExportSvg(ostr, 1.,
+		map.ExportSvg(ostr, g_map_scale,
 			m_min_long_plot - lon_range/20., m_max_long_plot + lon_range/20.,
 			m_min_lat_plot - lat_range/20., m_max_lat_plot + lat_range/20.);
 
@@ -351,6 +352,9 @@ void TrackInfos::Clear()
 }
 
 
+/**
+ * the mouse has moved in the plot widget
+ */
 void TrackInfos::PlotMouseMove(QMouseEvent *evt)
 {
 	if(!m_plot)
@@ -368,6 +372,41 @@ void TrackInfos::PlotMouseMove(QMouseEvent *evt)
 	t_real latitude = m_plot->yAxis->pixelToCoord(y);
 
 	emit PlotCoordsChanged(longitude, latitude);
+}
+
+
+/**
+ * the mouse has moved in the map widget
+ */
+void TrackInfos::MapMouseMove(QMouseEvent *evt)
+{
+	if(!m_map)
+		return;
+
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+	qreal x = evt->position().x();
+	qreal y = evt->position().y();
+#else
+	qreal x = evt->x();
+	qreal y = evt->y();
+#endif
+
+	y = m_map->height() - y - 1.;
+
+	x /= t_real(m_map->width() - 1);
+	y /= t_real(m_map->height() - 1);
+
+	// map into the plot range given in the call to ExportSvg
+	t_real lon_range = m_max_long_plot - m_min_long_plot;
+	t_real lat_range = m_max_lat_plot - m_min_lat_plot;
+
+	t_real lon = std::lerp(m_min_long_plot - lon_range/20., m_max_long_plot + lon_range/20., x);
+	t_real lat = std::lerp(m_min_lat_plot - lat_range/20., m_max_lat_plot + lat_range/20., y);
+
+	lon *= t_real(180) / num::pi_v<t_real>;
+	lat *= t_real(180) / num::pi_v<t_real>;
+
+	emit PlotCoordsChanged(lon, lat);
 }
 
 

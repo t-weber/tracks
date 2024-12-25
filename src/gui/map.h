@@ -16,12 +16,15 @@
 #include <qcustomplot.h>
 #pragma GCC diagnostic pop
 
+#include <QtSvg/QSvgWidget>
+
 #include "globals.h"
 #include "lib/map.h"
 
 
+// --------------------------------------------------------------------------------
 /**
- * widget for listing tracks
+ * widget for plotting maps using QCustomPlot
  */
 class MapPlotter : public t_map
 {
@@ -37,6 +40,28 @@ protected:
 	t_real m_minmax_plot_longitude[2]{ -10., 10. };
 	t_real m_minmax_plot_latitude[2]{ -10., 10. };
 };
+// --------------------------------------------------------------------------------
+
+
+// --------------------------------------------------------------------------------
+/**
+ * widget for plotting maps using QSvgWidget
+ */
+class MapDrawer : public QSvgWidget
+{ Q_OBJECT
+public:
+	MapDrawer(QWidget *parent);
+	virtual ~MapDrawer();
+
+
+protected:
+	virtual void mouseMoveEvent(QMouseEvent *evt) override;
+
+
+signals:
+	void MouseMoved(QMouseEvent *);
+};
+// --------------------------------------------------------------------------------
 
 
 #endif

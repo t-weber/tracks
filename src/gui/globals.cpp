@@ -28,3 +28,7 @@ int g_dist_func = 0;
 
 // assumed time interval if non is given (for import)
 t_real g_assume_dt = 2.;
+
+
+// xml scaling factor
+t_real g_map_scale = 1.;
