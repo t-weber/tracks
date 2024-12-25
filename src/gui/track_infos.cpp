@@ -15,6 +15,7 @@ namespace fs = __map_fs;
 #include <QtWidgets/QGridLayout>
 #include <QtWidgets/QPushButton>
 #include <QtWidgets/QFileDialog>
+#include <QtWidgets/QProgressDialog>
 #include <QtSvg/QSvgRenderer>
 
 #include <sstream>
@@ -28,8 +29,10 @@ TrackInfos::TrackInfos(QWidget* parent) : QWidget{parent}
 	QWidget *plot_panel = new QWidget(tab);
 	QWidget *map_panel = new QWidget(tab);
 	tab->addTab(plot_panel, "Track");
-#ifdef _TRACKS_USE_OSMIUM_
 	tab->addTab(map_panel, "Map");
+#ifndef _TRACKS_USE_OSMIUM_
+	tab->setTabEnabled(1, false);
+	map_panel->setEnabled(false);
 #endif
 
 	// track plot panel
@@ -173,7 +176,7 @@ void TrackInfos::ResetPlotRange()
 
 
 /**
- * show the current track in the plotter
+ * sets the current track and shows it in the plotter
  */
 void TrackInfos::ShowTrack(const t_track& track)
 {
@@ -202,9 +205,7 @@ void TrackInfos::ShowTrack(const t_track& track)
 		return;
 	m_plot->clearPlottables();
 
-//#ifdef _TRACKS_USE_OSMIUM_
-//	PlotMap();
-//#endif
+	//PlotMap();
 
 	QCPCurve *curve = new QCPCurve(m_plot->xAxis, m_plot->yAxis);
 	curve->setData(longitudes, latitudes);
@@ -249,6 +250,10 @@ void TrackInfos::SelectMap()
  */
 void TrackInfos::PlotMap()
 {
+#ifndef _TRACKS_USE_OSMIUM_
+	return;
+#endif
+
 	if(!m_map)
 		return;
 
@@ -278,6 +283,23 @@ void TrackInfos::PlotMap()
 		}
 	}
 
+	// map loading progress
+	QProgressDialog progress_dlg{this};
+	progress_dlg.setMinimumDuration(500);
+	progress_dlg.setAutoClose(true);
+	progress_dlg.setWindowModality(Qt::WindowModal);
+	progress_dlg.setLabelText("Calculating map...");
+
+	// map loading progress callback
+	std::function<bool(t_size, t_size)> progress = [&progress_dlg](
+		t_size offs, t_size size) -> bool
+	{
+		progress_dlg.setRange(0, static_cast<int>(size));
+		progress_dlg.setValue(static_cast<int>(offs));
+
+		return !progress_dlg.wasCanceled();
+	};
+
 	// map
 	t_map map;
 	map.SetTrack(std::move(thetrack));
@@ -285,7 +307,8 @@ void TrackInfos::PlotMap()
 	// cut out a map that has some margins around the actual data area
 	if(map.Import(m_mapfile->text().toStdString(),
 		m_min_long_plot - lon_range/10., m_max_long_plot + lon_range/10.,
-		m_min_lat_plot - lat_range/10., m_max_lat_plot + lat_range/10.))
+		m_min_lat_plot - lat_range/10., m_max_lat_plot + lat_range/10.,
+		&progress))
 	{
 		// plot the data area
 		std::ostringstream ostr;
@@ -317,11 +340,14 @@ void TrackInfos::Clear()
 	m_track = nullptr;
 	m_infos->clear();
 
-	if(!m_plot)
-		return;
+	if(m_plot)
+	{
+		m_plot->clearPlottables();
+		m_plot->replot();
+	}
 
-	m_plot->clearPlottables();
-	m_plot->replot();
+	if(m_map)
+		m_map->load(QByteArray{});
 }
 
 

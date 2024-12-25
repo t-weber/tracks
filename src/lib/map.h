@@ -18,8 +18,10 @@
 #include <vector>
 #include <tuple>
 #include <optional>
+#include <functional>
 #include <unordered_map>
 #include <unordered_set>
+#include <stdexcept>
 
 #if __has_include(<filesystem>)
 	#include <filesystem>
@@ -303,7 +305,8 @@ public:
 	 */
 	bool Import(const std::string& mapname,
 		t_real min_longitude = -10., t_real max_longitude = 10.,
-		t_real min_latitude = -10., t_real max_latitude = 10.)
+		t_real min_latitude = -10., t_real max_latitude = 10.,
+		std::function<bool(t_size, t_size)> *progress = nullptr)
 	{
 		namespace num = std::numbers;
 
@@ -320,6 +323,10 @@ public:
 			const t_real *min_lon = nullptr, *max_lon = nullptr;
 			const t_real *min_lat = nullptr, *max_lat = nullptr;
 
+			const osmium::io::Reader* reader{};
+			std::optional<t_size> last_offs{};
+			std::function<bool(t_size, t_size)> *progress{};
+
 
 		public:
 			OsmHandler(Map<t_real, t_size> *super,
@@ -329,6 +336,18 @@ public:
 					min_lon{min_lon}, max_lon{max_lon},
 					min_lat{min_lat}, max_lat{max_lat}
 			{}
+
+
+			void SetReader(const osmium::io::Reader *reader)
+			{
+				this->reader = reader;
+			}
+
+
+			void SetProgressFunction(std::function<bool(t_size, t_size)> *progress)
+			{
+				this->progress = progress;
+			}
 
 
 			void node(const osmium::Node& node)
@@ -360,6 +379,8 @@ public:
 				super->m_max_longitude = std::max(super->m_max_longitude, vertex.longitude);
 
 				super->m_vertices.emplace(std::make_pair(node.id(), std::move(vertex)));
+
+				update_progress();
 			}
 
 
@@ -399,6 +420,8 @@ public:
 					super->m_segments_background.emplace(std::make_pair(way.id(), std::move(seg)));
 				else
 					super->m_segments.emplace(std::make_pair(way.id(), std::move(seg)));
+
+				update_progress();
 			}
 
 
@@ -447,24 +470,53 @@ public:
 					seg.tags.emplace(std::make_pair(tag.key(), tag.value()));
 
 				super->m_multisegments.emplace(std::make_pair(rel.id(), std::move(seg)));
+
+				update_progress();
 			}
+
+
+			void update_progress()
+			{
+				if(!reader || !progress)
+					return;
+
+				t_size offs = reader->offset();
+				t_size size = reader->file_size();
+
+				// offset already seen?
+				if(last_offs && *last_offs == offs)
+					return;
+				last_offs = offs;
+
+				if(!(*progress)(offs, size))
+					throw std::runtime_error{"Stop requested."};
+				//std::cout << offs << " / " << size << std::endl;
+			}
+
 
 			/*void area(const osmium::Area& area)
 			{
 			}
 
+
+			void osm_object(const osmium::OSMObject&)
+			{
+				update_progress();
+			}
+
+
 			void tag_list(const osmium::TagList& tags)
 			{
 			}*/
-		};
+		} osm_handler{this,
+			&min_longitude, &max_longitude,
+			&min_latitude, &max_latitude};
 
 		try
 		{
-			OsmHandler osm_handler{this,
-				&min_longitude, &max_longitude,
-				&min_latitude, &max_latitude};
-
 			osmium::io::Reader osm{mapname};
+			osm_handler.SetProgressFunction(progress);
+			osm_handler.SetReader(&osm);
 			osmium::apply(osm, osm_handler);
 		}
 		catch(const std::exception& ex)
@@ -478,7 +530,8 @@ public:
 #else
 	bool Import(const std::string& mapname,
 		t_real = -10., t_real = 10.,
-		t_real = -10., t_real = 10.)
+		t_real = -10., t_real = 10.,
+		std::function<bool(t_size, t_size)>* = nullptr)
 	{
 		std::cerr << "Cannot import \"" << mapname
 			<< "\" because osmium support is disabled."
@@ -505,12 +558,20 @@ public:
 			return std::make_tuple(true, 0x00, 0x99, 0x00);
 		else if(key == "natural" && val == "water")
 			return std::make_tuple(true, 0x44, 0x44, 0xff);
+		else if(key == "natural" && val == "scrub")
+			return std::make_tuple(true, 0x22, 0xaa, 0x22);
+		else if(key == "natural" && val == "bare_rock")
+			return std::make_tuple(true, 0x7d, 0x7d, 0x80);
+		else if(key == "natural" && val == "grassland")
+			return std::make_tuple(true, 0x44, 0xff, 0x44);
 		else if(key == "landuse" && val == "residential")
 			return std::make_tuple(true, 0xaa, 0xaa, 0xaa);
 		else if(key == "landuse" && val == "retail")
 			return std::make_tuple(true, 0xff, 0x44, 0x44);
 		else if(key == "landuse" && val == "industrial")
 			return std::make_tuple(true, 0xaa, 0xaa, 0x44);
+		else if(key == "landuse" && val == "farmland")
+			return std::make_tuple(true, 0x88, 0x33, 0x22);
 		else if(key == "landuse" && val == "forest")
 			return std::make_tuple(true, 0x00, 0x99, 0x00);
 		else if(key == "landuse" && (val == "grass" || val == "meadow"))
