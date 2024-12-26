@@ -45,6 +45,7 @@ extern t_real g_assume_dt;
 // xml map options
 extern t_real g_map_scale;
 extern bool g_map_show_buildings;
+extern bool g_map_show_labels;
 
 
 #endif

@@ -314,6 +314,7 @@ void TrackInfos::PlotMap()
 	// map
 	t_map map;
 	map.SetSkipBuildings(!g_map_show_buildings);
+	map.SetSkipLabels(!g_map_show_labels);
 	map.SetTrack(std::move(thetrack));
 
 	// cut out a map that has some margins around the actual data area

@@ -139,7 +139,22 @@ protected:
 		m_min_longitude = std::min(m_min_longitude, vertex.longitude);
 		m_max_longitude = std::max(m_max_longitude, vertex.longitude);
 
-		m_vertices.emplace(std::make_pair(*id, std::move(vertex)));
+		auto place_iter = vertex.tags.find("place");
+		auto name_iter = vertex.tags.find("name");
+		if(place_iter != vertex.tags.end() && name_iter != vertex.tags.end())
+		{
+			if(!m_skip_labels)
+			{
+				// place label
+				m_label_vertices.emplace(std::make_pair(*id, std::move(vertex)));
+			}
+		}
+		else
+		{
+			// vertex
+			m_vertices.emplace(std::make_pair(*id, std::move(vertex)));
+		}
+
 		return true;
 	}
 
@@ -385,7 +400,21 @@ public:
 				super->m_min_longitude = std::min(super->m_min_longitude, vertex.longitude);
 				super->m_max_longitude = std::max(super->m_max_longitude, vertex.longitude);
 
-				super->m_vertices.emplace(std::make_pair(node.id(), std::move(vertex)));
+				auto place_iter = vertex.tags.find("place");
+				auto name_iter = vertex.tags.find("name");
+				if(place_iter != vertex.tags.end() && name_iter != vertex.tags.end())
+				{
+					if(!super->m_skip_labels)
+					{
+						// place label
+						super->m_label_vertices.emplace(std::make_pair(node.id(), std::move(vertex)));
+					}
+				}
+				else
+				{
+					// vertex
+					super->m_vertices.emplace(std::make_pair(node.id(), std::move(vertex)));
+				}
 
 				update_progress();
 			}
@@ -868,15 +897,41 @@ public:
 			line.push_back(vert);
 		}
 
-		if(m_track.size())
+		if(line.size())
 		{
 			//svg.add(line);
 			svg.map(line, "stroke:#000000; "
 				"stroke-width:48px; fill:none;", 1.);
 			svg.map(line, "stroke:#ffff00; "
 				"stroke-width:24px; fill:none;", 1.);
+
+			// draw start and end points
+			svg.map(*line.begin(), "stroke-width:16px; "
+				"stroke:#000000; fill:#ff0000;", 42.);
+			svg.map(*line.rbegin(), "stroke-width:16px; "
+				"stroke:#000000; fill:#00ff00;", 42.);
 		}
 
+		// draw place labels
+		for(const auto& [ id, vertex ] : m_label_vertices)
+		{
+			auto place_iter = vertex.tags.find("place");
+			auto name_iter = vertex.tags.find("name");
+
+			if(place_iter == vertex.tags.end() || name_iter == vertex.tags.end())
+				continue;
+
+			t_vert vert{
+				vertex.longitude * t_real(180) / num::pi_v<t_real>,
+				vertex.latitude * t_real(180) / num::pi_v<t_real>};
+
+			svg.text(vert, name_iter->second,
+				"font-family:sans-serif; font-size:180pt; "
+				"font-style=normal; font-weight=bold; "
+				"stroke-width:12px; stroke:#000000; fill:#cccc44;",
+				0, 0, 1);
+		}
+		
 		return true;
 	}
 
@@ -884,6 +939,12 @@ public:
 	void SetSkipBuildings(bool b)
 	{
 		m_skip_buildings = b;
+	}
+
+
+	void SetSkipLabels(bool b)
+	{
+		m_skip_labels = b;
 	}
 
 
@@ -903,6 +964,7 @@ protected:
 	std::string m_creator{};
 
 	std::unordered_map<t_size, t_vertex> m_vertices{};
+	std::unordered_map<t_size, t_vertex> m_label_vertices{};
 	std::unordered_map<t_size, t_segment> m_segments{};
 	std::unordered_map<t_size, t_segment> m_segments_background{};
 	std::unordered_map<t_size, t_multisegment> m_multisegments{};
@@ -911,6 +973,7 @@ protected:
 	t_real m_min_longitude{}, m_max_longitude{};
 
 	bool m_skip_buildings{false};
+	bool m_skip_labels{true};
 
 	std::vector<t_vertex> m_track{};
 };

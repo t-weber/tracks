@@ -841,6 +841,8 @@ void TracksWnd::ShowSettings(bool only_create)
 			"Map scaling factor:", g_map_scale, 0.01, 99., 1., 2);
 		m_settings->AddCheckbox("settings/show_buildings",
 			"Show buildings in map", g_map_show_buildings);
+		m_settings->AddCheckbox("settings/show_labels",
+			"Show labels in map", g_map_show_labels);
 		m_settings->AddLine();
 		m_settings->AddCheckbox("settings/load_last_file",
 			"Reload last file on startup", g_reload_last);
@@ -872,6 +874,8 @@ void TracksWnd::ApplySettings()
 		value<decltype(g_map_scale)>();
 	g_map_show_buildings = m_settings->GetValue("settings/show_buildings").
 		value<decltype(g_map_show_buildings)>();
+	g_map_show_labels = m_settings->GetValue("settings/show_labels").
+		value<decltype(g_map_show_labels)>();
 	g_reload_last = m_settings->GetValue("settings/load_last_file").
 		value<decltype(g_reload_last)>();
 
