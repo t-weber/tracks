@@ -37,6 +37,7 @@ public:
 
 	std::optional<t_real> GetTrackTime(int row) const;
 
+	void SelectTrack(t_size idx);
 	void DeleteSelectedTracks();
 
 

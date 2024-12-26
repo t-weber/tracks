@@ -27,6 +27,9 @@
 #define TAB_NUM_COLS  6
 
 
+#define TRACK_IDX     Qt::UserRole + 0
+
+
 Summary::Summary(QWidget* parent)
 	: QDialog(parent)
 {
@@ -53,6 +56,9 @@ Summary::Summary(QWidget* parent)
 	m_table->horizontalHeader()->setDefaultSectionSize(150);
 	m_table->verticalHeader()->setDefaultSectionSize(24);
 	m_table->verticalHeader()->setVisible(true);
+
+	connect(m_table.get(), &QTableWidget::cellDoubleClicked,
+		this, &Summary::TableDoubleClicked);
 
 	// status bar
 	m_status = std::make_shared<QLabel>(this);
@@ -176,15 +182,37 @@ void Summary::FillTable()
 		m_table->setItem(row, TAB_PACE, new NumericTableWidgetItem<t_real>(duration / distance, g_prec_gui, " min/km"));
 		m_table->setItem(row, TAB_HEIGHT, new NumericTableWidgetItem<t_real>(height, g_prec_gui, " m"));
 
-		// set read-only
+		// set all items read-only
 		for(int col = 0; col < TAB_NUM_COLS; ++col)
 		{
 			m_table->item(row, col)->setFlags(
 				m_table->item(row, col)->flags() & ~Qt::ItemIsEditable);
 		}
+
+		// set the track index
+		QVariant val;
+		val.setValue(track_idx);
+		m_table->item(row, TAB_NAME)->setData(TRACK_IDX, val);
 	}
 
 	m_table->setSortingEnabled(true);
+}
+
+
+/**
+ * show the double-clicked track in the main window
+ */
+void Summary::TableDoubleClicked(int row, [[maybe_unused]] int col)
+{
+	if(!m_table)
+		return;
+
+	QVariant val = m_table->item(row, TAB_NAME)->data(TRACK_IDX);
+	if(!val.isValid())
+		return;
+
+	t_size track_idx = val.value<t_size>();
+	emit TrackSelected(track_idx);
 }
 
 

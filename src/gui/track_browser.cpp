@@ -213,6 +213,31 @@ void TrackBrowser::SetTrackIndex(int row, t_size idx)
 }
 
 
+void TrackBrowser::SelectTrack(t_size idx)
+{
+	if(!m_list)
+		return;
+
+	// look for the track with the given index
+	for(int row = 0; row < m_list->count(); ++row)
+	{
+		QListWidgetItem *item = m_list->item(row);
+		if(!item)
+			continue;
+
+		QVariant val = item->data(TRACK_IDX);
+		if(!val.isValid())
+			continue;
+
+		if(val.value<t_size>() == idx)
+		{
+			m_list->setCurrentItem(item);
+			break;
+		}
+	}
+}
+
+
 std::optional<t_real> TrackBrowser::GetTrackTime(int row) const
 {
 	if(!m_list || row < 0)

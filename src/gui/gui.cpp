@@ -931,6 +931,9 @@ void TracksWnd::ShowSummary()
 	{
 		m_summary = std::make_shared<Summary>(this);
 		m_summary->SetTrackDB(&m_trackdb);
+
+		connect(m_summary.get(), &Summary::TrackSelected,
+			m_tracks->GetWidget(), &TrackBrowser::SelectTrack);
 	}
 
 	show_dialog(m_summary.get());

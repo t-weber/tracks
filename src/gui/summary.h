@@ -40,6 +40,8 @@ protected:
 	virtual void accept() override;
 	virtual void reject() override;
 
+	void TableDoubleClicked(int row, int col);
+
 
 private:
 	std::shared_ptr<QTableWidget> m_table{};
@@ -47,6 +49,10 @@ private:
 	std::shared_ptr<QDialogButtonBox> m_buttonbox{};
 
 	const t_tracks *m_trackdb{};
+
+
+signals:
+	void TrackSelected(t_size idx);
 };
 
 
