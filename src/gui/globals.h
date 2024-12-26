@@ -42,8 +42,9 @@ extern int g_dist_func;
 extern t_real g_assume_dt;
 
 
-// xml scaling factor
+// xml map options
 extern t_real g_map_scale;
+extern bool g_map_show_buildings;
 
 
 #endif

@@ -30,5 +30,6 @@ int g_dist_func = 0;
 t_real g_assume_dt = 2.;
 
 
-// xml scaling factor
+// xml map options
 t_real g_map_scale = 1.;
+bool g_map_show_buildings = false;

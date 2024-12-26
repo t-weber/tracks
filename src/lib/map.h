@@ -177,6 +177,8 @@ protected:
 
 					if(!is_background && *key == "landuse")
 						is_background = true;
+					if(m_skip_buildings && *key == "building")
+						return false;
 
 					seg.tags.emplace(std::make_pair(*key, *val));
 				}
@@ -230,6 +232,9 @@ protected:
 
 					if(!key || !val)
 						continue;
+
+					if(m_skip_buildings && *key == "building")
+						return false;
 
 					seg.tags.emplace(std::make_pair(*key, *val));
 				}
@@ -321,9 +326,9 @@ public:
 		struct OsmHandler : public osmium::handler::Handler
 		{
 		private:
-			Map<t_real, t_size> *super = nullptr;
-			const t_real *min_lon = nullptr, *max_lon = nullptr;
-			const t_real *min_lat = nullptr, *max_lat = nullptr;
+			Map<t_real, t_size> *super{};
+			const t_real *min_lon{}, *max_lon{};
+			const t_real *min_lat{}, *max_lat{};
 
 			const osmium::io::Reader* reader{};
 			std::optional<t_size> last_offs{};
@@ -409,11 +414,15 @@ public:
 					return;
 
 				bool is_background = false;
+
 				for(const auto& tag : way.tags())
 				{
 					seg.tags.emplace(std::make_pair(tag.key(), tag.value()));
+
 					if(!is_background && std::string(tag.key()) == "landuse")
 						is_background = true;
+					if(super->m_skip_buildings && std::string(tag.key()) == "building")
+						return;
 				}
 
 				if(seg.vertex_ids.size() >= 2 && *seg.vertex_ids.begin() == *seg.vertex_ids.rbegin())
@@ -469,7 +478,12 @@ public:
 					return;
 
 				for(const auto& tag : rel.tags())
+				{
 					seg.tags.emplace(std::make_pair(tag.key(), tag.value()));
+
+					if(super->m_skip_buildings && std::string(tag.key()) == "building")
+						return;
+				}
 
 				super->m_multisegments.emplace(std::make_pair(rel.id(), std::move(seg)));
 
@@ -554,6 +568,22 @@ public:
 			return std::make_tuple(true, 0x22, 0x22, 0x22);
 		else if(key == "surface" && val == "concrete")
 			return std::make_tuple(true, 0x33, 0x33, 0x33);
+		else if(key == "building" /*&& val == "yes"*/)
+			return std::make_tuple(true, 0xdd, 0xdd, 0xdd);
+		else if(key == "landuse" && val == "residential")
+			return std::make_tuple(true, 0xbb, 0xbb, 0xcc);
+		else if(key == "landuse" && val == "retail")
+			return std::make_tuple(true, 0xff, 0x44, 0x44);
+		else if(key == "landuse" && val == "industrial")
+			return std::make_tuple(true, 0xaa, 0xaa, 0x44);
+		else if(key == "landuse" && val == "forest")
+			return std::make_tuple(true, 0x00, 0x99, 0x00);
+		else if(key == "landuse" && (val == "grass" || val == "meadow"))
+			return std::make_tuple(true, 0x44, 0xff, 0x44);
+		else if(key == "landuse" && (val == "farmland" || val == "farmyard"))
+			return std::make_tuple(true, 0x88, 0x33, 0x22);
+		else if(key == "quarter" && val == "suburb")
+			return std::make_tuple(true, 0x99, 0x55, 0x55);
 		else if(key == "natural" && val == "shingle")
 			return std::make_tuple(true, 0x55, 0x55, 0xff);
 		else if((key == "natural" || key == "surface") && val == "wood")
@@ -566,26 +596,16 @@ public:
 			return std::make_tuple(true, 0x7d, 0x7d, 0x80);
 		else if(key == "natural" && val == "grassland")
 			return std::make_tuple(true, 0x44, 0xff, 0x44);
-		else if(key == "landuse" && val == "residential")
-			return std::make_tuple(true, 0xaa, 0xaa, 0xaa);
-		else if(key == "landuse" && val == "retail")
-			return std::make_tuple(true, 0xff, 0x44, 0x44);
-		else if(key == "landuse" && val == "industrial")
-			return std::make_tuple(true, 0xaa, 0xaa, 0x44);
-		else if(key == "landuse" && val == "forest")
-			return std::make_tuple(true, 0x00, 0x99, 0x00);
-		else if(key == "landuse" && (val == "grass" || val == "meadow"))
-			return std::make_tuple(true, 0x44, 0xff, 0x44);
-		else if(key == "landuse" && (val == "farmland" || val == "farmyard"))
-			return std::make_tuple(true, 0x88, 0x33, 0x22);
 		else if(key == "waterway" && val == "river")
 			return std::make_tuple(true, 0x55, 0x55, 0xff);
-		else if(key == "building" /*&& val == "yes"*/)
-			return std::make_tuple(true, 0xdd, 0xdd, 0xdd);
 		else if(key == "leisure" && (val == "park" || val == "garden"))
 			return std::make_tuple(true, 0x55, 0xff, 0x55);
 		else if(key == "leisure" && val == "pitch")
 			return std::make_tuple(true, 0x55, 0xbb, 0x55);
+		else if(key == "amenity" && (val == "research_institute" || val == "university"))
+			return std::make_tuple(true, 0x99, 0x99, 0x99);
+		else if(key == "amenity" && (val == "school" || val == "college"))
+			return std::make_tuple(true, 0x88, 0x88, 0x88);
 
 		return std::make_tuple(false, 0, 0, 0);
 	}
@@ -861,6 +881,11 @@ public:
 	}
 
 
+	void SetSkipBuildings(bool b)
+	{
+		m_skip_buildings = b;
+	}
+
 
 	/**
 	 * set a track to be displayed together with the map
@@ -884,6 +909,8 @@ protected:
 
 	t_real m_min_latitude{}, m_max_latitude{};
 	t_real m_min_longitude{}, m_max_longitude{};
+
+	bool m_skip_buildings{false};
 
 	std::vector<t_vertex> m_track{};
 };
