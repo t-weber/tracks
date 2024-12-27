@@ -53,6 +53,7 @@ struct MapVertex
 	t_real latitude{};
 
 	std::unordered_map<std::string, std::string> tags{};
+	bool referenced{false};
 };
 
 
@@ -97,6 +98,25 @@ public:
 
 
 protected:
+	/**
+	 * remove unreferenced vertices
+	 */
+	void PruneVertices()
+	{
+		for(auto iter = m_vertices.begin(); iter != m_vertices.end();)
+		{
+			if(iter->second.referenced)
+			{
+				++iter;
+				continue;
+			}
+
+			iter = m_vertices.erase(iter);
+		}
+	}
+
+
+
 	bool ImportVertexXml(const boost::property_tree::ptree& node)
 	{
 		namespace num = std::numbers;
@@ -115,6 +135,7 @@ protected:
 		{
 			.longitude = *lon / t_real(180) * num::pi_v<t_real>,
 			.latitude = *lat / t_real(180) * num::pi_v<t_real>,
+			.referenced = true,  // mark all as referenced
 		};
 
 		if(auto tags = node.get_child_optional(""))
@@ -193,7 +214,8 @@ protected:
 
 					if(!is_background && *key == "landuse")
 						is_background = true;
-					if(m_skip_buildings && *key == "building")
+					if(m_skip_buildings && (*key == "building" 
+						|| (*key == "leisure" && *val == "swimming_pool")))
 						return false;
 
 					seg.tags.emplace(std::make_pair(*key, *val));
@@ -249,7 +271,8 @@ protected:
 					if(!key || !val)
 						continue;
 
-					if(m_skip_buildings && *key == "building")
+					if(m_skip_buildings && (*key == "building"
+						|| (*key == "leisure" && *val == "swimming_pool")))
 						return false;
 
 					seg.tags.emplace(std::make_pair(*key, *val));
@@ -314,6 +337,7 @@ public:
 				ImportMultiSegmentXml(node.second);
 		}  // node iteration
 
+		//PruneVertices();
 		return true;
 	}
 
@@ -431,31 +455,37 @@ public:
 				t_segment seg;
 				//seg.vertex_ids.reserve(way.nodes().size());
 
-				t_size invalid_refs = 0;
-				for(const auto& node : way.nodes())
-				{
-					t_size ref = node.ref();
-					seg.vertex_ids.push_back(ref);
-
-					if(super->m_vertices.find(ref) == super->m_vertices.end())
-						++invalid_refs;
-				}
-
-				// only referring to invalid vertices?
-				if(invalid_refs == seg.vertex_ids.size())
-					return;
-
+				// get segment tags
 				bool is_background = false;
-
 				for(const auto& tag : way.tags())
 				{
 					seg.tags.emplace(std::make_pair(tag.key(), tag.value()));
 
 					if(!is_background && std::string(tag.key()) == "landuse")
 						is_background = true;
-					if(super->m_skip_buildings && std::string(tag.key()) == "building")
+					if(super->m_skip_buildings && (std::string(tag.key()) == "building"
+						|| (std::string(tag.key()) == "leisure" && 
+							std::string(tag.value()) == "swimming_pool")))
 						return;
 				}
+
+				// get segment vertices
+				t_size invalid_refs = 0;
+				for(const auto& node : way.nodes())
+				{
+					t_size ref = node.ref();
+					seg.vertex_ids.push_back(ref);
+
+					auto vert_iter = super->m_vertices.find(ref);
+					if(vert_iter == super->m_vertices.end())
+						++invalid_refs;
+					else
+						vert_iter->second.referenced = true;
+				}
+
+				// only referring to invalid vertices?
+				if(invalid_refs == seg.vertex_ids.size())
+					return;
 
 				if(seg.vertex_ids.size() >= 2 && *seg.vertex_ids.begin() == *seg.vertex_ids.rbegin())
 					seg.is_area = true;
@@ -472,6 +502,18 @@ public:
 			{
 				t_multisegment seg;
 
+				// get tags
+				for(const auto& tag : rel.tags())
+				{
+					if(super->m_skip_buildings && (std::string(tag.key()) == "building"
+						|| (std::string(tag.key()) == "leisure" && 
+							std::string(tag.value()) == "swimming_pool")))
+						return;
+
+					seg.tags.emplace(std::make_pair(tag.key(), tag.value()));
+				}
+
+				// get vertices
 				t_size invalid_node_refs = 0;
 				t_size invalid_inner_seg_refs = 0;
 				t_size invalid_seg_refs = 0;
@@ -484,8 +526,11 @@ public:
 					{
 						seg.vertex_ids.push_back(ref);
 
-						if(super->m_vertices.find(ref) == super->m_vertices.end())
+						auto vert_iter = super->m_vertices.find(ref);
+						if(vert_iter == super->m_vertices.end())
 							++invalid_node_refs;
+						else
+							vert_iter->second.referenced = true;
 					}
 					else if(member.type() == osmium::item_type::way && std::string(member.role()) == "inner")
 					{
@@ -508,14 +553,6 @@ public:
 					invalid_inner_seg_refs == seg.segment_inner_ids.size() &&
 					invalid_seg_refs == seg.segment_ids.size())
 					return;
-
-				for(const auto& tag : rel.tags())
-				{
-					seg.tags.emplace(std::make_pair(tag.key(), tag.value()));
-
-					if(super->m_skip_buildings && std::string(tag.key()) == "building")
-						return;
-				}
 
 				super->m_multisegments.emplace(std::make_pair(rel.id(), std::move(seg)));
 
@@ -617,6 +654,7 @@ public:
 			return false;
 		}
 
+		PruneVertices();
 		return true;
 	}
 
@@ -1065,17 +1103,17 @@ protected:
 	std::string m_version{};
 	std::string m_creator{};
 
-	std::unordered_map<t_size, t_vertex> m_vertices{};
-	std::unordered_map<t_size, t_vertex> m_label_vertices{};
-	std::unordered_map<t_size, t_segment> m_segments{};
-	std::unordered_map<t_size, t_segment> m_segments_background{};
-	std::unordered_map<t_size, t_multisegment> m_multisegments{};
-
 	t_real m_min_latitude{}, m_max_latitude{};
 	t_real m_min_longitude{}, m_max_longitude{};
 
 	bool m_skip_buildings{false};
 	bool m_skip_labels{true};
+
+	std::unordered_map<t_size, t_vertex> m_vertices{};
+	std::unordered_map<t_size, t_vertex> m_label_vertices{};
+	std::unordered_map<t_size, t_segment> m_segments{};
+	std::unordered_map<t_size, t_segment> m_segments_background{};
+	std::unordered_map<t_size, t_multisegment> m_multisegments{};
 
 	std::vector<t_vertex> m_track{};
 };
