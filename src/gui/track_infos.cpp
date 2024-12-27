@@ -318,7 +318,7 @@ void TrackInfos::PlotMap()
 	map.SetTrack(std::move(thetrack));
 
 	// cut out a map that has some margins around the actual data area
-	if(map.Import(m_mapfile->text().toStdString(),
+	if(map.ImportDir(m_mapfile->text().toStdString(),
 		m_min_long_plot - lon_range/10., m_max_long_plot + lon_range/10.,
 		m_min_lat_plot - lat_range/10., m_max_lat_plot + lat_range/10.,
 		&progress))

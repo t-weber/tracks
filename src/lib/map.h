@@ -31,6 +31,7 @@
 	namespace __map_fs = boost::filesystem;
 #endif
 
+#include <boost/algorithm/string.hpp>
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/xml_parser.hpp>
 #include <boost/geometry.hpp>
@@ -319,6 +320,7 @@ public:
 
 
 #ifdef _TRACKS_USE_OSMIUM_
+
 	/**
 	 * import a map from an osm or a pbf file
 	 * @see https://github.com/osmcode/libosmium/blob/master/examples/
@@ -328,7 +330,8 @@ public:
 	bool Import(const std::string& mapname,
 		t_real min_longitude = -10., t_real max_longitude = 10.,
 		t_real min_latitude = -10., t_real max_latitude = 10.,
-		std::function<bool(t_size, t_size)> *progress = nullptr)
+		std::function<bool(t_size, t_size)> *progress = nullptr,
+		bool check_bounds = false)
 	{
 		namespace num = std::numbers;
 
@@ -559,7 +562,51 @@ public:
 
 		try
 		{
-			osmium::io::Reader osm{mapname};
+			osmium::io::Reader osm{mapname,
+				osmium::osm_entity_bits::node | osmium::osm_entity_bits::way
+				| osmium::osm_entity_bits::relation,
+				osmium::io::read_meta::yes};
+			bool contained = true;
+
+			// if valid bounds are given, check if the map is contained within
+			if(check_bounds &&
+				min_longitude >= -num::pi_v<t_real> && max_longitude <= num::pi_v<t_real> &&
+				min_latitude >= -num::pi_v<t_real>/t_real(2) && max_latitude <= num::pi_v<t_real>/t_real(2))
+			{
+				contained = false;
+
+				osmium::io::Header header = osm.header();
+				for(const osmium::Box& box : header.boxes())
+				{
+					if(!box.valid())
+						continue;
+
+					if(box.left() / t_real(180) * num::pi_v<t_real> > min_longitude)
+						continue;
+					if(box.bottom() / t_real(180) * num::pi_v<t_real> > min_latitude)
+						continue;
+					if(box.right() / t_real(180) * num::pi_v<t_real> < min_longitude)
+						continue;
+					if(box.top() / t_real(180) * num::pi_v<t_real> < min_latitude)
+						continue;
+
+					if(box.left() / t_real(180) * num::pi_v<t_real> > max_longitude)
+						continue;
+					if(box.bottom() / t_real(180) * num::pi_v<t_real> > max_latitude)
+						continue;
+					if(box.right() / t_real(180) * num::pi_v<t_real> < max_longitude)
+						continue;
+					if(box.top() / t_real(180) * num::pi_v<t_real> < max_latitude)
+						continue;
+
+					contained = true;
+					break;
+				}
+			}
+
+			if(!contained)
+				return false;
+
 			osm_handler.SetProgressFunction(progress);
 			osm_handler.SetReader(&osm);
 			osmium::apply(osm, osm_handler);
@@ -572,18 +619,73 @@ public:
 
 		return true;
 	}
+
 #else
+
 	bool Import(const std::string& mapname,
 		t_real = -10., t_real = 10.,
 		t_real = -10., t_real = 10.,
-		std::function<bool(t_size, t_size)>* = nullptr)
+		std::function<bool(t_size, t_size)>* = nullptr,
+		bool check_bounds = false)
 	{
 		std::cerr << "Cannot import \"" << mapname
 			<< "\" because osmium support is disabled."
 			<< std::endl;
 		return false;
 	}
+
 #endif  // _TRACKS_USE_OSMIUM_
+
+
+
+	/**
+	 * try to import from all map files in a given directory
+	 * until a map with matching bounds has been found
+	 */
+	bool ImportDir(const std::string& dirname,
+		t_real min_longitude = -10., t_real max_longitude = 10.,
+		t_real min_latitude = -10., t_real max_latitude = 10.,
+		std::function<bool(t_size, t_size)> *progress = nullptr)
+	{
+		namespace fs = __map_fs;
+
+		// if a file is given instead of a directory, load it directly
+		// without bounds checks ...
+		if(fs::is_regular_file(dirname))
+		{
+			return Import(dirname,
+				min_longitude, max_longitude,
+				min_latitude, max_latitude,
+				progress, false);
+		}
+
+		// ... otherwise iterate all files in the directory until
+		// the one with the correct bounds has been found
+		using t_iter = fs::directory_iterator;
+		t_iter dir{fs::path{dirname}};
+
+		for(t_iter iter = fs::begin(dir); iter != fs::end(dir); ++iter)
+		{
+			const fs::path& file = *iter;
+
+			if(!fs::is_regular_file(file))
+				continue;
+			if(std::string ext = file.extension().string();
+				boost::to_lower_copy(ext) != ".osm" && boost::to_lower_copy(ext) != ".pbf")
+				continue;
+
+			std::string filename = file.filename().string();
+			if(Import(filename,
+				min_longitude, max_longitude,
+				min_latitude, max_latitude,
+				progress, true))
+			{
+				return true;
+			}
+		}
+
+		return false;
+	}
 
 
 
