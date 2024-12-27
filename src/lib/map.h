@@ -22,6 +22,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <stdexcept>
+#include <cstdint>
 
 #if __has_include(<filesystem>)
 	#include <filesystem>
@@ -1076,16 +1077,19 @@ public:
 	}
 
 
+
 	void SetSkipBuildings(bool b)
 	{
 		m_skip_buildings = b;
 	}
 
 
+
 	void SetSkipLabels(bool b)
 	{
 		m_skip_labels = b;
 	}
+
 
 
 	/**
@@ -1098,13 +1102,305 @@ public:
 
 
 
+	bool Save(std::ofstream& ofstr) const
+	{
+		if(!ofstr)
+			return false;
+
+		auto save_string = [&ofstr](const std::string& str)
+		{
+			const t_size len = str.size();
+			ofstr.write(reinterpret_cast<const char*>(&len), sizeof(len));
+			ofstr.write(reinterpret_cast<const char*>(str.data()), str.size() * sizeof(char));
+		};
+
+		auto save_tags = [&ofstr, &save_string](
+			const std::unordered_map<std::string, std::string>& tags)
+		{
+			t_size num_tags = tags.size();
+			ofstr.write(reinterpret_cast<const char*>(&num_tags), sizeof(num_tags));
+
+			for(const auto& [key, val] : tags)
+			{
+				save_string(key);
+				save_string(val);
+			}
+		};
+
+		auto save_vertices = [&ofstr, &save_tags](
+			const std::unordered_map<t_size, t_vertex>& vertices)
+		{
+			t_size num_vertices = vertices.size();
+			ofstr.write(reinterpret_cast<const char*>(&num_vertices), sizeof(num_vertices));
+
+			for(const auto& [idx, vertex] : vertices)
+			{
+				ofstr.write(reinterpret_cast<const char*>(&idx), sizeof(idx));
+				ofstr.write(reinterpret_cast<const char*>(&vertex.latitude), sizeof(vertex.latitude));
+				ofstr.write(reinterpret_cast<const char*>(&vertex.longitude), sizeof(vertex.longitude));
+
+				save_tags(vertex.tags);
+			}
+		};
+
+		auto save_segments = [&ofstr, &save_tags](
+			const std::unordered_map<t_size, t_segment>& segs)
+		{
+			t_size num_segs = segs.size();
+			ofstr.write(reinterpret_cast<const char*>(&num_segs), sizeof(num_segs));
+
+			for(const auto& [idx, seg] : segs)
+			{
+				ofstr.write(reinterpret_cast<const char*>(&idx), sizeof(idx));
+
+				std::uint8_t flags = seg.is_area ? 1 : 0;
+				ofstr.write(reinterpret_cast<const char*>(&flags), sizeof(flags));
+
+				t_size num_verts = seg.vertex_ids.size();
+				ofstr.write(reinterpret_cast<const char*>(&num_verts), sizeof(num_verts));
+				for(t_size vert_id : seg.vertex_ids)
+					ofstr.write(reinterpret_cast<const char*>(&vert_id), sizeof(vert_id));				
+
+				save_tags(seg.tags);
+			}
+		};
+
+		auto save_multisegments = [&ofstr, &save_tags](
+			const std::unordered_map<t_size, t_multisegment>& segs)
+		{
+			t_size num_segs = segs.size();
+			ofstr.write(reinterpret_cast<const char*>(&num_segs), sizeof(num_segs));
+
+			for(const auto& [idx, seg] : segs)
+			{
+				ofstr.write(reinterpret_cast<const char*>(&idx), sizeof(idx));
+
+				t_size num_verts = seg.vertex_ids.size();
+				ofstr.write(reinterpret_cast<const char*>(&num_verts), sizeof(num_verts));
+				for(t_size vert_id : seg.vertex_ids)
+					ofstr.write(reinterpret_cast<const char*>(&vert_id), sizeof(vert_id));				
+
+				t_size num_isegs = seg.segment_inner_ids.size();
+				ofstr.write(reinterpret_cast<const char*>(&num_isegs), sizeof(num_isegs));
+				for(t_size seg_id : seg.segment_inner_ids)
+					ofstr.write(reinterpret_cast<const char*>(&seg_id), sizeof(seg_id));				
+
+				t_size num_segs = seg.segment_ids.size();
+				ofstr.write(reinterpret_cast<const char*>(&num_segs), sizeof(num_segs));
+				for(t_size seg_id : seg.segment_ids)
+					ofstr.write(reinterpret_cast<const char*>(&seg_id), sizeof(seg_id));				
+
+				save_tags(seg.tags);
+			}
+		};
+
+		ofstr.write(reinterpret_cast<const char*>(&m_min_latitude), sizeof(m_min_latitude));
+		ofstr.write(reinterpret_cast<const char*>(&m_max_latitude), sizeof(m_max_latitude));
+		ofstr.write(reinterpret_cast<const char*>(&m_min_longitude), sizeof(m_min_longitude));
+		ofstr.write(reinterpret_cast<const char*>(&m_max_longitude), sizeof(m_max_longitude));
+
+		std::uint8_t flags = 0;
+		if(m_skip_buildings)
+			flags |= (1 << 0);
+		if(m_skip_labels)
+			flags |= (1 << 1);
+		ofstr.write(reinterpret_cast<const char*>(&flags), sizeof(flags));
+
+		save_vertices(m_vertices);
+		save_vertices(m_label_vertices);
+		save_segments(m_segments);
+		save_segments(m_segments_background);
+		save_multisegments(m_multisegments);
+
+		return true;
+	}
+
+
+
+	bool Load(std::ifstream& ifstr)
+	{
+		if(!ifstr)
+			return false;
+
+		auto load_string = [&ifstr]() -> std::string
+		{
+			t_size len{};
+			ifstr.read(reinterpret_cast<char*>(&len), sizeof(len));
+
+			std::string str;
+			str.resize(len);
+			ifstr.read(reinterpret_cast<char*>(str.data()), str.size() * sizeof(char));
+
+			return str;
+		};
+
+		auto load_tags = [&ifstr, &load_string]()
+			-> std::unordered_map<std::string, std::string>
+		{
+			t_size len{};
+			ifstr.read(reinterpret_cast<char*>(&len), sizeof(len));
+
+			std::unordered_map<std::string, std::string> tags;
+
+			for(t_size i = 0; i < len; ++i)
+			{
+				std::string key = load_string();
+				std::string val = load_string();
+
+				tags.emplace(std::make_pair(std::move(key), std::move(val)));
+			}
+
+			return tags;
+		};
+
+		auto load_vertices = [&ifstr, &load_tags]()
+			-> std::unordered_map<t_size, t_vertex>
+		{
+			t_size len{};
+			ifstr.read(reinterpret_cast<char*>(&len), sizeof(len));
+
+			std::unordered_map<t_size, t_vertex> vertices;
+
+			for(t_size i = 0; i < len; ++i)
+			{
+				t_vertex vertex;
+
+				t_size idx{};
+				ifstr.read(reinterpret_cast<char*>(&idx), sizeof(idx));
+				ifstr.read(reinterpret_cast<char*>(&vertex.latitude), sizeof(vertex.latitude));
+				ifstr.read(reinterpret_cast<char*>(&vertex.longitude), sizeof(vertex.longitude));
+
+				vertex.tags = load_tags();
+				vertex.referenced = true;
+
+				vertices.emplace(std::make_pair(idx, std::move(vertex)));
+			}
+
+			return vertices;
+		};
+
+		auto load_segments = [&ifstr, &load_tags]()
+			-> std::unordered_map<t_size, t_segment>
+		{
+			t_size len{};
+			ifstr.read(reinterpret_cast<char*>(&len), sizeof(len));
+
+			std::unordered_map<t_size, t_segment> segs;
+
+			for(t_size i = 0; i < len; ++i)
+			{
+				t_segment seg;
+
+				t_size idx{};
+				ifstr.read(reinterpret_cast<char*>(&idx), sizeof(idx));
+
+				std::uint8_t flags;
+				ifstr.read(reinterpret_cast<char*>(&flags), sizeof(flags));
+				seg.is_area = (flags != 0);
+
+				t_size num_verts{};
+				ifstr.read(reinterpret_cast<char*>(&num_verts), sizeof(num_verts));
+
+				for(t_size j = 0; j < num_verts; ++j)
+				{
+					t_size vert_id{};
+					ifstr.read(reinterpret_cast<char*>(&vert_id), sizeof(vert_id));
+
+					seg.vertex_ids.push_back(vert_id);
+				}
+
+				seg.tags = load_tags();
+
+				segs.emplace(std::make_pair(idx, std::move(seg)));
+			}
+
+			return segs;
+		};
+
+		auto load_multisegments = [&ifstr, &load_tags]()
+			-> std::unordered_map<t_size, t_multisegment>
+		{
+			t_size len{};
+			ifstr.read(reinterpret_cast<char*>(&len), sizeof(len));
+
+			std::unordered_map<t_size, t_multisegment> segs;
+
+			for(t_size i = 0; i < len; ++i)
+			{
+				t_multisegment seg;
+
+				t_size idx{};
+				ifstr.read(reinterpret_cast<char*>(&idx), sizeof(idx));
+
+				t_size num_verts{};
+				ifstr.read(reinterpret_cast<char*>(&num_verts), sizeof(num_verts));
+
+				for(t_size j = 0; j < num_verts; ++j)
+				{
+					t_size vert_id{};
+					ifstr.read(reinterpret_cast<char*>(&vert_id), sizeof(vert_id));
+
+					seg.vertex_ids.push_back(vert_id);
+				}
+
+				t_size num_isegs{};
+				ifstr.read(reinterpret_cast<char*>(&num_isegs), sizeof(num_isegs));
+
+				for(t_size j = 0; j < num_isegs; ++j)
+				{
+					t_size seg_id{};
+					ifstr.read(reinterpret_cast<char*>(&seg_id), sizeof(seg_id));
+
+					seg.segment_inner_ids.push_back(seg_id);
+				}
+
+				t_size num_segs{};
+				ifstr.read(reinterpret_cast<char*>(&num_segs), sizeof(num_segs));
+
+				for(t_size j = 0; j < num_segs; ++j)
+				{
+					t_size seg_id{};
+					ifstr.read(reinterpret_cast<char*>(&seg_id), sizeof(seg_id));
+
+					seg.segment_ids.push_back(seg_id);
+				}
+
+				seg.tags = load_tags();
+
+				segs.emplace(std::make_pair(idx, std::move(seg)));
+			}
+
+			return segs;
+		};
+
+		ifstr.read(reinterpret_cast<char*>(&m_min_latitude), sizeof(m_min_latitude));
+		ifstr.read(reinterpret_cast<char*>(&m_max_latitude), sizeof(m_max_latitude));
+		ifstr.read(reinterpret_cast<char*>(&m_min_longitude), sizeof(m_min_longitude));
+		ifstr.read(reinterpret_cast<char*>(&m_max_longitude), sizeof(m_max_longitude));
+
+		std::uint8_t flags = 0;
+		ifstr.read(reinterpret_cast<char*>(&flags), sizeof(flags));
+		m_skip_buildings = (flags & (1 << 0)) != 0;
+		m_skip_labels = (flags & (1 << 1)) != 0;
+
+		m_vertices = load_vertices();
+		m_label_vertices = load_vertices();
+		m_segments = load_segments();
+		m_segments_background = load_segments();
+		m_multisegments = load_multisegments();
+
+		return true;
+	}
+
+
+
 protected:
 	std::string m_filename{};
 	std::string m_version{};
 	std::string m_creator{};
 
-	t_real m_min_latitude{}, m_max_latitude{};
 	t_real m_min_longitude{}, m_max_longitude{};
+	t_real m_min_latitude{}, m_max_latitude{};
 
 	bool m_skip_buildings{false};
 	bool m_skip_labels{true};

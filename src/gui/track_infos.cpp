@@ -75,11 +75,11 @@ TrackInfos::TrackInfos(QWidget* parent) : QWidget{parent}
 	m_map_context->addAction(actionSaveSvg);
 
 	m_mapfile = std::make_shared<QLineEdit>(map_panel);
-	m_mapfile->setPlaceholderText("Map File (.osm or .osm.pbf)");
+	m_mapfile->setPlaceholderText("Directory with Map Files (.osm or .osm.pbf)");
 	m_mapfile->setToolTip("Map file to draw.");
 
 	QPushButton *btn_browse_map = new QPushButton(map_panel);
-	btn_browse_map->setText("Select Map...");
+	btn_browse_map->setText("Select Map Dir...");
 	btn_browse_map->setToolTip("Select a map file to draw.");
 	connect(btn_browse_map, &QAbstractButton::clicked, this, &TrackInfos::SelectMap);
 
@@ -230,7 +230,7 @@ void TrackInfos::ShowTrack(const t_track& track)
 
 
 /**
- * browse for map files
+ * browse for map directories (or files)
  */
 void TrackInfos::SelectMap()
 {
@@ -238,8 +238,9 @@ void TrackInfos::SelectMap()
 		this, "Load Map File", m_mapdir.c_str(),
 		"Map Files (*.osm *.pbf);;All Files (* *.*)");
 	filedlg->setAcceptMode(QFileDialog::AcceptOpen);
-	filedlg->setDefaultSuffix(".pbf");
-	filedlg->setFileMode(QFileDialog::ExistingFile);
+	//filedlg->setDefaultSuffix(".pbf");
+	filedlg->setOptions(QFileDialog::ShowDirsOnly | QFileDialog::ReadOnly);
+	filedlg->setFileMode(/*QFileDialog::ExistingFile*/ QFileDialog::Directory);
 
 	if(!filedlg->exec())
 		return;
@@ -250,8 +251,8 @@ void TrackInfos::SelectMap()
 
 	m_mapfile->setText(files[0]);
 
-	fs::path file{files[0].toStdString()};
-	m_mapdir = file.parent_path().string();
+	fs::path dir{files[0].toStdString()};
+	m_mapdir = dir/*.parent_path()*/.string();
 }
 
 
@@ -517,7 +518,10 @@ void TrackInfos::RestoreSettings(QSettings& settings)
 		m_same_range->setChecked(settings.value("track_info/keep_aspect").toBool());
 
 	if(settings.contains("track_info/recent_maps"))
+	{
 		m_mapdir = settings.value("track_info/recent_maps").toString().toStdString();
+		m_mapfile->setText(m_mapdir.c_str());
+	}
 
 	if(settings.contains("track_info/recent_svgs"))
 		m_svgdir = settings.value("track_info/recent_svgs").toString().toStdString();

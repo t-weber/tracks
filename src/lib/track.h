@@ -27,6 +27,7 @@
 
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/xml_parser.hpp>
+#include <boost/functional/hash.hpp>
 
 #include "calc.h"
 #include "timepoint.h"
@@ -69,9 +70,11 @@ public:
 	using t_TrackPoint = TrackPoint<t_timept, t_real>;
 
 
+
 public:
 	SingleTrack() = default;
 	~SingleTrack() = default;
+
 
 
 	/**
@@ -148,6 +151,7 @@ public:
 			time_pt_last = trackpt.timept;
 		}
 	}
+
 
 
 	/**
@@ -233,14 +237,18 @@ public:
 		}  // track iteration
 
 		Calculate();
+		CalculateHash();
+
 		return true;
 	}
+
 
 
 	const std::vector<t_TrackPoint>& GetPoints() const
 	{
 		return m_points;
 	}
+
 
 
 	std::optional<t_timept> GetStartTime() const
@@ -252,6 +260,7 @@ public:
 	}
 
 
+
 	std::optional<t_timept> GetEndTime() const
 	{
 		if(m_points.size() == 0)
@@ -261,10 +270,12 @@ public:
 	}
 
 
+
 	const std::string& GetFileName() const
 	{
 		return m_filename;
 	}
+
 
 
 	void SetFileName(const std::string& name)
@@ -273,10 +284,12 @@ public:
 	}
 
 
+
 	const std::string& GetVersion() const
 	{
 		return m_version;
 	}
+
 
 
 	const std::string& GetCreator() const
@@ -285,10 +298,12 @@ public:
 	}
 
 
+
 	t_real GetTotalDistance(bool planar = false) const
 	{
 		return planar ? m_total_dist_planar : m_total_dist;
 	}
+
 
 
 	t_real GetTotalTime() const
@@ -297,10 +312,12 @@ public:
 	}
 
 
+
 	std::pair<t_real, t_real> GetLatitudeRange() const
 	{
 		return std::make_pair(m_min_lat, m_max_lat);
 	}
+
 
 
 	std::pair<t_real, t_real> GetLongitudeRange() const
@@ -309,16 +326,34 @@ public:
 	}
 
 
+
 	std::pair<t_real, t_real> GetElevationRange() const
 	{
 		return std::make_pair(m_min_elev, m_max_elev);
 	}
 
 
+
+	t_size GetHash() const
+	{
+		return m_hash;
+	}
+
+
+
+	void SetDistanceFunction(int dist_func)
+	{
+		m_distance_function = dist_func;
+	}
+
+
+
 	bool Save(std::ofstream& ofstr) const
 	{
 		if(!ofstr)
 			return false;
+
+		ofstr.write(reinterpret_cast<const char*>(&m_hash), sizeof(m_hash));
 
 		const t_size num_points = GetPoints().size();
 		ofstr.write(reinterpret_cast<const char*>(&num_points), sizeof(num_points));
@@ -367,10 +402,13 @@ public:
 	}
 
 
+
 	bool Load(std::ifstream& ifstr, bool recalculate = false)
 	{
 		if(!ifstr)
 			return false;
+
+		ifstr.read(reinterpret_cast<char*>(&m_hash), sizeof(m_hash));
 
 		t_size num_points = 0;
 		ifstr.read(reinterpret_cast<char*>(&num_points), sizeof(num_points));
@@ -422,9 +460,14 @@ public:
 		ifstr.read(reinterpret_cast<char*>(m_filename.data()), m_filename.size() * sizeof(char));
 
 		if(recalculate)
+		{
 			Calculate();
+			CalculateHash();
+		}
+
 		return true;
 	}
+
 
 
 	std::string PrintHtml(int prec = -1) const
@@ -465,6 +508,7 @@ public:
 
 		return ostr.str();
 	}
+
 
 
 	friend std::ostream& operator<<(std::ostream& ostr, const SingleTrack<t_real>& track)
@@ -526,10 +570,26 @@ public:
 	}
 
 
-	void SetDistanceFunction(int dist_func)
+
+protected:
+	void CalculateHash()
 	{
-		m_distance_function = dist_func;
+		m_hash = 0;
+
+		for(const t_TrackPoint& pt : m_points)
+		{
+			t_size lat_hash = std::hash<t_real>{}(pt.latitude);
+			t_size lon_hash = std::hash<t_real>{}(pt.longitude);
+			t_size ele_hash = std::hash<t_real>{}(pt.elevation);
+			t_size time_hash = std::hash<t_size>{}(pt.timept.time_since_epoch().count());
+
+			boost::hash_combine(m_hash, lat_hash);
+			boost::hash_combine(m_hash, lon_hash);
+			boost::hash_combine(m_hash, ele_hash);
+			boost::hash_combine(m_hash, time_hash);
+		}
 	}
+
 
 
 private:
@@ -547,6 +607,8 @@ private:
 	t_real m_min_elev{}, m_max_elev{};
 
 	int m_distance_function{0};
+
+	t_size m_hash{};
 };
 
 
