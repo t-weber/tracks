@@ -18,7 +18,9 @@ namespace fs = __map_fs;
 #include <QtSvg/QSvgRenderer>
 
 #include <sstream>
+#include <iomanip>
 #include <cmath>
+#include <optional>
 #include <numbers>
 namespace num = std::numbers;
 
@@ -280,6 +282,7 @@ void TrackInfos::PlotMap()
 
 	// track
 	std::vector<typename t_map::t_vertex> thetrack;
+	std::optional<std::string> cached_map_name;
 	if(m_track)
 	{
 		thetrack.reserve(m_track->GetPoints().size());
@@ -293,6 +296,10 @@ void TrackInfos::PlotMap()
 
 			thetrack.emplace_back(std::move(vert));
 		}
+
+		t_size track_hash = m_track->GetHash();
+		cached_map_name = (std::ostringstream{} << std::hex 
+			<< track_hash << ".trackmap").str();
 	}
 
 	// map loading progress
@@ -318,18 +325,34 @@ void TrackInfos::PlotMap()
 	map.SetSkipLabels(!g_map_show_labels);
 	map.SetTrack(std::move(thetrack));
 
-	// cut out a map that has some margins around the actual data area
-	if(map.ImportDir(m_mapfile->text().toStdString(),
-		m_min_long_plot - lon_range/10., m_max_long_plot + lon_range/10.,
-		m_min_lat_plot - lat_range/10., m_max_lat_plot + lat_range/10.,
-		&progress))
+	// try to load a cached map
+	bool map_loaded = map.Load(*cached_map_name);
+
+	// else generate a new map
+	if(!map_loaded)
 	{
-		// plot the data area
+		// cut out a map that has some margins around the actual data area
+		map_loaded = map.ImportDir(m_mapfile->text().toStdString(),
+			m_min_long_plot - lon_range/10., m_max_long_plot + lon_range/10.,
+			m_min_lat_plot - lat_range/10., m_max_lat_plot + lat_range/10.,
+			&progress);
+
+		if(cached_map_name)
+		{
+			// cache generated map
+			map.Save(*cached_map_name);
+		}
+	}
+
+	if(map_loaded)
+	{
+		// plot the map data area as svg image
 		std::ostringstream ostr;
 		map.ExportSvg(ostr, g_map_scale,
 			m_min_long_plot - lon_range/20., m_max_long_plot + lon_range/20.,
 			m_min_lat_plot - lat_range/20., m_max_lat_plot + lat_range/20.);
 
+		// load the generated svg image
 		m_map_image = QByteArray{ostr.str().c_str(), static_cast<int>(ostr.str().size())};
 		m_map->load(m_map_image);
 	}

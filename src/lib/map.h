@@ -46,6 +46,9 @@
 #endif
 
 
+#define MAP_MAGIC "TRACKMAP"
+
+
 
 template<class t_real = double>
 struct MapVertex
@@ -1194,6 +1197,8 @@ public:
 			}
 		};
 
+		ofstr.write(MAP_MAGIC, sizeof(MAP_MAGIC));
+
 		ofstr.write(reinterpret_cast<const char*>(&m_min_latitude), sizeof(m_min_latitude));
 		ofstr.write(reinterpret_cast<const char*>(&m_max_latitude), sizeof(m_max_latitude));
 		ofstr.write(reinterpret_cast<const char*>(&m_min_longitude), sizeof(m_min_longitude));
@@ -1373,6 +1378,11 @@ public:
 			return segs;
 		};
 
+		char magic[sizeof(MAP_MAGIC)];
+		ifstr.read(magic, sizeof(magic));
+		if(std::string(magic) != MAP_MAGIC)
+			return false;
+
 		ifstr.read(reinterpret_cast<char*>(&m_min_latitude), sizeof(m_min_latitude));
 		ifstr.read(reinterpret_cast<char*>(&m_max_latitude), sizeof(m_max_latitude));
 		ifstr.read(reinterpret_cast<char*>(&m_min_longitude), sizeof(m_min_longitude));
@@ -1390,6 +1400,28 @@ public:
 		m_multisegments = load_multisegments();
 
 		return true;
+	}
+
+
+
+	bool Save(const std::string& filename) const
+	{
+		std::ofstream ofstr{filename, std::ios::binary};
+		if(!ofstr)
+			return false;
+
+		return Save(ofstr);
+	}
+
+
+
+	bool Load(const std::string& filename)
+	{
+		std::ifstream ifstr{filename, std::ios::binary};
+		if(!ifstr)
+			return false;
+
+		return Load(ifstr);
 	}
 
 
