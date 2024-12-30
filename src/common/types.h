@@ -16,6 +16,7 @@ using t_int = int;
 using t_uint = unsigned int;
 using t_size = std::size_t;
 using t_real = double;
+using t_real_map = float;
 
 
 #endif

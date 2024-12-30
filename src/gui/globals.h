@@ -21,7 +21,7 @@ using t_track_pt = typename t_track::t_TrackPoint;
 
 
 // map types
-using t_map = Map<t_real, t_size>;
+using t_map = Map<t_real_map, t_size>;
 
 
 // epsilon and precision values

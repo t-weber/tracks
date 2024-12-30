@@ -40,6 +40,9 @@ public:
 	TrackInfos(QWidget *parent = nullptr);
 	virtual ~TrackInfos();
 
+	TrackInfos(const TrackInfos&) = delete;
+	TrackInfos& operator=(const TrackInfos&) = delete;
+
 	void SaveSettings(QSettings& settings);
 	void RestoreSettings(QSettings& settings);
 

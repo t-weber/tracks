@@ -12,6 +12,7 @@
 
 #include <algorithm>
 #include <map>
+#include <string_view>
 
 
 #define TRACKDB_MAGIC "TRACKDB"
@@ -167,7 +168,7 @@ public:
 
 		char magic[sizeof(TRACKDB_MAGIC)];
 		ifstr.read(magic, sizeof(magic));
-		if(std::string(magic) != TRACKDB_MAGIC)
+		if(std::string_view(magic) != TRACKDB_MAGIC)
 			return false;
 
 		t_size num_tracks = 0;

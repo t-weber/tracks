@@ -290,15 +290,15 @@ void TrackInfos::PlotMap()
 		{
 			typename t_map::t_vertex vert
 			{
-				.longitude = pt.longitude,
-				.latitude = pt.latitude,
+				.longitude = static_cast<t_real_map>(pt.longitude),
+				.latitude = static_cast<t_real_map>(pt.latitude),
 			};
 
 			thetrack.emplace_back(std::move(vert));
 		}
 
 		t_size track_hash = m_track->GetHash();
-		cached_map_name = (std::ostringstream{} << std::hex 
+		cached_map_name = (std::ostringstream{} << std::hex
 			<< track_hash << ".trackmap").str();
 	}
 
@@ -333,8 +333,10 @@ void TrackInfos::PlotMap()
 	{
 		// cut out a map that has some margins around the actual data area
 		map_loaded = map.ImportDir(m_mapfile->text().toStdString(),
-			m_min_long_plot - lon_range/10., m_max_long_plot + lon_range/10.,
-			m_min_lat_plot - lat_range/10., m_max_lat_plot + lat_range/10.,
+			static_cast<t_real_map>(m_min_long_plot - lon_range/10.),
+			static_cast<t_real_map>(m_max_long_plot + lon_range/10.),
+			static_cast<t_real_map>(m_min_lat_plot - lat_range/10.),
+			static_cast<t_real_map>(m_max_lat_plot + lat_range/10.),
 			&progress);
 
 		if(cached_map_name)
@@ -348,9 +350,11 @@ void TrackInfos::PlotMap()
 	{
 		// plot the map data area as svg image
 		std::ostringstream ostr;
-		map.ExportSvg(ostr, g_map_scale,
-			m_min_long_plot - lon_range/20., m_max_long_plot + lon_range/20.,
-			m_min_lat_plot - lat_range/20., m_max_lat_plot + lat_range/20.);
+		map.ExportSvg(ostr, static_cast<t_real_map>(g_map_scale),
+			static_cast<t_real_map>(m_min_long_plot - lon_range/20.),
+			static_cast<t_real_map>(m_max_long_plot + lon_range/20.),
+			static_cast<t_real_map>(m_min_lat_plot - lat_range/20.),
+			static_cast<t_real_map>(m_max_lat_plot + lat_range/20.));
 
 		// load the generated svg image
 		m_map_image = QByteArray{ostr.str().c_str(), static_cast<int>(ostr.str().size())};

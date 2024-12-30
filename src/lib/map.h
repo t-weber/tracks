@@ -14,6 +14,7 @@
 #include <numbers>
 #include <limits>
 #include <string>
+#include <string_view>
 #include <list>
 #include <vector>
 #include <tuple>
@@ -93,6 +94,8 @@ public:
 	using t_segment = MapSegment<t_size>;
 	using t_multisegment = MapMultiSegment<t_size>;
 
+	using t_colmap = std::unordered_map<std::string_view, std::tuple<int, int, int>>;
+
 
 
 public:
@@ -121,6 +124,23 @@ protected:
 
 
 
+	bool HasSurfaceColour(const std::string_view& key, const std::string_view& val) const
+	{
+		if(!m_skip_buildings && key == "building")
+			return true;
+		if(key == "highway")
+			return true;
+
+		auto iter_surf = m_seg_colours.find(key);
+		if(iter_surf == m_seg_colours.end())
+			return false;
+
+		auto iter = iter_surf->second.find(val);
+		return iter != iter_surf->second.end();
+	}
+
+
+
 	bool ImportVertexXml(const boost::property_tree::ptree& node)
 	{
 		namespace num = std::numbers;
@@ -142,6 +162,8 @@ protected:
 			.referenced = true,  // mark all as referenced
 		};
 
+		bool has_place = false;
+		bool has_name = false;
 		if(auto tags = node.get_child_optional(""))
 		{
 			for(const auto& tag : *tags)
@@ -155,7 +177,20 @@ protected:
 				if(!key || !val)
 					continue;
 
-				vertex.tags.emplace(std::make_pair(*key, *val));
+				bool found_tag = false;
+				if(!has_place && *key == "place")
+				{
+					has_place = true;
+					found_tag = true;
+				}
+				if(!has_name && *key == "name")
+				{
+					has_name = true;
+					found_tag = true;
+				}
+
+				if(!m_skip_unnecessary_tags || found_tag)
+					vertex.tags.emplace(std::make_pair(*key, *val));
 			}
 		}
 
@@ -165,9 +200,7 @@ protected:
 		m_min_longitude = std::min(m_min_longitude, vertex.longitude);
 		m_max_longitude = std::max(m_max_longitude, vertex.longitude);
 
-		auto place_iter = vertex.tags.find("place");
-		auto name_iter = vertex.tags.find("name");
-		if(place_iter != vertex.tags.end() && name_iter != vertex.tags.end())
+		if(has_place && has_name)
 		{
 			if(!m_skip_labels)
 			{
@@ -218,11 +251,12 @@ protected:
 
 					if(!is_background && *key == "landuse")
 						is_background = true;
-					if(m_skip_buildings && (*key == "building" 
+					if(m_skip_buildings && (*key == "building"
 						|| (*key == "leisure" && *val == "swimming_pool")))
 						return false;
 
-					seg.tags.emplace(std::make_pair(*key, *val));
+					if(!m_skip_unnecessary_tags || HasSurfaceColour(*key, *val))
+						seg.tags.emplace(std::make_pair(*key, *val));
 				}
 			}
 		}
@@ -279,7 +313,8 @@ protected:
 						|| (*key == "leisure" && *val == "swimming_pool")))
 						return false;
 
-					seg.tags.emplace(std::make_pair(*key, *val));
+					if(!m_skip_unnecessary_tags || HasSurfaceColour(*key, *val))
+						seg.tags.emplace(std::make_pair(*key, *val));
 				}
 			}
 		}
@@ -422,18 +457,35 @@ public:
 					.latitude = lat,
 				};
 
-				for(const auto& tag : node.tags())
-					vertex.tags.emplace(std::make_pair(tag.key(), tag.value()));
-
 				// vertex ranges
 				super->m_min_latitude = std::min(super->m_min_latitude, vertex.latitude);
 				super->m_max_latitude = std::max(super->m_max_latitude, vertex.latitude);
 				super->m_min_longitude = std::min(super->m_min_longitude, vertex.longitude);
 				super->m_max_longitude = std::max(super->m_max_longitude, vertex.longitude);
 
-				auto place_iter = vertex.tags.find("place");
-				auto name_iter = vertex.tags.find("name");
-				if(place_iter != vertex.tags.end() && name_iter != vertex.tags.end())
+				bool has_place = false;
+				bool has_name = false;
+				for(const auto& tag : node.tags())
+				{
+					bool found_tag = false;
+					std::string_view key{tag.key()};
+
+					if(!has_place && key == "place")
+					{
+						has_place = true;
+						found_tag = true;
+					}
+					if(!has_name && key == "name")
+					{
+						has_name = true;
+						found_tag = true;
+					}
+
+					if(!super->m_skip_unnecessary_tags || found_tag)
+						vertex.tags.emplace(std::make_pair(tag.key(), tag.value()));
+				}
+
+				if(has_place && has_name)
 				{
 					if(!super->m_skip_labels)
 					{
@@ -463,14 +515,17 @@ public:
 				bool is_background = false;
 				for(const auto& tag : way.tags())
 				{
-					seg.tags.emplace(std::make_pair(tag.key(), tag.value()));
+					std::string_view key{tag.key()};
+					std::string_view val{tag.value()};
 
-					if(!is_background && std::string(tag.key()) == "landuse")
+					if(!is_background && key == "landuse")
 						is_background = true;
-					if(super->m_skip_buildings && (std::string(tag.key()) == "building"
-						|| (std::string(tag.key()) == "leisure" && 
-							std::string(tag.value()) == "swimming_pool")))
+					if(super->m_skip_buildings && (key == "building"
+						|| (key == "leisure" && val == "swimming_pool")))
 						return;
+
+					if(!super->m_skip_unnecessary_tags || super->HasSurfaceColour(key, val))
+						seg.tags.emplace(std::make_pair(key, val));
 				}
 
 				// get segment vertices
@@ -509,12 +564,15 @@ public:
 				// get tags
 				for(const auto& tag : rel.tags())
 				{
-					if(super->m_skip_buildings && (std::string(tag.key()) == "building"
-						|| (std::string(tag.key()) == "leisure" && 
-							std::string(tag.value()) == "swimming_pool")))
+					std::string_view key{tag.key()};
+					std::string_view val{tag.value()};
+
+					if(super->m_skip_buildings && (key == "building"
+						|| (key == "leisure" && val == "swimming_pool")))
 						return;
 
-					seg.tags.emplace(std::make_pair(tag.key(), tag.value()));
+					if(!super->m_skip_unnecessary_tags || super->HasSurfaceColour(key, val))
+						seg.tags.emplace(std::make_pair(key, val));
 				}
 
 				// get vertices
@@ -536,7 +594,7 @@ public:
 						else
 							vert_iter->second.referenced = true;
 					}
-					else if(member.type() == osmium::item_type::way && std::string(member.role()) == "inner")
+					else if(member.type() == osmium::item_type::way && std::string_view(member.role()) == "inner")
 					{
 						seg.segment_inner_ids.push_back(ref);
 
@@ -668,7 +726,7 @@ public:
 		t_real = -10., t_real = 10.,
 		t_real = -10., t_real = 10.,
 		std::function<bool(t_size, t_size)>* = nullptr,
-		bool check_bounds = false)
+		bool = false)
 	{
 		std::cerr << "Cannot import \"" << mapname
 			<< "\" because osmium support is disabled."
@@ -737,50 +795,20 @@ public:
 	std::tuple<bool, int, int, int>
 	GetSurfaceColour(const std::string& key, const std::string& val) const
 	{
-		if(key == "surface" && val == "asphalt")
-			return std::make_tuple(true, 0x22, 0x22, 0x22);
-		else if(key == "surface" && val == "concrete")
-			return std::make_tuple(true, 0x33, 0x33, 0x33);
-		else if(key == "building" /*&& val == "yes"*/)
-			return std::make_tuple(true, 0xdd, 0xdd, 0xdd);
-		else if(key == "landuse" && val == "residential")
-			return std::make_tuple(true, 0xbb, 0xbb, 0xcc);
-		else if(key == "landuse" && val == "retail")
-			return std::make_tuple(true, 0xff, 0x44, 0x44);
-		else if(key == "landuse" && val == "industrial")
-			return std::make_tuple(true, 0xaa, 0xaa, 0x44);
-		else if(key == "landuse" && val == "forest")
-			return std::make_tuple(true, 0x00, 0x99, 0x00);
-		else if(key == "landuse" && (val == "grass" || val == "meadow"))
-			return std::make_tuple(true, 0x44, 0xff, 0x44);
-		else if(key == "landuse" && (val == "farmland" || val == "farmyard"))
-			return std::make_tuple(true, 0x88, 0x33, 0x22);
-		else if(key == "quarter" && val == "suburb")
-			return std::make_tuple(true, 0x99, 0x55, 0x55);
-		else if(key == "natural" && val == "shingle")
-			return std::make_tuple(true, 0x55, 0x55, 0xff);
-		else if((key == "natural" || key == "surface") && val == "wood")
-			return std::make_tuple(true, 0x00, 0x99, 0x00);
-		else if(key == "natural" && val == "water")
-			return std::make_tuple(true, 0x44, 0x44, 0xff);
-		else if(key == "natural" && val == "scrub")
-			return std::make_tuple(true, 0x22, 0xaa, 0x22);
-		else if(key == "natural" && val == "bare_rock")
-			return std::make_tuple(true, 0x7d, 0x7d, 0x80);
-		else if(key == "natural" && val == "grassland")
-			return std::make_tuple(true, 0x44, 0xff, 0x44);
-		else if(key == "waterway" && val == "river")
-			return std::make_tuple(true, 0x55, 0x55, 0xff);
-		else if(key == "leisure" && (val == "park" || val == "garden"))
-			return std::make_tuple(true, 0x55, 0xff, 0x55);
-		else if(key == "leisure" && val == "pitch")
-			return std::make_tuple(true, 0x55, 0xbb, 0x55);
-		else if(key == "amenity" && (val == "research_institute" || val == "university"))
-			return std::make_tuple(true, 0x99, 0x99, 0x99);
-		else if(key == "amenity" && (val == "school" || val == "college"))
-			return std::make_tuple(true, 0x88, 0x88, 0x88);
+		static const auto def_colour = std::make_tuple(false, 0, 0, 0);
 
-		return std::make_tuple(false, 0, 0, 0);
+		if(key == "building" /*&& val == "yes"*/)
+			return std::make_tuple(true, 0xdd, 0xdd, 0xdd);
+
+		auto surf_iter = m_seg_colours.find(key);
+		if(surf_iter == m_seg_colours.end())
+			return def_colour;
+
+		const auto& surface = surf_iter->second;
+		if(auto iter = surface.find(val); iter != surface.end())
+			return std::tuple_cat(std::make_tuple(true), iter->second);
+
+		return def_colour;
 	}
 
 
@@ -803,29 +831,16 @@ public:
 
 
 
-	/**
-	 * @see https://wiki.openstreetmap.org/wiki/Key:highway
-	 */
 	std::tuple<bool, t_real>
 	GetLineWidth(const std::string& key, const std::string& val,
 		t_real def_line_width) const
 	{
-		if(key == "highway" && val == "motorway")
-			return std::make_tuple(true, 70.);
-		else if(key == "highway" && val == "motorway_link")
-			return std::make_tuple(true, 65.);
-		else if(key == "highway" && val == "trunk")
-			return std::make_tuple(true, 60.);
-		else if(key == "highway" && val == "primary")
-			return std::make_tuple(true, 50.);
-		else if(key == "highway" && val == "secondary")
-			return std::make_tuple(true, 40.);
-		else if(key == "highway" && val == "tertiary")
-			return std::make_tuple(true, 30.);
-		else if(key == "highway" && val == "residential")
-			return std::make_tuple(true, 20.);
-		else if(key == "highway" && val == "track")
-			return std::make_tuple(true, 10.);
+		if(key == "highway")
+		{
+			auto iter = m_road_widths.find(val);
+			if(iter != m_road_widths.end())
+				return std::make_tuple(true, iter->second);
+		}
 
 		return std::make_tuple(false, def_line_width);
 	}
@@ -1057,25 +1072,28 @@ public:
 		}
 
 		// draw place labels
-		for(const auto& [ id, vertex ] : m_label_vertices)
+		if(!m_skip_labels)
 		{
-			auto place_iter = vertex.tags.find("place");
-			auto name_iter = vertex.tags.find("name");
+			for(const auto& [ id, vertex ] : m_label_vertices)
+			{
+				auto place_iter = vertex.tags.find("place");
+				auto name_iter = vertex.tags.find("name");
 
-			if(place_iter == vertex.tags.end() || name_iter == vertex.tags.end())
-				continue;
+				if(place_iter == vertex.tags.end() || name_iter == vertex.tags.end())
+					continue;
 
-			t_vert vert{
-				vertex.longitude * t_real(180) / num::pi_v<t_real>,
-				vertex.latitude * t_real(180) / num::pi_v<t_real>};
+				t_vert vert{
+					vertex.longitude * t_real(180) / num::pi_v<t_real>,
+					vertex.latitude * t_real(180) / num::pi_v<t_real>};
 
-			svg.text(vert, name_iter->second,
-				"font-family:sans-serif; font-size:180pt; "
-				"font-style=normal; font-weight=bold; "
-				"stroke-width:12px; stroke:#000000; fill:#cccc44;",
-				0, 0, 1);
+				svg.text(vert, name_iter->second,
+					"font-family:sans-serif; font-size:180pt; "
+					"font-style=normal; font-weight=bold; "
+					"stroke-width:12px; stroke:#000000; fill:#cccc44;",
+					0, 0, 1);
+			}
 		}
-		
+
 		return true;
 	}
 
@@ -1162,7 +1180,7 @@ public:
 				t_size num_verts = seg.vertex_ids.size();
 				ofstr.write(reinterpret_cast<const char*>(&num_verts), sizeof(num_verts));
 				for(t_size vert_id : seg.vertex_ids)
-					ofstr.write(reinterpret_cast<const char*>(&vert_id), sizeof(vert_id));				
+					ofstr.write(reinterpret_cast<const char*>(&vert_id), sizeof(vert_id));
 
 				save_tags(seg.tags);
 			}
@@ -1181,17 +1199,17 @@ public:
 				t_size num_verts = seg.vertex_ids.size();
 				ofstr.write(reinterpret_cast<const char*>(&num_verts), sizeof(num_verts));
 				for(t_size vert_id : seg.vertex_ids)
-					ofstr.write(reinterpret_cast<const char*>(&vert_id), sizeof(vert_id));				
+					ofstr.write(reinterpret_cast<const char*>(&vert_id), sizeof(vert_id));
 
 				t_size num_isegs = seg.segment_inner_ids.size();
 				ofstr.write(reinterpret_cast<const char*>(&num_isegs), sizeof(num_isegs));
 				for(t_size seg_id : seg.segment_inner_ids)
-					ofstr.write(reinterpret_cast<const char*>(&seg_id), sizeof(seg_id));				
+					ofstr.write(reinterpret_cast<const char*>(&seg_id), sizeof(seg_id));
 
 				t_size num_segs = seg.segment_ids.size();
 				ofstr.write(reinterpret_cast<const char*>(&num_segs), sizeof(num_segs));
 				for(t_size seg_id : seg.segment_ids)
-					ofstr.write(reinterpret_cast<const char*>(&seg_id), sizeof(seg_id));				
+					ofstr.write(reinterpret_cast<const char*>(&seg_id), sizeof(seg_id));
 
 				save_tags(seg.tags);
 			}
@@ -1380,7 +1398,7 @@ public:
 
 		char magic[sizeof(MAP_MAGIC)];
 		ifstr.read(magic, sizeof(magic));
-		if(std::string(magic) != MAP_MAGIC)
+		if(std::string_view(magic) != MAP_MAGIC)
 			return false;
 
 		ifstr.read(reinterpret_cast<char*>(&m_min_latitude), sizeof(m_min_latitude));
@@ -1436,6 +1454,7 @@ protected:
 
 	bool m_skip_buildings{false};
 	bool m_skip_labels{true};
+	bool m_skip_unnecessary_tags{true};
 
 	std::unordered_map<t_size, t_vertex> m_vertices{};
 	std::unordered_map<t_size, t_vertex> m_label_vertices{};
@@ -1444,6 +1463,99 @@ protected:
 	std::unordered_map<t_size, t_multisegment> m_multisegments{};
 
 	std::vector<t_vertex> m_track{};
+
+
+
+private:
+	// @see https://wiki.openstreetmap.org/wiki/Key:highway
+	std::unordered_map<std::string, t_real> m_road_widths
+	{
+		{ "motorway",      70. },
+		{ "motorway_link", 65. },
+		{ "trunk",         60. },
+		{ "primary",       50. },
+		{ "secondary",     40. },
+		{ "tertiary",      30. },
+		{ "residential",   20. },
+		{ "track",         10. },
+	};
+
+	std::unordered_map<std::string_view, t_colmap> m_seg_colours
+	{{
+		// @see https://wiki.openstreetmap.org/wiki/Key:surface
+		"surface",
+		t_colmap
+		{
+			{ "asphalt",  std::make_tuple(0x22, 0x22, 0x22) },
+			{ "concrete", std::make_tuple(0x33, 0x33, 0x33) },
+			{ "wood",     std::make_tuple(0x00, 0x99, 0x00) },
+		},
+	},
+	{
+		// @see https://wiki.openstreetmap.org/wiki/Key:landuse
+		"landuse",
+		t_colmap
+		{
+			{ "residential", std::make_tuple(0xbb, 0xbb, 0xcc) },
+			{ "retail",      std::make_tuple(0xff, 0x44, 0x44) },
+			{ "industrial",  std::make_tuple(0xaa, 0xaa, 0x44) },
+			{ "forest",      std::make_tuple(0x00, 0x99, 0x00) },
+			{ "grass",       std::make_tuple(0x44, 0xff, 0x44) },
+			{ "meadow",      std::make_tuple(0x44, 0xff, 0x44) },
+			{ "farmland",    std::make_tuple(0x88, 0x33, 0x22) },
+			{ "farmyard",    std::make_tuple(0x88, 0x33, 0x22) },
+		},
+	},
+	{
+		// @see https://wiki.openstreetmap.org/wiki/Key:quarter
+		"quarter",
+		t_colmap
+		{
+			{ "suburb", std::make_tuple(0x99, 0x55, 0x55) },
+		},
+	},
+	{
+		// @see https://wiki.openstreetmap.org/wiki/Key:natural
+		"natural",
+		t_colmap
+		{
+			{ "shingle",   std::make_tuple(0x55, 0x55, 0xff) },
+			{ "wood",      std::make_tuple(0x00, 0x99, 0x00) },
+			{ "water",     std::make_tuple(0x44, 0x44, 0xff) },
+			{ "scrub",     std::make_tuple(0x22, 0xaa, 0x22) },
+			{ "bare_rock", std::make_tuple(0x7d, 0x7d, 0x80) },
+			{ "grassland", std::make_tuple(0x44, 0xff, 0x44) },
+		},
+	},
+	{
+		// @see https://wiki.openstreetmap.org/wiki/Key:waterway
+		"waterway",
+		t_colmap
+		{
+			{ "river", std::make_tuple(0x55, 0x55, 0xff) },
+		},
+	},
+	{
+		// @see https://wiki.openstreetmap.org/wiki/Key:leisure
+		"leisure",
+		t_colmap
+		{
+			{ "park",   std::make_tuple(0x55, 0xff, 0x55) },
+			{ "garden", std::make_tuple(0x55, 0xff, 0x55) },
+			{ "pitch",  std::make_tuple(0x55, 0xbb, 0x55) },
+		},
+	},
+	{
+		// @see https://wiki.openstreetmap.org/wiki/Key:amenity
+		"amenity",
+		t_colmap
+		{
+			{ "research_institute", std::make_tuple(0x99, 0x99, 0x99) },
+			{ "university",         std::make_tuple(0x99, 0x99, 0x99) },
+			{ "school",             std::make_tuple(0x88, 0x88, 0x88) },
+			{ "college",            std::make_tuple(0x88, 0x88, 0x88) },
+		},
+	}};
 };
 
 
