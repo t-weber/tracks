@@ -9,7 +9,6 @@
 #include "helpers.h"
 namespace fs = __map_fs;
 
-#include <QtWidgets/QTabWidget>
 #include <QtWidgets/QGridLayout>
 #include <QtWidgets/QPushButton>
 #include <QtWidgets/QFileDialog>
@@ -27,13 +26,13 @@ namespace num = std::numbers;
 
 TrackInfos::TrackInfos(QWidget* parent) : QWidget{parent}
 {
-	QTabWidget *tab = new QTabWidget(this);
-	QWidget *plot_panel = new QWidget(tab);
-	QWidget *map_panel = new QWidget(tab);
-	tab->addTab(plot_panel, "Track");
-	tab->addTab(map_panel, "Map");
+	m_tab = std::make_shared<QTabWidget>(this);
+	QWidget *plot_panel = new QWidget(m_tab.get());
+	QWidget *map_panel = new QWidget(m_tab.get());
+	m_tab->addTab(plot_panel, "Track");
+	m_tab->addTab(map_panel, "Map");
 #ifndef _TRACKS_USE_OSMIUM_
-	tab->setTabEnabled(1, false);
+	m_tab->setTabEnabled(1, false);
 	map_panel->setEnabled(false);
 #endif
 
@@ -88,7 +87,10 @@ TrackInfos::TrackInfos(QWidget* parent) : QWidget{parent}
 	QPushButton *btn_calc_map = new QPushButton(map_panel);
 	btn_calc_map->setText("Calculate Map");
 	btn_calc_map->setToolTip("Calculate the map for the current track.");
-	connect(btn_calc_map, &QAbstractButton::clicked, this, &TrackInfos::PlotMap);
+	connect(btn_calc_map, &QAbstractButton::clicked, [this]()
+	{
+		PlotMap(false);
+	});
 
 	QGridLayout *map_panel_layout = new QGridLayout(map_panel);
 	map_panel_layout->setContentsMargins(4, 4, 4, 4);
@@ -105,7 +107,7 @@ TrackInfos::TrackInfos(QWidget* parent) : QWidget{parent}
 
 	m_split = std::make_shared<QSplitter>(this);
 	m_split->setOrientation(Qt::Vertical);
-	m_split->addWidget(tab);
+	m_split->addWidget(m_tab.get());
 	m_split->addWidget(m_infos.get());
 	m_split->setStretchFactor(0, 10);
 	m_split->setStretchFactor(1, 1);
@@ -137,8 +139,26 @@ void TrackInfos::CalcPlotRange()
 	if(!m_plot || !m_same_range)
 		return;
 
-	t_real aspect = t_real(m_plot->viewport().height()) /
-		t_real(m_plot->viewport().width());
+	int h = 3;
+	int w = 4;
+
+	if(m_tab->currentIndex() == 0)
+	{
+		h = m_plot->viewport().height();
+		w = m_plot->viewport().width();
+	}
+	else
+	{
+		h = m_map->height();
+		w = m_map->width();
+	}
+
+	if(h <= 0 || w <= 0)
+	{
+		h = 3;
+		w = 4;
+	}
+	t_real aspect = t_real(h) / t_real(w);
 
 	if(m_same_range->isChecked())
 	{
@@ -217,7 +237,7 @@ void TrackInfos::ShowTrack(const t_track& track)
 		return;
 	m_plot->clearPlottables();
 
-	//PlotMap();
+	PlotMap(true);
 
 	QCPCurve *curve = new QCPCurve(m_plot->xAxis, m_plot->yAxis);
 	curve->setData(longitudes, latitudes);
@@ -261,7 +281,7 @@ void TrackInfos::SelectMap()
 /**
  * render an image of the map corresponding to the current track
  */
-void TrackInfos::PlotMap()
+void TrackInfos::PlotMap(bool load_cached)
 {
 #ifndef _TRACKS_USE_OSMIUM_
 	return;
@@ -325,11 +345,14 @@ void TrackInfos::PlotMap()
 	map.SetSkipLabels(!g_map_show_labels);
 	map.SetTrack(std::move(thetrack));
 
+	bool map_loaded = false;
+
 	// try to load a cached map
-	bool map_loaded = map.Load(*cached_map_name);
+	if(load_cached)
+		map_loaded = map.Load(*cached_map_name);
 
 	// else generate a new map
-	if(!map_loaded)
+	else if(!load_cached && !map_loaded)
 	{
 		// cut out a map that has some margins around the actual data area
 		map_loaded = map.ImportDir(m_mapfile->text().toStdString(),
@@ -532,6 +555,7 @@ void TrackInfos::SaveSettings(QSettings& settings)
 	settings.setValue("track_info/keep_aspect", m_same_range->isChecked());
 	settings.setValue("track_info/recent_maps", m_mapdir.c_str());
 	settings.setValue("track_info/recent_svgs", m_svgdir.c_str());
+	settings.setValue("track_info/recent_tab", m_tab->currentIndex());
 }
 
 
@@ -552,4 +576,7 @@ void TrackInfos::RestoreSettings(QSettings& settings)
 
 	if(settings.contains("track_info/recent_svgs"))
 		m_svgdir = settings.value("track_info/recent_svgs").toString().toStdString();
+
+	if(settings.contains("track_info/recent_tab"))
+		m_tab->setCurrentIndex(settings.value("track_info/recent_tab").toInt());
 }

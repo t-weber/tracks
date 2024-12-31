@@ -11,6 +11,7 @@
 #include <QtCore/QByteArray>
 #include <QtCore/QSettings>
 #include <QtWidgets/QWidget>
+#include <QtWidgets/QTabWidget>
 #include <QtWidgets/QTextEdit>
 #include <QtWidgets/QCheckBox>
 #include <QtWidgets/QSplitter>
@@ -60,17 +61,20 @@ protected:
 	void MapMouseMove(QMouseEvent *evt);
 	void MapMouseClick(QMouseEvent *evt);
 	void SelectMap();
-	void PlotMap();
+	void PlotMap(bool load_cached = false);
 	void SaveMapSvg();
 
 
 private:
 	std::shared_ptr<QSplitter> m_split{};
 	std::shared_ptr<QTextEdit> m_infos{};
-	std::shared_ptr<QCheckBox> m_same_range{};
-	std::shared_ptr<QLineEdit> m_mapfile{};
+
+	std::shared_ptr<QTabWidget> m_tab{};
 	std::shared_ptr<QCustomPlot> m_plot{};
+	std::shared_ptr<QCheckBox> m_same_range{};
+
 	std::shared_ptr<MapDrawer> m_map{};
+	std::shared_ptr<QLineEdit> m_mapfile{};
 	std::shared_ptr<QMenu> m_map_context{};
 
 	// svg image of the map

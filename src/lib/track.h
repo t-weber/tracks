@@ -486,21 +486,21 @@ public:
 		ostr << "<html>";
 		ostr << "<ul>";
 
-		ostr << "<li>Number of track points: " << GetPoints().size() << ".</li>";
+		ostr << "<li><b>Number of track points</b>: " << GetPoints().size() << ".</li>";
 		if(start_time && end_time)
 		{
-			ostr << "<li>Track time: "
+			ostr << "<li><b>Track time</b>: "
 				<< from_timepoint<t_clk, t_timept>(*start_time, true) << " - "
 				<< from_timepoint<t_clk, t_timept>(*end_time, false)
 				<< " (" << get_time_str(t) << ").</li>";
 		}
-		ostr << "<li>Elevation range: [ " << min_elev << ", " << max_elev << " ] m"
+		ostr << "<li><b>Elevation range</b>: [ " << min_elev << ", " << max_elev << " ] m"
 			<< " (height difference: " << max_elev - min_elev << " m).</li>";
-		ostr << "<li>Distance: " << s / 1000. << " km"
+		ostr << "<li><b>Distance</b>: " << s / 1000. << " km"
 			<< " (planar: " << s_planar / 1000. << " km).</li>";
-		ostr << "<li>Pace: " << get_pace_str((t / 60.) / (s / 1000.))
+		ostr << "<li><b>Pace</b>: " << get_pace_str((t / 60.) / (s / 1000.))
 			<< " (planar: " << get_pace_str((t / 60.) / (s_planar / 1000.)) << ").</li>";
-		ostr << "<li>Speed: " << s / t << " m/s" << " = " << (s / 1000.) / (t / 60. / 60.) << " km/h"
+		ostr << "<li><b>Speed</b>: " << s / t << " m/s" << " = " << (s / 1000.) / (t / 60. / 60.) << " km/h"
 			<< " (planar: " << s_planar / t << " m/s" << " = " << (s_planar / 1000.) / (t / 60. / 60.) << " km/h).</li>";
 
 		ostr << "</ul>";

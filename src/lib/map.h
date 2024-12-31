@@ -51,37 +51,38 @@
 
 
 
-template<class t_real = double>
+template<class t_tags, class t_real = double>
 struct MapVertex
 {
 	t_real longitude{};
 	t_real latitude{};
 
-	std::unordered_map<std::string, std::string> tags{};
+	t_tags tags{};
 	bool referenced{false};
 };
 
 
 
-template<class t_size = std::size_t>
+template<class t_tags, class t_size = std::size_t>
 struct MapSegment
 {
 	std::list<t_size> vertex_ids{};
 	bool is_area{false};
 
-	std::unordered_map<std::string, std::string> tags{};
+	t_tags tags{};
+	bool referenced{false};
 };
 
 
 
-template<class t_size = std::size_t>
+template<class t_tags, class t_size = std::size_t>
 struct MapMultiSegment
 {
 	std::list<t_size> vertex_ids{};
 	std::list<t_size> segment_inner_ids{};
 	std::list<t_size> segment_ids{};
 
-	std::unordered_map<std::string, std::string> tags{};
+	t_tags tags{};
 };
 
 
@@ -90,11 +91,13 @@ template<class t_real = double, class t_size = std::size_t>
 class Map
 {
 public:
-	using t_vertex = MapVertex<t_real>;
-	using t_segment = MapSegment<t_size>;
-	using t_multisegment = MapMultiSegment<t_size>;
-
+	using t_tags = std::unordered_map<std::string, std::string>;
+	using t_widthmap = std::unordered_map<std::string_view, t_real>;
 	using t_colmap = std::unordered_map<std::string_view, std::tuple<int, int, int>>;
+
+	using t_vertex = MapVertex<t_tags, t_real>;
+	using t_segment = MapSegment<t_tags, t_size>;
+	using t_multisegment = MapMultiSegment<t_tags, t_size>;
 
 
 
@@ -106,9 +109,9 @@ public:
 
 protected:
 	/**
-	 * remove unreferenced vertices
+	 * remove unreferenced vertices and segments
 	 */
-	void PruneVertices()
+	void PruneUnreferenced()
 	{
 		for(auto iter = m_vertices.begin(); iter != m_vertices.end();)
 		{
@@ -120,6 +123,30 @@ protected:
 
 			iter = m_vertices.erase(iter);
 		}
+
+		for(auto iter = m_segments.begin(); iter != m_segments.end();)
+		{
+			if(iter->second.referenced || iter->second.tags.size())
+			{
+				++iter;
+				continue;
+			}
+
+			// no tags and not referenced by multi-segments -> remove
+			iter = m_segments.erase(iter);
+		}
+	}
+
+
+
+	bool HasRoadWidth(const std::string_view& key, const std::string_view& val) const
+	{
+		auto iter_widths = m_road_widths.find(key);
+		if(iter_widths == m_road_widths.end())
+			return false;
+
+		auto iter = iter_widths->second.find(val);
+		return iter != iter_widths->second.end();
 	}
 
 
@@ -127,8 +154,6 @@ protected:
 	bool HasSurfaceColour(const std::string_view& key, const std::string_view& val) const
 	{
 		if(!m_skip_buildings && key == "building")
-			return true;
-		if(key == "highway")
 			return true;
 
 		auto iter_surf = m_seg_colours.find(key);
@@ -227,7 +252,9 @@ protected:
 			return false;
 
 		t_segment seg;
+		seg.referenced = true;  // mark all as referenced
 		bool is_background = false;
+		bool is_road = false;
 
 		if(auto tags = node.get_child_optional(""))
 		{
@@ -249,24 +276,37 @@ protected:
 					if(!key || !val)
 						continue;
 
-					if(!is_background && *key == "landuse")
+					if(!is_background && (*key == "landuse" || *key == "natural"))
 						is_background = true;
+					if(!is_road && m_road_widths.find(*key) != m_road_widths.end())
+						is_road = true;
 					if(m_skip_buildings && (*key == "building"
 						|| (*key == "leisure" && *val == "swimming_pool")))
 						return false;
 
-					if(!m_skip_unnecessary_tags || HasSurfaceColour(*key, *val))
+					if(!m_skip_unnecessary_tags
+						|| HasSurfaceColour(*key, *val)
+						|| HasRoadWidth(*key, *val))
+					{
 						seg.tags.emplace(std::make_pair(*key, *val));
+					}
 				}
 			}
 		}
 
 		if(seg.vertex_ids.size() >= 2 && *seg.vertex_ids.begin() == *seg.vertex_ids.rbegin())
 			seg.is_area = true;
+
 		if(is_background)
+		{
+			seg.is_area = is_road ? false : true;
 			m_segments_background.emplace(std::make_pair(*id, std::move(seg)));
-		else
+		}
+		else /*if(seg.tags.size())*/
+		{
 			m_segments.emplace(std::make_pair(*id, std::move(seg)));
+		}
+
 		return true;
 	}
 
@@ -313,13 +353,19 @@ protected:
 						|| (*key == "leisure" && *val == "swimming_pool")))
 						return false;
 
-					if(!m_skip_unnecessary_tags || HasSurfaceColour(*key, *val))
+					if(!m_skip_unnecessary_tags
+						|| HasSurfaceColour(*key, *val)
+						|| HasRoadWidth(*key, *val))
+					{
 						seg.tags.emplace(std::make_pair(*key, *val));
+					}
 				}
 			}
 		}
 
+		//if(seg.tags.size())
 		m_multisegments.emplace(std::make_pair(*id, std::move(seg)));
+
 		return true;
 	}
 
@@ -376,7 +422,7 @@ public:
 				ImportMultiSegmentXml(node.second);
 		}  // node iteration
 
-		//PruneVertices();
+		//PruneUnreferenced();
 		return true;
 	}
 
@@ -513,45 +559,69 @@ public:
 
 				// get segment tags
 				bool is_background = false;
+				bool is_road = false;
 				for(const auto& tag : way.tags())
 				{
 					std::string_view key{tag.key()};
 					std::string_view val{tag.value()};
 
-					if(!is_background && key == "landuse")
+					if(!is_background && (key == "landuse" || key == "natural"))
 						is_background = true;
+					if(!is_road && super->m_road_widths.find(key) != super->m_road_widths.end())
+						is_road = true;
 					if(super->m_skip_buildings && (key == "building"
 						|| (key == "leisure" && val == "swimming_pool")))
 						return;
 
-					if(!super->m_skip_unnecessary_tags || super->HasSurfaceColour(key, val))
+					if(!super->m_skip_unnecessary_tags
+						|| super->HasSurfaceColour(key, val)
+						|| super->HasRoadWidth(key, val))
+					{
 						seg.tags.emplace(std::make_pair(key, val));
+					}
 				}
 
+				//if(!seg.tags.size())
+				//	return;
+
 				// get segment vertices
-				t_size invalid_refs = 0;
+				t_size node_idx = 0;
 				for(const auto& node : way.nodes())
 				{
 					t_size ref = node.ref();
-					seg.vertex_ids.push_back(ref);
 
 					auto vert_iter = super->m_vertices.find(ref);
-					if(vert_iter == super->m_vertices.end())
-						++invalid_refs;
-					else
+					if(vert_iter != super->m_vertices.end())
+					{
+						seg.vertex_ids.push_back(ref);
 						vert_iter->second.referenced = true;
+					}
+
+					// first and last vertices are the same?
+					if(node_idx == way.nodes().size() - 1)
+					{
+						if(node.ref() == way.nodes().begin()->ref())
+							seg.is_area = true;
+					}
+
+					++node_idx;
 				}
 
 				// only referring to invalid vertices?
-				if(invalid_refs == seg.vertex_ids.size())
+				if(!seg.vertex_ids.size())
 					return;
 
-				if(seg.vertex_ids.size() >= 2 && *seg.vertex_ids.begin() == *seg.vertex_ids.rbegin())
-					seg.is_area = true;
 				if(is_background)
-					super->m_segments_background.emplace(std::make_pair(way.id(), std::move(seg)));
+				{
+					seg.is_area = is_road ? false : true;
+					super->m_segments_background.emplace(
+						std::make_pair(way.id(), std::move(seg)));
+				}
 				else
-					super->m_segments.emplace(std::make_pair(way.id(), std::move(seg)));
+				{
+					super->m_segments.emplace(
+						std::make_pair(way.id(), std::move(seg)));
+				}
 
 				update_progress();
 			}
@@ -571,49 +641,56 @@ public:
 						|| (key == "leisure" && val == "swimming_pool")))
 						return;
 
-					if(!super->m_skip_unnecessary_tags || super->HasSurfaceColour(key, val))
+					if(!super->m_skip_unnecessary_tags
+						|| super->HasSurfaceColour(key, val)
+						|| super->HasRoadWidth(key, val))
+					{
 						seg.tags.emplace(std::make_pair(key, val));
+					}
 				}
 
-				// get vertices
-				t_size invalid_node_refs = 0;
-				t_size invalid_inner_seg_refs = 0;
-				t_size invalid_seg_refs = 0;
+				//if(!seg.tags.size())
+				//	return;
 
+				// get vertices
 				for(const auto& member : rel.members())
 				{
 					t_size ref = member.ref();
 
 					if(member.type() == osmium::item_type::node)
 					{
-						seg.vertex_ids.push_back(ref);
-
 						auto vert_iter = super->m_vertices.find(ref);
-						if(vert_iter == super->m_vertices.end())
-							++invalid_node_refs;
-						else
+						if(vert_iter != super->m_vertices.end())
+						{
+							seg.vertex_ids.push_back(ref);
 							vert_iter->second.referenced = true;
+						}
 					}
-					else if(member.type() == osmium::item_type::way && std::string_view(member.role()) == "inner")
+					else if(member.type() == osmium::item_type::way &&
+						std::string_view(member.role()) == "inner")
 					{
-						seg.segment_inner_ids.push_back(ref);
-
-						if(super->m_segments.find(ref) == super->m_segments.end())
-							++invalid_inner_seg_refs;
+						auto seg_iter = super->m_segments.find(ref);
+						if(seg_iter != super->m_segments.end())
+						{
+							seg.segment_inner_ids.push_back(ref);
+							seg_iter->second.referenced = true;
+						}
 					}
-					else if(member.type() == osmium::item_type::way)
+					else if(member.type() == osmium::item_type::way &&
+						std::string_view(member.role()) == "outer")
 					{
-						seg.segment_ids.push_back(ref);
-
-						if(super->m_segments.find(ref) == super->m_segments.end())
-							++invalid_seg_refs;
+						auto seg_iter = super->m_segments.find(ref);
+						if(seg_iter != super->m_segments.end())
+						{
+							seg.segment_ids.push_back(ref);
+							seg_iter->second.referenced = true;
+						}
 					}
 				}
 
 				// only referring to invalid objects?
-				if(invalid_node_refs == seg.vertex_ids.size() &&
-					invalid_inner_seg_refs == seg.segment_inner_ids.size() &&
-					invalid_seg_refs == seg.segment_ids.size())
+				if(!seg.vertex_ids.size() && !seg.segment_inner_ids.size() &&
+					!seg.segment_ids.size())
 					return;
 
 				super->m_multisegments.emplace(std::make_pair(rel.id(), std::move(seg)));
@@ -716,7 +793,7 @@ public:
 			return false;
 		}
 
-		PruneVertices();
+		PruneUnreferenced();
 		return true;
 	}
 
@@ -795,7 +872,7 @@ public:
 	std::tuple<bool, int, int, int>
 	GetSurfaceColour(const std::string& key, const std::string& val) const
 	{
-		static const auto def_colour = std::make_tuple(false, 0, 0, 0);
+		const auto def_colour = std::make_tuple(false, 0, 0, 0);
 
 		if(key == "building" /*&& val == "yes"*/)
 			return std::make_tuple(true, 0xdd, 0xdd, 0xdd);
@@ -826,21 +903,23 @@ public:
 			<< std::setw(2) << std::setfill('0') << std::hex << r
 			<< std::setw(2) << std::setfill('0') << std::hex << g
 			<< std::setw(2) << std::setfill('0') << std::hex << b;
+
 		return std::make_tuple(ok, col_ostr.str());
 	}
 
 
 
 	std::tuple<bool, t_real>
-	GetLineWidth(const std::string& key, const std::string& val,
+	GetRoadWidth(const std::string& key, const std::string& val,
 		t_real def_line_width) const
 	{
-		if(key == "highway")
-		{
-			auto iter = m_road_widths.find(val);
-			if(iter != m_road_widths.end())
-				return std::make_tuple(true, iter->second);
-		}
+		auto widths_iter = m_road_widths.find(key);
+		if(widths_iter == m_road_widths.end())
+			return std::make_tuple(false, def_line_width);
+
+		const auto& widths = widths_iter->second;
+		if(auto iter = widths.find(val); iter != widths.end())
+			return std::make_tuple(true, iter->second);
 
 		return std::make_tuple(false, def_line_width);
 	}
@@ -918,7 +997,7 @@ public:
 		std::unordered_set<t_size> seg_already_drawn;
 		auto draw_seg = [this, &seg_already_drawn, &svg]
 			(t_size id, const t_segment *seg = nullptr,
-			const std::unordered_map<std::string, std::string>* more_tags = nullptr)
+			const t_tags* more_tags = nullptr)
 		{
 			auto id_iter = seg_already_drawn.find(id);
 			if(id_iter != seg_already_drawn.end())
@@ -936,6 +1015,7 @@ public:
 
 			if(!seg->is_area)
 				return;
+
 			t_poly poly;
 
 			for(const t_size vert_id : seg->vertex_ids)
@@ -979,10 +1059,13 @@ public:
 				}
 			}
 
-			//svg.add(poly);
-			svg.map(poly, "stroke:" + line_col +
-				"; stroke-width:" + std::to_string(line_width) + "px" +
-				"; fill:" + fill_col + ";", 1.);
+			if(found)
+			{
+				//svg.add(poly);
+				svg.map(poly, "stroke:" + line_col +
+					"; stroke-width:" + std::to_string(line_width) + "px" +
+					"; fill:" + fill_col + ";", 1.);
+			}
 		};
 
 		// draw background areas
@@ -1000,7 +1083,10 @@ public:
 
 		// draw areas
 		for(const auto& [ id, seg ] : m_segments)
-			draw_seg(id, &seg);
+		{
+			if(seg.is_area)
+				draw_seg(id, &seg);
+		}
 
 		// draw streets
 		for(const auto& [ id, seg ] : m_segments)
@@ -1030,7 +1116,7 @@ public:
 			{
 				if(!found_width)
 					std::tie(found_width, line_width) =
-						GetLineWidth(tag_key, tag_val, 8.);
+						GetRoadWidth(tag_key, tag_val, 8.);
 
 				if(!found_col)
 					std::tie(found_col, line_col) =
@@ -1136,7 +1222,7 @@ public:
 		};
 
 		auto save_tags = [&ofstr, &save_string](
-			const std::unordered_map<std::string, std::string>& tags)
+			const t_tags& tags)
 		{
 			t_size num_tags = tags.size();
 			ofstr.write(reinterpret_cast<const char*>(&num_tags), sizeof(num_tags));
@@ -1215,8 +1301,6 @@ public:
 			}
 		};
 
-		ofstr.write(MAP_MAGIC, sizeof(MAP_MAGIC));
-
 		ofstr.write(reinterpret_cast<const char*>(&m_min_latitude), sizeof(m_min_latitude));
 		ofstr.write(reinterpret_cast<const char*>(&m_max_latitude), sizeof(m_max_latitude));
 		ofstr.write(reinterpret_cast<const char*>(&m_min_longitude), sizeof(m_min_longitude));
@@ -1257,13 +1341,12 @@ public:
 			return str;
 		};
 
-		auto load_tags = [&ifstr, &load_string]()
-			-> std::unordered_map<std::string, std::string>
+		auto load_tags = [&ifstr, &load_string]() -> t_tags
 		{
 			t_size len{};
 			ifstr.read(reinterpret_cast<char*>(&len), sizeof(len));
 
-			std::unordered_map<std::string, std::string> tags;
+			t_tags tags;
 
 			for(t_size i = 0; i < len; ++i)
 			{
@@ -1333,6 +1416,7 @@ public:
 				}
 
 				seg.tags = load_tags();
+				seg.referenced = true;
 
 				segs.emplace(std::make_pair(idx, std::move(seg)));
 			}
@@ -1396,11 +1480,6 @@ public:
 			return segs;
 		};
 
-		char magic[sizeof(MAP_MAGIC)];
-		ifstr.read(magic, sizeof(magic));
-		if(std::string_view(magic) != MAP_MAGIC)
-			return false;
-
 		ifstr.read(reinterpret_cast<char*>(&m_min_latitude), sizeof(m_min_latitude));
 		ifstr.read(reinterpret_cast<char*>(&m_max_latitude), sizeof(m_max_latitude));
 		ifstr.read(reinterpret_cast<char*>(&m_min_longitude), sizeof(m_min_longitude));
@@ -1428,6 +1507,9 @@ public:
 		if(!ofstr)
 			return false;
 
+		// save signature
+		ofstr.write(MAP_MAGIC, sizeof(MAP_MAGIC));
+
 		return Save(ofstr);
 	}
 
@@ -1437,6 +1519,12 @@ public:
 	{
 		std::ifstream ifstr{filename, std::ios::binary};
 		if(!ifstr)
+			return false;
+
+		// check signature
+		char magic[sizeof(MAP_MAGIC)];
+		ifstr.read(magic, sizeof(magic));
+		if(std::string_view(magic) != MAP_MAGIC)
 			return false;
 
 		return Load(ifstr);
@@ -1468,56 +1556,80 @@ protected:
 
 private:
 	// @see https://wiki.openstreetmap.org/wiki/Key:highway
-	std::unordered_map<std::string, t_real> m_road_widths
+	std::unordered_map<std::string_view, t_widthmap> m_road_widths
+	{{
+		"highway", t_widthmap
+		{
+			{ "motorway",      70. },
+			{ "motorway_link", 65. },
+			{ "trunk",         60. },
+			{ "primary",       50. },
+			{ "secondary",     40. },
+			{ "tertiary",      30. },
+			{ "residential",   20. },
+			{ "track",         10. },
+			{ "service",       10. },
+			{ "pedestrian",    10. },
+		},
+	},
 	{
-		{ "motorway",      70. },
-		{ "motorway_link", 65. },
-		{ "trunk",         60. },
-		{ "primary",       50. },
-		{ "secondary",     40. },
-		{ "tertiary",      30. },
-		{ "residential",   20. },
-		{ "track",         10. },
-	};
+		"footway", t_widthmap
+		{
+		},
+	},
+	{
+		"cycleway", t_widthmap
+		{
+			{ "track", 10. },
+		},
+	},
+	{
+		"busyway", t_widthmap
+		{
+		},
+	}};
 
 	std::unordered_map<std::string_view, t_colmap> m_seg_colours
 	{{
 		// @see https://wiki.openstreetmap.org/wiki/Key:surface
-		"surface",
-		t_colmap
+		"surface", t_colmap
 		{
 			{ "asphalt",  std::make_tuple(0x22, 0x22, 0x22) },
 			{ "concrete", std::make_tuple(0x33, 0x33, 0x33) },
 			{ "wood",     std::make_tuple(0x00, 0x99, 0x00) },
+			{ "grass",    std::make_tuple(0x44, 0xff, 0x44) },
 		},
 	},
 	{
 		// @see https://wiki.openstreetmap.org/wiki/Key:landuse
-		"landuse",
-		t_colmap
+		"landuse", t_colmap
 		{
 			{ "residential", std::make_tuple(0xbb, 0xbb, 0xcc) },
 			{ "retail",      std::make_tuple(0xff, 0x44, 0x44) },
+			{ "commercial",  std::make_tuple(0xff, 0x44, 0x44) },
 			{ "industrial",  std::make_tuple(0xaa, 0xaa, 0x44) },
 			{ "forest",      std::make_tuple(0x00, 0x99, 0x00) },
 			{ "grass",       std::make_tuple(0x44, 0xff, 0x44) },
+			{ "greenery",    std::make_tuple(0x44, 0xff, 0x44) },
+			{ "orchard",     std::make_tuple(0x44, 0xff, 0x44) },
 			{ "meadow",      std::make_tuple(0x44, 0xff, 0x44) },
+			{ "scrub",       std::make_tuple(0x44, 0xee, 0x44) },
+			{ "vineyard",    std::make_tuple(0x55, 0xff, 0x55) },
 			{ "farmland",    std::make_tuple(0x88, 0x33, 0x22) },
 			{ "farmyard",    std::make_tuple(0x88, 0x33, 0x22) },
+			{ "brownfield",  std::make_tuple(0x77, 0x33, 0x22) },
 		},
 	},
 	{
 		// @see https://wiki.openstreetmap.org/wiki/Key:quarter
-		"quarter",
-		t_colmap
+		"quarter", t_colmap
 		{
 			{ "suburb", std::make_tuple(0x99, 0x55, 0x55) },
 		},
 	},
 	{
 		// @see https://wiki.openstreetmap.org/wiki/Key:natural
-		"natural",
-		t_colmap
+		"natural", t_colmap
 		{
 			{ "shingle",   std::make_tuple(0x55, 0x55, 0xff) },
 			{ "wood",      std::make_tuple(0x00, 0x99, 0x00) },
@@ -1529,16 +1641,14 @@ private:
 	},
 	{
 		// @see https://wiki.openstreetmap.org/wiki/Key:waterway
-		"waterway",
-		t_colmap
+		"waterway", t_colmap
 		{
 			{ "river", std::make_tuple(0x55, 0x55, 0xff) },
 		},
 	},
 	{
 		// @see https://wiki.openstreetmap.org/wiki/Key:leisure
-		"leisure",
-		t_colmap
+		"leisure", t_colmap
 		{
 			{ "park",   std::make_tuple(0x55, 0xff, 0x55) },
 			{ "garden", std::make_tuple(0x55, 0xff, 0x55) },
@@ -1547,8 +1657,7 @@ private:
 	},
 	{
 		// @see https://wiki.openstreetmap.org/wiki/Key:amenity
-		"amenity",
-		t_colmap
+		"amenity", t_colmap
 		{
 			{ "research_institute", std::make_tuple(0x99, 0x99, 0x99) },
 			{ "university",         std::make_tuple(0x99, 0x99, 0x99) },

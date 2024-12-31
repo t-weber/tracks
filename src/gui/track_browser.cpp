@@ -289,3 +289,9 @@ QSize TrackBrowser::sizeHint() const
 	size.rwidth() += 128;
 	return size;
 }
+
+
+void TrackBrowser::SetFocus()
+{
+	m_list->setFocus();
+}

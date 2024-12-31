@@ -415,6 +415,11 @@ void TracksWnd::SetupGUI()
 	{
 		m_recent.SetOpenFile(m_recent.GetLastOpenFile());
 		SetActiveFile();
+
+		if(m_trackdb.GetTrackCount() > 1)
+			m_tracks->GetWidget()->SelectTrack(0);
+
+		m_tracks->GetWidget()->SetFocus();
 	}
 	else
 	{

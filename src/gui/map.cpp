@@ -74,7 +74,7 @@ bool MapPlotter::Plot(std::shared_ptr<QCustomPlot> plot) const
 		{
 			if(!found_width)
 				std::tie(found_width, line_width) =
-					GetLineWidth(tag_key, tag_val, 1.);
+					GetRoadWidth(tag_key, tag_val, 1.);
 
 			if(!found_col)
 				std::tie(found_col, r, g, b) =

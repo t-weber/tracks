@@ -40,6 +40,8 @@ public:
 	void SelectTrack(t_size idx);
 	void DeleteSelectedTracks();
 
+	void SetFocus();
+
 
 protected:
 	virtual QSize sizeHint() const override;
