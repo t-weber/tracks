@@ -364,10 +364,10 @@ void TrackInfos::PlotMap(bool load_cached)
 	{
 		// cut out a map that has some margins around the actual data area
 		map_loaded = map.ImportDir(m_mapfile->text().toStdString(),
-			static_cast<t_real_map>(m_min_long_plot - lon_range/10.),
-			static_cast<t_real_map>(m_max_long_plot + lon_range/10.),
-			static_cast<t_real_map>(m_min_lat_plot - lat_range/10.),
-			static_cast<t_real_map>(m_max_lat_plot + lat_range/10.),
+			static_cast<t_real_map>(m_min_long_plot - lon_range*g_map_overdraw),
+			static_cast<t_real_map>(m_max_long_plot + lon_range*g_map_overdraw),
+			static_cast<t_real_map>(m_min_lat_plot - lat_range*g_map_overdraw),
+			static_cast<t_real_map>(m_max_lat_plot + lat_range*g_map_overdraw),
 			&progress);
 
 		if(cached_map_name)
@@ -382,16 +382,15 @@ void TrackInfos::PlotMap(bool load_cached)
 		// plot the map data area as svg image
 		std::ostringstream ostr;
 		map.ExportSvg(ostr, static_cast<t_real_map>(g_map_scale),
-			static_cast<t_real_map>(m_min_long_plot - lon_range/20.),
-			static_cast<t_real_map>(m_max_long_plot + lon_range/20.),
-			static_cast<t_real_map>(m_min_lat_plot - lat_range/20.),
-			static_cast<t_real_map>(m_max_lat_plot + lat_range/20.));
+			static_cast<t_real_map>(m_min_long_plot - lon_range*g_map_overdraw/2.),
+			static_cast<t_real_map>(m_max_long_plot + lon_range*g_map_overdraw/2.),
+			static_cast<t_real_map>(m_min_lat_plot - lat_range*g_map_overdraw/2.),
+			static_cast<t_real_map>(m_max_lat_plot + lat_range*g_map_overdraw/2.));
 
 		// load the generated svg image
 		m_map_image = QByteArray{ostr.str().c_str(), static_cast<int>(ostr.str().size())};
 		m_map->load(m_map_image);
 	}
-
 
 	/*MapPlotter map;
 	if(map.Import(m_mapfile->text().toStdString(),
@@ -399,8 +398,10 @@ void TrackInfos::PlotMap(bool load_cached)
 		m_min_lat_plot, m_max_lat_plot))
 	{
 		map.SetPlotRange(
-			m_min_long_plot - lon_range/10., m_max_long_plot + lon_range/10.,
-			m_min_lat_plot - lat_range/10., m_max_lat_plot + lat_range/10.);
+			m_min_long_plot - lon_range*g_map_overdraw
+			m_max_long_plot + lon_range*g_map_overdraw,
+			m_min_lat_plot - lat_range*g_map_overdraw,
+			m_max_lat_plot + lat_range*g_map_overdraw);
 		map.Plot(m_plot);
 	}*/
 }

@@ -12,6 +12,7 @@
 
 #include <algorithm>
 #include <map>
+#include <tuple>
 #include <string_view>
 
 
@@ -30,7 +31,8 @@ public:
 	using t_TrackPoint = typename t_track::t_TrackPoint;
 	using t_clk = typename t_track::t_clk;
 	using t_timept = typename t_track::t_timept;
-	using t_timept_map = std::map<t_timept, std::pair<t_real /*dist*/, t_size /*# tracks*/>>;
+	using t_timept_map = std::map<t_timept,
+		std::tuple<t_real /*dist*/, t_real /*time*/, t_size /*# tracks*/>>;
 
 
 public:
@@ -226,7 +228,7 @@ public:
 	/**
 	 * distance of all tracks sorted by months
 	 */
-	t_timept_map GetDistancePerTime(bool planar = false, bool yearly = false) const
+	t_timept_map GetDistancePerPeriod(bool planar = false, bool yearly = false) const
 	{
 		t_timept_map map;
 
@@ -238,14 +240,17 @@ public:
 			t_timept tp_rd = round_timepoint<t_clk, t_timept>(*tp, yearly);
 
 			t_real dist = track.GetTotalDistance(planar);
+			t_real time = track.GetTotalTime();
+
 			if(auto iter = map.find(tp_rd); iter != map.end())
 			{
-				iter->second.first += dist;  // distance
-				++iter->second.second;       // track counter
+				std::get<0>(iter->second) += dist;  // distance
+				std::get<1>(iter->second) += time;  // time
+				++std::get<2>(iter->second);        // track counter
 			}
 			else
 			{
-				map.insert(std::make_pair(tp_rd, std::make_pair(dist, 1)));
+				map.insert(std::make_pair(tp_rd, std::make_tuple(dist, time, 1)));
 			}
 		}
 

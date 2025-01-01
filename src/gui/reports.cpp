@@ -25,7 +25,9 @@
 #define TAB_COUNT     1
 #define TAB_DIST      2
 #define TAB_DIST_SUM  3
-#define TAB_NUM_COLS  4
+#define TAB_TIME      4
+#define TAB_TIME_SUM  5
+#define TAB_NUM_COLS  6
 
 
 Reports::Reports(QWidget* parent)
@@ -93,6 +95,8 @@ Reports::Reports(QWidget* parent)
 	m_table->setHorizontalHeaderItem(TAB_COUNT, new QTableWidgetItem{"Tracks"});
 	m_table->setHorizontalHeaderItem(TAB_DIST, new QTableWidgetItem{"Distance"});
 	m_table->setHorizontalHeaderItem(TAB_DIST_SUM, new QTableWidgetItem{"Distance Sum"});
+	m_table->setHorizontalHeaderItem(TAB_TIME, new QTableWidgetItem{"Time"});
+	m_table->setHorizontalHeaderItem(TAB_TIME_SUM, new QTableWidgetItem{"Time Sum"});
 
 	m_table->horizontalHeader()->setDefaultSectionSize(150);
 	m_table->verticalHeader()->setDefaultSectionSize(24);
@@ -187,6 +191,16 @@ Reports::Reports(QWidget* parent)
 		m_table->setColumnWidth(TAB_DIST_SUM, settings.value("dlg_reports/distsum_col").toInt());
 	else
 		m_table->setColumnWidth(TAB_DIST_SUM, 150);
+
+	if(settings.contains("dlg_reports/time_col"))
+		m_table->setColumnWidth(TAB_TIME, settings.value("dlg_reports/time_col").toInt());
+	else
+		m_table->setColumnWidth(TAB_TIME, 150);
+
+	if(settings.contains("dlg_reports/timesum_col"))
+		m_table->setColumnWidth(TAB_TIME_SUM, settings.value("dlg_reports/timesum_col").toInt());
+	else
+		m_table->setColumnWidth(TAB_TIME_SUM, 150);
 }
 
 
@@ -214,19 +228,26 @@ void Reports::FillDistancesTable()
 	// yearly distances
 	int row = 0;
 	t_real total_dist = 0.;
+	t_real total_time = 0.;
 	for(const auto& pair : m_yearly)
 	{
 		t_real epoch = std::chrono::duration_cast<typename t_track::t_sec>(
 			pair.first.time_since_epoch()).count();
-		t_size num_tracks = pair.second.second;
-		t_real dist = pair.second.first / 1000.;
+		t_size num_tracks = std::get<2>(pair.second);
+
+		t_real dist = std::get<0>(pair.second) / 1000.;
 		total_dist += dist;
+
+		t_real time = std::get<1>(pair.second) / 3600.;;
+		total_time += time;
 
 		m_table->setItem(row, TAB_DATE, new DateTableWidgetItem<
 			typename t_track::t_clk, typename t_track::t_timept, t_real>(epoch, false, " (full year)"));
 		m_table->setItem(row, TAB_COUNT, new NumericTableWidgetItem<t_size>(num_tracks, g_prec_gui));
 		m_table->setItem(row, TAB_DIST, new NumericTableWidgetItem<t_real>(dist, g_prec_gui, " km"));
 		m_table->setItem(row, TAB_DIST_SUM, new NumericTableWidgetItem<t_real>(total_dist, g_prec_gui, " km"));
+		m_table->setItem(row, TAB_TIME, new NumericTableWidgetItem<t_real>(time, g_prec_gui, " h"));
+		m_table->setItem(row, TAB_TIME_SUM, new NumericTableWidgetItem<t_real>(total_time, g_prec_gui, " h"));
 
 		// set read-only
 		for(int col = 0; col < TAB_NUM_COLS; ++col)
@@ -240,19 +261,26 @@ void Reports::FillDistancesTable()
 
 	// monthly distances
 	total_dist = 0.;
+	total_time = 0.;
 	for(const auto& pair : m_monthly)
 	{
 		t_real epoch = std::chrono::duration_cast<typename t_track::t_sec>(
 			pair.first.time_since_epoch()).count();
-		t_size num_tracks = pair.second.second;
-		t_real dist = pair.second.first / 1000.;
+		t_size num_tracks = std::get<2>(pair.second);
+
+		t_real dist = std::get<0>(pair.second) / 1000.;
 		total_dist += dist;
+
+		t_real time = std::get<1>(pair.second) / 3600.;
+		total_time += time;
 
 		m_table->setItem(row, TAB_DATE, new DateTableWidgetItem<
 			typename t_track::t_clk, typename t_track::t_timept, t_real>(epoch, true));
 		m_table->setItem(row, TAB_COUNT, new NumericTableWidgetItem<t_size>(num_tracks, g_prec_gui));
 		m_table->setItem(row, TAB_DIST, new NumericTableWidgetItem<t_real>(dist, g_prec_gui, " km"));
 		m_table->setItem(row, TAB_DIST_SUM, new NumericTableWidgetItem<t_real>(total_dist, g_prec_gui, " km"));
+		m_table->setItem(row, TAB_TIME, new NumericTableWidgetItem<t_real>(time, g_prec_gui, " h"));
+		m_table->setItem(row, TAB_TIME_SUM, new NumericTableWidgetItem<t_real>(total_time, g_prec_gui, " h"));
 
 		// set read-only
 		for(int col = 0; col < TAB_NUM_COLS; ++col)
@@ -273,8 +301,8 @@ void Reports::CalcDistances()
 	if(!m_trackdb)
 		return;
 
-	m_monthly = m_trackdb->GetDistancePerTime(false, false);
-	m_yearly = m_trackdb->GetDistancePerTime(false, true);
+	m_monthly = m_trackdb->GetDistancePerPeriod(false, false);
+	m_yearly = m_trackdb->GetDistancePerPeriod(false, true);
 
 	PlotDistances();
 	FillDistancesTable();
@@ -378,7 +406,7 @@ void Reports::PlotDistances()
 		{
 			t_real epoch = std::chrono::duration_cast<typename t_track::t_sec>(
 				pair.first.time_since_epoch()).count();
-			t_real dist = pair.second.first / 1000.;
+			t_real dist = std::get<0>(pair.second) / 1000.;
 			total_dist += dist;
 
 			epochs.push_back(epoch);
@@ -497,6 +525,8 @@ void Reports::accept()
 		settings.setValue("dlg_reports/count_col", m_table->columnWidth(TAB_COUNT));
 		settings.setValue("dlg_reports/dist_col", m_table->columnWidth(TAB_DIST));
 		settings.setValue("dlg_reports/distsum_col", m_table->columnWidth(TAB_DIST_SUM));
+		settings.setValue("dlg_reports/time_col", m_table->columnWidth(TAB_TIME));
+		settings.setValue("dlg_reports/timesum_col", m_table->columnWidth(TAB_TIME_SUM));
 	}
 
 	QDialog::accept();

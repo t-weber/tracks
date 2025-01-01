@@ -34,6 +34,7 @@ t_real g_assume_dt = 2.;
 
 // xml map options
 t_real g_map_scale = 1.;
+t_real g_map_overdraw = 0.1;
 bool g_map_show_buildings = false;
 bool g_map_show_labels = false;
 
