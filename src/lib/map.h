@@ -87,6 +87,15 @@ struct MapMultiSegment
 
 
 
+enum class MapObjType
+{
+	VERTEX,
+	SEGMENT,
+	MULTISEGMENT,
+};
+
+
+
 template<class t_real = double, class t_size = std::size_t>
 class Map
 {
@@ -98,6 +107,8 @@ public:
 	using t_vertex = MapVertex<t_tags, t_real>;
 	using t_segment = MapSegment<t_tags, t_size>;
 	using t_multisegment = MapMultiSegment<t_tags, t_size>;
+
+	using t_osmid = std::int64_t;
 
 
 
@@ -135,6 +146,95 @@ protected:
 			// no tags and not referenced by multi-segments -> remove
 			iter = m_segments.erase(iter);
 		}
+
+		for(auto iter = m_segments_background.begin(); iter != m_segments_background.end();)
+		{
+			if(iter->second.referenced || iter->second.tags.size())
+			{
+				++iter;
+				continue;
+			}
+
+			// no tags and not referenced by multi-segments -> remove
+			iter = m_segments_background.erase(iter);
+		}
+
+		for(auto iter = m_segments_foreground.begin(); iter != m_segments_foreground.end();)
+		{
+			if(iter->second.referenced || iter->second.tags.size())
+			{
+				++iter;
+				continue;
+			}
+
+			// no tags and not referenced by multi-segments -> remove
+			iter = m_segments_foreground.erase(iter);
+		}
+	}
+
+
+
+	/**
+	 * get the corresponding local id for a map object id
+	 */
+	std::optional<t_size> GetLocalId(MapObjType ty, t_osmid id) const
+	{
+		const std::unordered_map<t_osmid, t_size> *map = &m_local_vert_ids;
+
+		switch(ty)
+		{
+			case MapObjType::VERTEX:
+				map = &m_local_vert_ids;
+				break;
+			case MapObjType::SEGMENT:
+				map = &m_local_seg_ids;
+				break;
+			case MapObjType::MULTISEGMENT:
+				map = &m_local_multiseg_ids;
+				break;
+		}
+
+		auto iter = map->find(id);
+		if(iter == map->end())
+			return std::nullopt;
+
+		return iter->second;
+	}
+
+
+
+	/**
+	 * register a corresponding local id for a map object id
+	 */
+	std::size_t RegisterLocalId(MapObjType ty, t_osmid id)
+	{
+		std::unordered_map<t_osmid, t_size> *map = &m_local_vert_ids;
+		t_size *local_id = &m_cur_local_vert_id;
+
+		switch(ty)
+		{
+			case MapObjType::VERTEX:
+				map = &m_local_vert_ids;
+				local_id = &m_cur_local_vert_id;
+				break;
+			case MapObjType::SEGMENT:
+				map = &m_local_seg_ids;
+				local_id = &m_cur_local_seg_id;
+				break;
+			case MapObjType::MULTISEGMENT:
+				map = &m_local_multiseg_ids;
+				local_id = &m_cur_local_multiseg_id;
+				break;
+		}
+
+		// id already in map?
+		auto iter = map->find(id);
+		if(iter != map->end())
+			return iter->second;
+
+		// register a new id
+		map->emplace(std::make_pair(id, *local_id));
+		return (*local_id)++;
 	}
 
 
@@ -230,13 +330,15 @@ protected:
 			if(!m_skip_labels)
 			{
 				// place label
-				m_label_vertices.emplace(std::make_pair(*id, std::move(vertex)));
+				t_size local_id = RegisterLocalId(MapObjType::VERTEX, *id);
+				m_label_vertices.emplace(std::make_pair(local_id, std::move(vertex)));
 			}
 		}
 		else
 		{
 			// vertex
-			m_vertices.emplace(std::make_pair(*id, std::move(vertex)));
+			t_size local_id = RegisterLocalId(MapObjType::VERTEX, *id);
+			m_vertices.emplace(std::make_pair(local_id, std::move(vertex)));
 		}
 
 		return true;
@@ -251,9 +353,10 @@ protected:
 		if(vis && !*vis)
 			return false;
 
-		t_segment seg;
+		t_segment seg{};
 		seg.referenced = true;  // mark all as referenced
 		bool is_background = false;
+		bool is_foreground = false;
 		bool is_road = false;
 
 		if(auto tags = node.get_child_optional(""))
@@ -266,7 +369,11 @@ protected:
 					if(!vertex_id)
 						continue;
 
-					seg.vertex_ids.push_back(*vertex_id);
+					std::optional<t_size> local_id = GetLocalId(MapObjType::VERTEX, *vertex_id);
+					if(!local_id)
+						continue;
+
+					seg.vertex_ids.push_back(*local_id);
 				}
 				else if(tag.first == "tag")
 				{
@@ -278,6 +385,8 @@ protected:
 
 					if(!is_background && (*key == "landuse" || *key == "natural"))
 						is_background = true;
+					if(!is_foreground && (*key == "natural" && *val == "water"))
+						is_foreground = true;
 					if(!is_road && m_road_widths.find(*key) != m_road_widths.end())
 						is_road = true;
 					if(m_skip_buildings && (*key == "building"
@@ -296,16 +405,16 @@ protected:
 
 		if(seg.vertex_ids.size() >= 2 && *seg.vertex_ids.begin() == *seg.vertex_ids.rbegin())
 			seg.is_area = true;
+		if(is_road)
+			seg.is_area = false;
 
-		if(is_background)
-		{
-			seg.is_area = is_road ? false : true;
-			m_segments_background.emplace(std::make_pair(*id, std::move(seg)));
-		}
+		t_size local_id = RegisterLocalId(MapObjType::SEGMENT, *id);
+		if(is_foreground)
+			m_segments_foreground.emplace(std::make_pair(local_id, std::move(seg)));
+		else if(is_background)
+			m_segments_background.emplace(std::make_pair(local_id, std::move(seg)));
 		else /*if(seg.tags.size())*/
-		{
-			m_segments.emplace(std::make_pair(*id, std::move(seg)));
-		}
+			m_segments.emplace(std::make_pair(local_id, std::move(seg)));
 
 		return true;
 	}
@@ -319,7 +428,7 @@ protected:
 		if(vis && !*vis)
 			return false;
 
-		t_multisegment seg;
+		t_multisegment seg{};
 
 		if(auto tags = node.get_child_optional(""))
 		{
@@ -334,11 +443,29 @@ protected:
 						continue;
 
 					if(*seg_ty == "node")
-						seg.vertex_ids.push_back(*seg_ref);
+					{
+						std::optional<t_size> local_id = GetLocalId(MapObjType::VERTEX, *seg_ref);
+						if(!local_id)
+							continue;
+
+						seg.vertex_ids.push_back(*local_id);
+					}
 					else if(*seg_ty == "way" && seg_role && *seg_role == "inner")
-						seg.segment_inner_ids.push_back(*seg_ref);
+					{
+						std::optional<t_size> local_id = GetLocalId(MapObjType::SEGMENT, *seg_ref);
+						if(!local_id)
+							continue;
+
+						seg.segment_inner_ids.push_back(*local_id);
+					}
 					else if(*seg_ty == "way")
-						seg.segment_ids.push_back(*seg_ref);
+					{
+						std::optional<t_size> local_id = GetLocalId(MapObjType::SEGMENT, *seg_ref);
+						if(!local_id)
+							continue;
+
+						seg.segment_ids.push_back(*local_id);
+					}
 
 				}
 				else if(tag.first == "tag")
@@ -363,8 +490,9 @@ protected:
 			}
 		}
 
+		t_size local_id = RegisterLocalId(MapObjType::MULTISEGMENT, *id);
 		//if(seg.tags.size())
-		m_multisegments.emplace(std::make_pair(*id, std::move(seg)));
+		m_multisegments.emplace(std::make_pair(local_id, std::move(seg)));
 
 		return true;
 	}
@@ -539,13 +667,19 @@ public:
 					if(!super->m_skip_labels)
 					{
 						// place label
-						super->m_label_vertices.emplace(std::make_pair(node.id(), std::move(vertex)));
+						super->m_label_vertices.emplace(
+							std::make_pair(
+								super->RegisterLocalId(MapObjType::VERTEX, node.id()),
+								std::move(vertex)));
 					}
 				}
 				else
 				{
 					// vertex
-					super->m_vertices.emplace(std::make_pair(node.id(), std::move(vertex)));
+					super->m_vertices.emplace(
+						std::make_pair(
+							super->RegisterLocalId(MapObjType::VERTEX, node.id()),
+							std::move(vertex)));
 				}
 
 				update_progress();
@@ -557,11 +691,12 @@ public:
 				if(!way.visible())
 					return;
 
-				t_segment seg;
+				t_segment seg{};
 				//seg.vertex_ids.reserve(way.nodes().size());
 
 				// get segment tags
 				bool is_background = false;
+				bool is_foreground = false;
 				bool is_road = false;
 				for(const auto& tag : way.tags())
 				{
@@ -570,6 +705,8 @@ public:
 
 					if(!is_background && (key == "landuse" || key == "natural"))
 						is_background = true;
+					if(!is_foreground && (key == "natural" && val == "water"))
+						is_foreground = true;
 					if(!is_road && super->m_road_widths.find(key) != super->m_road_widths.end())
 						is_road = true;
 					if(super->m_skip_buildings && (key == "building"
@@ -591,20 +728,22 @@ public:
 				t_size node_idx = 0;
 				for(const auto& node : way.nodes())
 				{
-					t_size ref = node.ref();
-
-					auto vert_iter = super->m_vertices.find(ref);
-					if(vert_iter != super->m_vertices.end())
+					std::optional<t_size> ref = super->GetLocalId(MapObjType::VERTEX, node.ref());
+					if(ref)
 					{
-						seg.vertex_ids.push_back(ref);
-						vert_iter->second.referenced = true;
+						auto vert_iter = super->m_vertices.find(*ref);
+						if(vert_iter != super->m_vertices.end())
+						{
+							seg.vertex_ids.push_back(*ref);
+							vert_iter->second.referenced = true;
+						}
 					}
 
 					// first and last vertices are the same?
-					if(node_idx == way.nodes().size() - 1)
+					if(node_idx == way.nodes().size() - 1 &&
+						node.ref() == way.nodes().begin()->ref())
 					{
-						if(node.ref() == way.nodes().begin()->ref())
-							seg.is_area = true;
+						seg.is_area = true;
 					}
 
 					++node_idx;
@@ -613,17 +752,30 @@ public:
 				// only referring to invalid vertices?
 				if(!seg.vertex_ids.size())
 					return;
+				if(is_road)
+					seg.is_area = false;
 
-				if(is_background)
+				t_size local_id = super->RegisterLocalId(MapObjType::SEGMENT, way.id());
+				if(is_foreground)
 				{
-					seg.is_area = is_road ? false : true;
+					super->m_segments_foreground.emplace(
+						std::make_pair(
+							local_id,
+							std::move(seg)));
+				}
+				else if(is_background)
+				{
 					super->m_segments_background.emplace(
-						std::make_pair(way.id(), std::move(seg)));
+						std::make_pair(
+							local_id,
+							std::move(seg)));
 				}
 				else
 				{
 					super->m_segments.emplace(
-						std::make_pair(way.id(), std::move(seg)));
+						std::make_pair(
+							local_id,
+							std::move(seg)));
 				}
 
 				update_progress();
@@ -632,7 +784,7 @@ public:
 
 			void relation(const osmium::Relation& rel)
 			{
-				t_multisegment seg;
+				t_multisegment seg{};
 
 				// get tags
 				for(const auto& tag : rel.tags())
@@ -658,36 +810,46 @@ public:
 				// get vertices
 				for(const auto& member : rel.members())
 				{
-					t_size ref = member.ref();
-
 					if(member.type() == osmium::item_type::node)
 					{
-						auto vert_iter = super->m_vertices.find(ref);
-						if(vert_iter != super->m_vertices.end())
-						{
-							seg.vertex_ids.push_back(ref);
-							vert_iter->second.referenced = true;
-						}
+						std::optional<t_size> ref = super->GetLocalId(MapObjType::VERTEX, member.ref());
+						if(!ref)
+							continue;
+
+						auto vert_iter = super->m_vertices.find(*ref);
+						if(vert_iter == super->m_vertices.end())
+							continue;
+
+						seg.vertex_ids.push_back(*ref);
+						vert_iter->second.referenced = true;
 					}
 					else if(member.type() == osmium::item_type::way &&
 						std::string_view(member.role()) == "inner")
 					{
-						auto seg_iter = super->m_segments.find(ref);
-						if(seg_iter != super->m_segments.end())
-						{
-							seg.segment_inner_ids.push_back(ref);
-							seg_iter->second.referenced = true;
-						}
+						std::optional<t_size> ref = super->GetLocalId(MapObjType::SEGMENT, member.ref());
+						if(!ref)
+							continue;
+
+						auto seg_iter = super->m_segments.find(*ref);
+						if(seg_iter == super->m_segments.end())
+							continue;
+
+						seg.segment_inner_ids.push_back(*ref);
+						seg_iter->second.referenced = true;
 					}
-					else if(member.type() == osmium::item_type::way &&
-						std::string_view(member.role()) == "outer")
+					else if(member.type() == osmium::item_type::way /*&&
+						std::string_view(member.role()) == "outer"*/)
 					{
-						auto seg_iter = super->m_segments.find(ref);
-						if(seg_iter != super->m_segments.end())
-						{
-							seg.segment_ids.push_back(ref);
-							seg_iter->second.referenced = true;
-						}
+						std::optional<t_size> ref = super->GetLocalId(MapObjType::SEGMENT, member.ref());
+						if(!ref)
+							continue;
+
+						auto seg_iter = super->m_segments.find(*ref);
+						if(seg_iter == super->m_segments.end())
+							continue;
+
+						seg.segment_ids.push_back(*ref);
+						seg_iter->second.referenced = true;
 					}
 				}
 
@@ -696,7 +858,10 @@ public:
 					!seg.segment_ids.size())
 					return;
 
-				super->m_multisegments.emplace(std::make_pair(rel.id(), std::move(seg)));
+				super->m_multisegments.emplace(
+					std::make_pair(
+						super->RegisterLocalId(MapObjType::MULTISEGMENT, rel.id()),
+						std::move(seg)));
 
 				update_progress();
 			}
@@ -1086,10 +1251,11 @@ public:
 
 		// draw areas
 		for(const auto& [ id, seg ] : m_segments)
-		{
-			if(seg.is_area)
-				draw_seg(id, &seg);
-		}
+			draw_seg(id, &seg);
+
+		// draw foreground areas
+		for(const auto& [ id, seg ] : m_segments_foreground)
+			draw_seg(id, &seg);
 
 		// draw streets
 		for(const auto& [ id, seg ] : m_segments)
@@ -1320,6 +1486,7 @@ public:
 		save_vertices(m_label_vertices);
 		save_segments(m_segments);
 		save_segments(m_segments_background);
+		save_segments(m_segments_foreground);
 		save_multisegments(m_multisegments);
 
 		return true;
@@ -1497,6 +1664,7 @@ public:
 		m_label_vertices = load_vertices();
 		m_segments = load_segments();
 		m_segments_background = load_segments();
+		m_segments_foreground = load_segments();
 		m_multisegments = load_multisegments();
 
 		return true;
@@ -1551,6 +1719,7 @@ protected:
 	std::unordered_map<t_size, t_vertex> m_label_vertices{};
 	std::unordered_map<t_size, t_segment> m_segments{};
 	std::unordered_map<t_size, t_segment> m_segments_background{};
+	std::unordered_map<t_size, t_segment> m_segments_foreground{};
 	std::unordered_map<t_size, t_multisegment> m_multisegments{};
 
 	std::vector<t_vertex> m_track{};
@@ -1558,6 +1727,15 @@ protected:
 
 
 private:
+	// map to translate to local ids (only used for importing)
+	std::unordered_map<t_osmid, t_size> m_local_vert_ids{};
+	std::unordered_map<t_osmid, t_size> m_local_seg_ids{};
+	std::unordered_map<t_osmid, t_size> m_local_multiseg_ids{};
+	t_size m_cur_local_vert_id{};
+	t_size m_cur_local_seg_id{};
+	t_size m_cur_local_multiseg_id{};
+
+
 	// @see https://wiki.openstreetmap.org/wiki/Key:highway
 	std::unordered_map<std::string_view, t_widthmap> m_road_widths
 	{{
@@ -1576,6 +1754,13 @@ private:
 		},
 	},
 	{
+		"railway", t_widthmap
+		{
+			{ "rail", 50. },
+			{ "tram", 40. },
+		},
+	},
+	{
 		"footway", t_widthmap
 		{
 		},
@@ -1591,6 +1776,7 @@ private:
 		{
 		},
 	}};
+
 
 	std::unordered_map<std::string_view, t_colmap> m_seg_colours
 	{{
@@ -1624,13 +1810,6 @@ private:
 		},
 	},
 	{
-		// @see https://wiki.openstreetmap.org/wiki/Key:quarter
-		"quarter", t_colmap
-		{
-			{ "suburb", std::make_tuple(0x99, 0x55, 0x55) },
-		},
-	},
-	{
 		// @see https://wiki.openstreetmap.org/wiki/Key:natural
 		"natural", t_colmap
 		{
@@ -1640,6 +1819,13 @@ private:
 			{ "scrub",     std::make_tuple(0x22, 0xaa, 0x22) },
 			{ "bare_rock", std::make_tuple(0x7d, 0x7d, 0x80) },
 			{ "grassland", std::make_tuple(0x44, 0xff, 0x44) },
+		},
+	},
+	{
+		// @see https://wiki.openstreetmap.org/wiki/Key:quarter
+		"quarter", t_colmap
+		{
+			{ "suburb", std::make_tuple(0x99, 0x55, 0x55) },
 		},
 	},
 	{

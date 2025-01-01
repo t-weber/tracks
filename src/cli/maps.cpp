@@ -39,6 +39,8 @@ int main(int argc, char **argv)
 	try
 	{
 		Map<t_real, t_size> map;
+		map.SetSkipBuildings(false);
+		map.SetSkipLabels(true);
 
 		if(use_xml_loader && !map.ImportXml(argv[1]))
 		{
