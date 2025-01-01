@@ -13,6 +13,8 @@
 #include "lib/trackdb.h"
 #include "lib/map.h"
 
+#include <QtCore/QString>
+
 
 // track types
 using t_tracks = MultipleTracks<t_real, t_size>;
@@ -21,7 +23,7 @@ using t_track_pt = typename t_track::t_TrackPoint;
 
 
 // map types
-using t_map = Map<t_real_map, t_size>;
+using t_map = Map<t_real_map, t_size_map>;
 
 
 // epsilon and precision values
@@ -46,6 +48,10 @@ extern t_real g_assume_dt;
 extern t_real g_map_scale;
 extern bool g_map_show_buildings;
 extern bool g_map_show_labels;
+
+
+// directory for temporary files
+extern QString g_temp_dir;
 
 
 #endif

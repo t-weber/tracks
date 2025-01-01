@@ -841,7 +841,7 @@ void TracksWnd::ShowSettings(bool only_create)
 			g_dist_func);
 		m_settings->AddLine();
 		m_settings->AddDoubleSpinbox("settings/assume_dt",
-			"Assumed time interval (s):", g_assume_dt, 0.1, 99., 1., 1);
+			"Assumed time interval:", g_assume_dt, 0.1, 99., 1., 1, " s");
 		m_settings->AddDoubleSpinbox("settings/map_scale",
 			"Map scaling factor:", g_map_scale, 0.01, 99., 1., 2);
 		m_settings->AddCheckbox("settings/show_buildings",
@@ -851,6 +851,8 @@ void TracksWnd::ShowSettings(bool only_create)
 		m_settings->AddLine();
 		m_settings->AddCheckbox("settings/load_last_file",
 			"Reload last file on startup", g_reload_last);
+		m_settings->AddDirectorybox("settings/temp_dir",
+			"Temporary directory:", g_temp_dir);
 		m_settings->FinishSetup();
 	}
 
@@ -883,9 +885,29 @@ void TracksWnd::ApplySettings()
 		value<decltype(g_map_show_labels)>();
 	g_reload_last = m_settings->GetValue("settings/load_last_file").
 		value<decltype(g_reload_last)>();
+	g_temp_dir = m_settings->GetValue("settings/temp_dir").toString();
 
+	CreateTempDir();
 	m_trackdb.SetDistanceFunction(g_dist_func);
 	update();
+}
+
+
+void TracksWnd::CreateTempDir()
+{
+	if(g_temp_dir == "")
+		return;
+
+	if(QDir{}.exists(g_temp_dir))
+		return;
+
+	if(!QDir{}.mkpath(g_temp_dir))
+	{
+		QMessageBox::critical(this, "Error",
+			QString("Temporary directory \"%1\" could not be created.")
+				.arg(g_temp_dir));
+		g_temp_dir = "";
+	}
 }
 
 

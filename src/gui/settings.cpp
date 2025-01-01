@@ -14,6 +14,7 @@
 #include <QtWidgets/QLabel>
 #include <QtWidgets/QSpacerItem>
 #include <QtWidgets/QScrollArea>
+#include <QtWidgets/QFileDialog>
 
 
 const QColor& get_foreground_colour()
@@ -108,6 +109,18 @@ Settings::Settings(QWidget *parent, bool scrolling)
 }
 
 
+void Settings::SetNumGridColumns(unsigned int num)
+{
+	m_numGridColumns = num;
+}
+
+
+void Settings::SetCurGridColumn(unsigned int num)
+{
+	m_curGridColumn = num;
+}
+
+
 /**
  * adds a check box to the end of the grid layout
  */
@@ -126,7 +139,7 @@ void Settings::AddCheckbox(const QString& key, const QString& descr, bool value)
 	box->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
 
 	int row = m_grid->rowCount();
-	m_grid->addWidget(box, row, m_curGridColumn*2+0, 1, 2);
+	m_grid->addWidget(box, row, m_curGridColumn*m_numGridColumns + 0, 1, m_numGridColumns);
 
 	m_checkboxes.push_back(std::make_tuple(box, key, initial_value));
 }
@@ -136,7 +149,7 @@ void Settings::AddCheckbox(const QString& key, const QString& descr, bool value)
  * adds a spin box to the end of the grid layout
  */
 void Settings::AddSpinbox(const QString& key, const QString& descr,
-	int value, int min, int max, int step)
+	int value, int min, int max, int step, const QString& suffix)
 {
 	int initial_value = value;
 
@@ -147,18 +160,19 @@ void Settings::AddSpinbox(const QString& key, const QString& descr,
 
 	QLabel *label = new QLabel(this);
 	label->setText(descr);
-	label->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+	label->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Preferred);
 
 	QSpinBox *box = new QSpinBox(this);
 	box->setValue(value);
 	box->setMinimum(min);
 	box->setMaximum(max);
 	box->setSingleStep(step);
+	box->setSuffix(suffix);
 	box->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
 
 	int row = m_grid->rowCount();
-	m_grid->addWidget(label, row, m_curGridColumn*2+0, 1, 1);
-	m_grid->addWidget(box, row, m_curGridColumn*2+1, 1, 1);
+	m_grid->addWidget(label, row, m_curGridColumn*m_numGridColumns + 0, 1, 1);
+	m_grid->addWidget(box, row, m_curGridColumn*m_numGridColumns + 1, 1, m_numGridColumns - 1);
 
 	m_spinboxes.push_back(std::make_tuple(box, key, initial_value));
 }
@@ -168,7 +182,8 @@ void Settings::AddSpinbox(const QString& key, const QString& descr,
  * adds a double box to the end of the grid layout
  */
 void Settings::AddDoubleSpinbox(const QString& key, const QString& descr,
-	double value, double min, double max, double step, int decimals)
+	double value, double min, double max, double step, int decimals,
+	const QString& suffix)
 {
 	double initial_value = value;
 
@@ -179,7 +194,7 @@ void Settings::AddDoubleSpinbox(const QString& key, const QString& descr,
 
 	QLabel *label = new QLabel(this);
 	label->setText(descr);
-	label->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+	label->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Preferred);
 
 	QDoubleSpinBox *box = new QDoubleSpinBox(this);
 	box->setDecimals(decimals);
@@ -187,11 +202,12 @@ void Settings::AddDoubleSpinbox(const QString& key, const QString& descr,
 	box->setMinimum(min);
 	box->setMaximum(max);
 	box->setSingleStep(step);
+	box->setSuffix(suffix);
 	box->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
 
 	int row = m_grid->rowCount();
-	m_grid->addWidget(label, row, m_curGridColumn*2+0, 1, 1);
-	m_grid->addWidget(box, row, m_curGridColumn*2+1, 1, 1);
+	m_grid->addWidget(label, row, m_curGridColumn*m_numGridColumns + 0, 1, 1);
+	m_grid->addWidget(box, row, m_curGridColumn*m_numGridColumns + 1, 1, m_numGridColumns - 1);
 
 	m_doublespinboxes.push_back(std::make_tuple(box, key, initial_value));
 }
@@ -212,7 +228,7 @@ void Settings::AddCombobox(const QString& key, const QString& descr,
 
 	QLabel *label = new QLabel(this);
 	label->setText(descr);
-	label->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+	label->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Preferred);
 
 	QComboBox *box = new QComboBox(this);
 	box->addItems(items);
@@ -220,10 +236,91 @@ void Settings::AddCombobox(const QString& key, const QString& descr,
 	box->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
 
 	int row = m_grid->rowCount();
-	m_grid->addWidget(label, row, m_curGridColumn*2+0, 1, 1);
-	m_grid->addWidget(box, row, m_curGridColumn*2+1, 1, 1);
+	m_grid->addWidget(label, row, m_curGridColumn*m_numGridColumns + 0, 1, 1);
+	m_grid->addWidget(box, row, m_curGridColumn*m_numGridColumns + 1, 1, m_numGridColumns - 1);
 
 	m_comboboxes.push_back(std::make_tuple(box, key, initial_idx));
+}
+
+
+/**
+ * adds an edit box to the end of the grid layout
+ */
+void Settings::AddEditbox(const QString& key, const QString& descr,
+	const QString& initial_value)
+{
+	// look for already saved value
+	QString value = initial_value;
+	QSettings settings{this};
+	if(settings.contains(key))
+		value = settings.value(key).toString();
+
+	QLabel *label = new QLabel(this);
+	label->setText(descr);
+	label->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Preferred);
+
+	QLineEdit *box = new QLineEdit(this);
+	box->setText(value);
+	box->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+
+	int row = m_grid->rowCount();
+	m_grid->addWidget(label, row, m_curGridColumn*m_numGridColumns + 0, 1, 1);
+	m_grid->addWidget(box, row, m_curGridColumn*m_numGridColumns + 1, 1, m_numGridColumns - 1);
+
+	m_editboxes.push_back(std::make_tuple(box, key, initial_value));
+}
+
+
+/**
+ * adds a directory browser to the end of the grid layout
+ */
+void Settings::AddDirectorybox(const QString& key, const QString& descr,
+	const QString& initial_value)
+{
+	// look for already saved value
+	QString value = initial_value;
+	QSettings settings{this};
+	if(settings.contains(key))
+		value = settings.value(key).toString();
+
+	QLabel *label = new QLabel(this);
+	label->setText(descr);
+	label->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Preferred);
+
+	QLineEdit *box = new QLineEdit(this);
+	box->setText(value);
+	box->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+
+	QPushButton *btn = new QPushButton(this);
+	btn->setText("Browse...");
+	btn->setToolTip("Browse for temporary directory.");
+	btn->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Preferred);
+
+	int row = m_grid->rowCount();
+	m_grid->addWidget(label, row, m_curGridColumn*m_numGridColumns + 0, 1, 1);
+	m_grid->addWidget(box, row, m_curGridColumn*m_numGridColumns + 1, 1, 1);
+	m_grid->addWidget(btn, row, m_curGridColumn*m_numGridColumns + 2, 1, 1);
+
+	m_editboxes.push_back(std::make_tuple(box, key, initial_value));
+
+	// browse button handler
+	connect(btn, &QAbstractButton::clicked, [this, box]()
+	{
+		auto filedlg = std::make_shared<QFileDialog>(this,
+			"Select Directory", box->text());
+		filedlg->setAcceptMode(QFileDialog::AcceptOpen);
+		filedlg->setOptions(QFileDialog::ShowDirsOnly | QFileDialog::ReadOnly);
+		filedlg->setFileMode(QFileDialog::Directory);
+
+		if(!filedlg->exec())
+			return;
+
+		QStringList files = filedlg->selectedFiles();
+		if(files.size() == 0 || files[0] == "")
+			return;
+
+		box->setText(files[0]);
+	});
 }
 
 
@@ -244,7 +341,7 @@ void Settings::AddSpacer(int size_v)
 
 	QSpacerItem *spacer_end = new QSpacerItem(1, size_v, policy_h, policy_v);
 	m_grid->addItem(spacer_end,
-		m_grid->rowCount(), 0, 1, m_numGridColumns*2);
+		m_grid->rowCount(), 0, 1, m_numGridColumns);
 }
 
 
@@ -258,7 +355,7 @@ void Settings::AddLine()
 	frame->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
 
 	m_grid->addWidget(frame,
-		m_grid->rowCount(), 0, 1, m_numGridColumns*2);
+		m_grid->rowCount(), 0, 1, m_numGridColumns);
 }
 
 
@@ -269,7 +366,7 @@ void Settings::FinishSetup()
 {
 	AddSpacer();
 	m_grid->addWidget(m_buttonbox.get(),
-		m_grid->rowCount(), 0, 1, m_numGridColumns*2);
+		m_grid->rowCount(), 0, 1, m_numGridColumns);
 
 	ApplySettings();
 }
@@ -285,11 +382,10 @@ QVariant Settings::GetValue(const QString& key) const
 	// look for the key among the check boxes
 	for(auto& [box, box_key, initial] : m_checkboxes)
 	{
-		if(key == box_key)
-		{
-			val.setValue(box->isChecked());
-			break;
-		}
+		if(key != box_key)
+			continue;
+		val.setValue(box->isChecked());
+		break;
 	}
 
 	if(val.isValid())
@@ -298,11 +394,10 @@ QVariant Settings::GetValue(const QString& key) const
 	// look for the key among the spin boxes
 	for(auto& [box, box_key, initial] : m_spinboxes)
 	{
-		if(key == box_key)
-		{
-			val.setValue(box->value());
-			break;
-		}
+		if(key != box_key)
+			continue;
+		val.setValue(box->value());
+		break;
 	}
 
 	if(val.isValid())
@@ -311,11 +406,10 @@ QVariant Settings::GetValue(const QString& key) const
 	// look for the key among the double spin boxes
 	for(auto& [box, box_key, initial] : m_doublespinboxes)
 	{
-		if(key == box_key)
-		{
-			val.setValue(box->value());
-			break;
-		}
+		if(key != box_key)
+			continue;
+		val.setValue(box->value());
+		break;
 	}
 
 	if(val.isValid())
@@ -324,11 +418,19 @@ QVariant Settings::GetValue(const QString& key) const
 	// look for the key among the combo boxes
 	for(auto& [box, box_key, initial] : m_comboboxes)
 	{
-		if(key == box_key)
-		{
-			val.setValue(box->currentIndex());
-			break;
-		}
+		if(key != box_key)
+			continue;
+		val.setValue(box->currentIndex());
+		break;
+	}
+
+	// look for the key among the edit boxes
+	for(auto& [box, box_key, initial] : m_editboxes)
+	{
+		if(key != box_key)
+			continue;
+		val.setValue(box->text());
+		break;
 	}
 
 	return val;
@@ -350,6 +452,8 @@ void Settings::ApplySettings()
 		settings.setValue(key, box->value());
 	for(const auto& [box, key, initial] : m_comboboxes)
 		settings.setValue(key, box->currentIndex());
+	for(const auto& [box, key, initial] : m_editboxes)
+		settings.setValue(key, box->text());
 
 	// signal changes
 	emit this->SignalApplySettings();
@@ -369,6 +473,8 @@ void Settings::RestoreDefaultSettings()
 		box->setValue(initial);
 	for(auto& [box, key, initial] : m_comboboxes)
 		box->setCurrentIndex(initial);
+	for(auto& [box, key, initial] : m_editboxes)
+		box->setText(initial);
 
 	// signal changes
 	emit this->SignalApplySettings();
@@ -393,5 +499,4 @@ void Settings::reject()
 	QDialog::reject();
 }
 
-// TODO
 // ----------------------------------------------------------------------------

@@ -214,7 +214,7 @@ protected:
 					found_tag = true;
 				}
 
-				if(!m_skip_unnecessary_tags || found_tag)
+				if(!m_skip_unnecessary_tags || (!m_skip_labels && found_tag))
 					vertex.tags.emplace(std::make_pair(*key, *val));
 			}
 		}
@@ -527,8 +527,11 @@ public:
 						found_tag = true;
 					}
 
-					if(!super->m_skip_unnecessary_tags || found_tag)
+					if(!super->m_skip_unnecessary_tags ||
+						(!super->m_skip_labels && found_tag))
+					{
 						vertex.tags.emplace(std::make_pair(tag.key(), tag.value()));
+					}
 				}
 
 				if(has_place && has_name)
@@ -1584,7 +1587,7 @@ private:
 		},
 	},
 	{
-		"busyway", t_widthmap
+		"busway", t_widthmap
 		{
 		},
 	}};

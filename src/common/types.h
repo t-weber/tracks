@@ -9,6 +9,7 @@
 #define __TRACKS_TYPES_H__
 
 #include <cstddef>
+#include <cstdint>
 
 
 // primitive types
@@ -16,6 +17,8 @@ using t_int = int;
 using t_uint = unsigned int;
 using t_size = std::size_t;
 using t_real = double;
+
+using t_size_map = std::uint32_t;
 using t_real_map = float;
 
 

@@ -7,6 +7,8 @@
 
 #include "globals.h"
 
+#include <QtCore/QDir>
+
 //#include <limits>
 
 
@@ -34,3 +36,7 @@ t_real g_assume_dt = 2.;
 t_real g_map_scale = 1.;
 bool g_map_show_buildings = false;
 bool g_map_show_labels = false;
+
+
+// directory for temporary files
+QString g_temp_dir = QDir::tempPath() + QDir::separator() + "tracks";

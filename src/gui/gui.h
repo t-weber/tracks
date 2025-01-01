@@ -120,6 +120,7 @@ protected:
 
 	void SetActiveFile();
 	bool AskUnsaved();
+	void CreateTempDir();
 
 	QString GetFileDir();
 	QString GetImportDir();

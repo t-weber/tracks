@@ -9,6 +9,7 @@
 #include "helpers.h"
 namespace fs = __map_fs;
 
+#include <QtCore/QDir>
 #include <QtWidgets/QGridLayout>
 #include <QtWidgets/QPushButton>
 #include <QtWidgets/QFileDialog>
@@ -77,16 +78,16 @@ TrackInfos::TrackInfos(QWidget* parent) : QWidget{parent}
 
 	m_mapfile = std::make_shared<QLineEdit>(map_panel);
 	m_mapfile->setPlaceholderText("Directory with Map Files (.osm or .osm.pbf)");
-	m_mapfile->setToolTip("Map file to draw.");
+	m_mapfile->setToolTip("Directory containing map files.");
 
 	QPushButton *btn_browse_map = new QPushButton(map_panel);
 	btn_browse_map->setText("Select Map Dir...");
-	btn_browse_map->setToolTip("Select a map file to draw.");
+	btn_browse_map->setToolTip("Select a directory with map files (.osm or .osm.pbf).");
 	connect(btn_browse_map, &QAbstractButton::clicked, this, &TrackInfos::SelectMap);
 
 	QPushButton *btn_calc_map = new QPushButton(map_panel);
 	btn_calc_map->setText("Calculate Map");
-	btn_calc_map->setToolTip("Calculate the map for the current track.");
+	btn_calc_map->setToolTip("(Re-)Calculate the map for the current track.");
 	connect(btn_calc_map, &QAbstractButton::clicked, [this]()
 	{
 		PlotMap(false);
@@ -257,7 +258,7 @@ void TrackInfos::ShowTrack(const t_track& track)
 void TrackInfos::SelectMap()
 {
 	auto filedlg = std::make_shared<QFileDialog>(
-		this, "Load Map File", m_mapdir.c_str(),
+		this, "Select Map Directory", m_mapdir.c_str(),
 		"Map Files (*.osm *.pbf);;All Files (* *.*)");
 	filedlg->setAcceptMode(QFileDialog::AcceptOpen);
 	//filedlg->setDefaultSuffix(".pbf");
@@ -318,8 +319,14 @@ void TrackInfos::PlotMap(bool load_cached)
 		}
 
 		t_size track_hash = m_track->GetHash();
-		cached_map_name = (std::ostringstream{} << std::hex
-			<< track_hash << ".trackmap").str();
+		std::ostringstream ostr_cached;
+		if(g_temp_dir != "")
+		{
+			ostr_cached << g_temp_dir.toStdString();
+			ostr_cached << QString{QDir::separator()}.toStdString();
+		}
+		ostr_cached << std::hex << track_hash << ".trackmap";
+		cached_map_name = ostr_cached.str();
 	}
 
 	// map loading progress
@@ -327,11 +334,12 @@ void TrackInfos::PlotMap(bool load_cached)
 	progress_dlg.setMinimumDuration(500);
 	progress_dlg.setAutoClose(true);
 	progress_dlg.setWindowModality(Qt::WindowModal);
+	progress_dlg.setWindowTitle("Tracks");
 	progress_dlg.setLabelText("Calculating map...");
 
 	// map loading progress callback
-	std::function<bool(t_size, t_size)> progress = [&progress_dlg](
-		t_size offs, t_size size) -> bool
+	std::function<bool(t_size_map, t_size_map)> progress = [&progress_dlg](
+		t_size_map offs, t_size_map size) -> bool
 	{
 		progress_dlg.setRange(0, static_cast<int>(size));
 		progress_dlg.setValue(static_cast<int>(offs));

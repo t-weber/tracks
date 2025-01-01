@@ -19,6 +19,7 @@
 #include <QtWidgets/QSpinBox>
 #include <QtWidgets/QDoubleSpinBox>
 #include <QtWidgets/QComboBox>
+#include <QtWidgets/QLineEdit>
 
 #include <memory>
 
@@ -45,18 +46,21 @@ public:
 
 	void AddCheckbox(const QString& key, const QString& descr, bool value);
 	void AddSpinbox(const QString& key, const QString& descr,
-		int value, int min = 0, int max = 100, int step = 1);
+		int value, int min = 0, int max = 100, int step = 1,
+		const QString& suffix = "");
 	void AddDoubleSpinbox(const QString& key, const QString& descr,
 		double value, double min = 0, double max = 100, double step = 1,
-		int decimals = 2);
+		int decimals = 2, const QString& suffix = "");
 	void AddCombobox(const QString& key, const QString& descr,
 		const QStringList& items, int idx);
+	void AddEditbox(const QString& key, const QString& descr, const QString& initial_value);
+	void AddDirectorybox(const QString& key, const QString& descr, const QString& initial_value);
 	void AddSpacer(int size_v = -1);
 	void AddLine();
 	void FinishSetup();
 
-	void SetNumGridColumns(unsigned int num) { m_numGridColumns = num; }
-	void SetCurGridColumn(unsigned int num) { m_curGridColumn = num; }
+	void SetNumGridColumns(unsigned int num);
+	void SetCurGridColumn(unsigned int num);
 
 	QVariant GetValue(const QString& key) const;
 
@@ -70,7 +74,7 @@ protected:
 
 
 private:
-	unsigned int m_numGridColumns{1};
+	unsigned int m_numGridColumns{3};
 	unsigned int m_curGridColumn{0};
 
 	std::shared_ptr<QGridLayout> m_grid{};
@@ -91,6 +95,10 @@ private:
 	// combo box, key, and initial value
 	using t_comboboxinfo = std::tuple<QComboBox*, QString, int>;
 	std::vector<t_comboboxinfo> m_comboboxes{};
+
+	// edit box, key, and initial value
+	using t_editboxinfo = std::tuple<QLineEdit*, QString, QString>;
+	std::vector<t_editboxinfo> m_editboxes{};
 
 
 signals:
