@@ -575,7 +575,7 @@ void TracksWnd::PlotCoordsChanged(t_real longitude, t_real latitude)
 {
 	std::ostringstream ostr;
 	ostr.precision(g_prec_gui);
-	ostr << "Coordinates: (" << longitude << "°, " << latitude << "°).";
+	ostr << "Longitude: " << longitude << "°, Latitude: " << latitude << "°.";
 	SetStatusMessage(ostr.str().c_str());
 }
 

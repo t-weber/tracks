@@ -37,20 +37,20 @@
 template<class t_timept, class t_real = double>
 struct TrackPoint
 {
-	t_real latitude{};
-	t_real longitude{};
-	t_real elevation{};
+	t_real latitude{};               // [deg]
+	t_real longitude{};              // [deg]
+	t_real elevation{};              // [m]
 
 	t_timept timept{};
 
-	t_real elapsed{};                // time elapsed since last point
-	t_real elapsed_total{};          // time elapsed since first point
+	t_real elapsed{};                // time elapsed since last point  [s]
+	t_real elapsed_total{};          // time elapsed since first point [s]
 
-	t_real distance_planar{};        // planar distance to last point
-	t_real distance_planar_total{};  // planar distance to first point
+	t_real distance_planar{};        // planar distance to last point  [m]
+	t_real distance_planar_total{};  // planar distance to first point [m]
 
-	t_real distance{};               // full distance to last point
-	t_real distance_total{};         // full distance to first point
+	t_real distance{};               // full distance to last point  [m]
+	t_real distance_total{};         // full distance to first point [m]
 };
 
 
@@ -150,6 +150,42 @@ public:
 			elevation_last = trackpt.elevation;
 			time_pt_last = trackpt.timept;
 		}
+	}
+
+
+
+	/**
+	 * bin the track time per distance
+	 */
+	template<template<class...> class t_vec = std::vector>
+	std::pair<t_vec<t_real>, t_vec<t_real>>
+	GetTimePerDistance(t_real dist_bin = 1000., bool planar = false) const
+	{
+		t_vec<t_real> times, dists;
+		t_size num_bins = static_cast<t_size>(std::ceil(GetTotalDistance(planar) / dist_bin));
+		times.reserve(num_bins);
+		dists.reserve(num_bins);
+
+		t_real time = 0., dist = 0.;
+		t_size bin_idx = 0;
+		for(const t_TrackPoint& pt : m_points)
+		{
+			time += pt.elapsed;
+			dist += planar ? pt.distance_planar : pt.distance;
+
+			if(dist >= dist_bin)
+			{
+				time *= dist_bin / dist;  // normalise to bin size
+
+				times.push_back(time);
+				dists.push_back(dist_bin * static_cast<t_real>(bin_idx + 1));
+
+				time = dist = 0.;
+				++bin_idx;
+			}
+		}
+
+		return std::make_pair(times, dists);
 	}
 
 

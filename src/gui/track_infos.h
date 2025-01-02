@@ -54,9 +54,10 @@ public:
 protected:
 	virtual QSize sizeHint() const override;
 
-	void PlotMouseMove(QMouseEvent *evt);
-	void CalcPlotRange();
-	void ResetPlotRange();
+	void TrackPlotMouseMove(QMouseEvent *evt);
+	void CalcTrackPlotRange();
+	void ResetTrackPlotRange();
+	void PlotTrack();
 
 	void MapMouseMove(QMouseEvent *evt);
 	void MapMouseClick(QMouseEvent *evt);
@@ -64,29 +65,38 @@ protected:
 	void PlotMap(bool load_cached = false);
 	void SaveMapSvg();
 
+	void ResetPacePlotRange();
+	void PlotPace();
+
 
 private:
 	std::shared_ptr<QSplitter> m_split{};
+	std::shared_ptr<QTabWidget> m_tab{};
 	std::shared_ptr<QTextEdit> m_infos{};
 
-	std::shared_ptr<QTabWidget> m_tab{};
-	std::shared_ptr<QCustomPlot> m_plot{};
+	std::shared_ptr<QCustomPlot> m_track_plot{};
 	std::shared_ptr<QCheckBox> m_same_range{};
 
 	std::shared_ptr<MapDrawer> m_map{};
 	std::shared_ptr<QLineEdit> m_mapfile{};
 	std::shared_ptr<QMenu> m_map_context{};
 
+	std::shared_ptr<QCustomPlot> m_pace_plot{};
+
 	// svg image of the map
 	QByteArray m_map_image{};
 
-	// track coordinate range
+	// track coordinate ranges
 	t_real m_min_long{}, m_max_long{};
 	t_real m_min_lat{}, m_max_lat{};
 
-	// plotted coordinate range
+	// plotted coordinate ranges
 	t_real m_min_long_plot{}, m_max_long_plot{};
 	t_real m_min_lat_plot{}, m_max_lat_plot{};
+
+	// pace plot ranges
+	t_real m_min_dist{}, m_max_dist{};
+	t_real m_min_pace{}, m_max_pace{};
 
 	// currently selected track
 	const t_track *m_track{};

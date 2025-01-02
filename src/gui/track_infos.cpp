@@ -21,6 +21,7 @@ namespace fs = __map_fs;
 #include <iomanip>
 #include <cmath>
 #include <optional>
+#include <algorithm>
 #include <numbers>
 namespace num = std::numbers;
 
@@ -29,8 +30,10 @@ TrackInfos::TrackInfos(QWidget* parent) : QWidget{parent}
 {
 	m_tab = std::make_shared<QTabWidget>(this);
 	QWidget *plot_panel = new QWidget(m_tab.get());
+	QWidget *pace_panel = new QWidget(m_tab.get());
 	QWidget *map_panel = new QWidget(m_tab.get());
 	m_tab->addTab(plot_panel, "Track");
+	m_tab->addTab(pace_panel, "Pace");
 	m_tab->addTab(map_panel, "Map");
 #ifndef _TRACKS_USE_OSMIUM_
 	m_tab->setTabEnabled(1, false);
@@ -38,30 +41,49 @@ TrackInfos::TrackInfos(QWidget* parent) : QWidget{parent}
 #endif
 
 	// track plot panel
-	m_plot = std::make_shared<QCustomPlot>(plot_panel);
-	m_plot->setSelectionRectMode(QCP::srmZoom);
-	m_plot->setInteraction(QCP::Interaction(int(QCP::iRangeZoom) | int(QCP::iRangeDrag)));
-	m_plot->xAxis->setLabel("Longitude (Degrees)");
-	m_plot->yAxis->setLabel("Latitude (Degrees)");
+	m_track_plot = std::make_shared<QCustomPlot>(plot_panel);
+	m_track_plot->setSelectionRectMode(QCP::srmZoom);
+	m_track_plot->setInteraction(QCP::Interaction(int(QCP::iRangeZoom) | int(QCP::iRangeDrag)));
+	m_track_plot->xAxis->setLabel("Longitude (Degrees)");
+	m_track_plot->yAxis->setLabel("Latitude (Degrees)");
 
 	m_same_range = std::make_shared<QCheckBox>(plot_panel);
 	m_same_range->setText("Keep Aspect");
 	m_same_range->setToolTip("Correct the angular range aspect ratio for longitudes and latitudes.");
 	m_same_range->setChecked(true);
-	connect(m_same_range.get(), &QAbstractButton::toggled, this, &TrackInfos::ResetPlotRange);
+	connect(m_same_range.get(), &QAbstractButton::toggled, this, &TrackInfos::ResetTrackPlotRange);
 
 	QPushButton *btn_replot = new QPushButton(plot_panel);
 	btn_replot->setText("Reset Plot");
 	btn_replot->setToolTip("Reset the range of the longitude and latitude to show all track data.");
-	connect(btn_replot, &QAbstractButton::clicked, this, &TrackInfos::ResetPlotRange);
+	connect(btn_replot, &QAbstractButton::clicked, this, &TrackInfos::ResetTrackPlotRange);
 
 	QGridLayout *plot_panel_layout = new QGridLayout(plot_panel);
 	plot_panel_layout->setContentsMargins(4, 4, 4, 4);
 	plot_panel_layout->setVerticalSpacing(4);
 	plot_panel_layout->setHorizontalSpacing(4);
-	plot_panel_layout->addWidget(m_plot.get(), 0, 0, 1, 4);
+	plot_panel_layout->addWidget(m_track_plot.get(), 0, 0, 1, 4);
 	plot_panel_layout->addWidget(m_same_range.get(), 1, 0, 1, 1);
 	plot_panel_layout->addWidget(btn_replot, 1, 3, 1, 1);
+
+	// pace plot panel
+	m_pace_plot = std::make_shared<QCustomPlot>(pace_panel);
+	m_pace_plot->setSelectionRectMode(QCP::srmZoom);
+	m_pace_plot->setInteraction(QCP::Interaction(int(QCP::iRangeZoom) | int(QCP::iRangeDrag)));
+	m_pace_plot->xAxis->setLabel("Distance (km)");
+	m_pace_plot->yAxis->setLabel("Pace (min/km)");
+
+	QPushButton *btn_replot_pace = new QPushButton(pace_panel);
+	btn_replot_pace->setText("Reset Plot");
+	btn_replot_pace->setToolTip("Reset the plotting range.");
+	connect(btn_replot_pace, &QAbstractButton::clicked, this, &TrackInfos::ResetPacePlotRange);
+
+	QGridLayout *pace_panel_layout = new QGridLayout(pace_panel);
+	pace_panel_layout->setContentsMargins(4, 4, 4, 4);
+	pace_panel_layout->setVerticalSpacing(4);
+	pace_panel_layout->setHorizontalSpacing(4);
+	pace_panel_layout->addWidget(m_pace_plot.get(), 0, 0, 1, 4);
+	pace_panel_layout->addWidget(btn_replot_pace, 1, 3, 1, 1);
 
 	// map plot panel
 	m_map = std::make_shared<MapDrawer>(map_panel);
@@ -119,7 +141,7 @@ TrackInfos::TrackInfos(QWidget* parent) : QWidget{parent}
 	main_layout->setHorizontalSpacing(4);
 	main_layout->addWidget(m_split.get(), 0, 0, 1, 1);
 
-	connect(m_plot.get(), &QCustomPlot::mouseMove, this, &TrackInfos::PlotMouseMove);
+	connect(m_track_plot.get(), &QCustomPlot::mouseMove, this, &TrackInfos::TrackPlotMouseMove);
 	connect(m_map.get(), &MapDrawer::MouseMoved, this, &TrackInfos::MapMouseMove);
 	connect(m_map.get(), &MapDrawer::MousePressed, this, &TrackInfos::MapMouseClick);
 }
@@ -130,39 +152,55 @@ TrackInfos::~TrackInfos()
 }
 
 
-void TrackInfos::CalcPlotRange()
+/**
+ * sets the current track and shows it in the plotter
+ */
+void TrackInfos::ShowTrack(const t_track& track)
+{
+	m_track = &track;
+
+	// print track infos
+	m_infos->setHtml(track.PrintHtml(g_prec_gui).c_str());
+
+	PlotTrack();
+	PlotPace();
+	PlotMap(true);
+}
+
+
+void TrackInfos::CalcTrackPlotRange()
 {
 	m_min_long_plot = m_min_long;
 	m_max_long_plot = m_max_long;
 	m_min_lat_plot = m_min_lat;
 	m_max_lat_plot = m_max_lat;
 
-	if(!m_plot || !m_same_range)
+	if(!m_track_plot)
 		return;
 
-	int h = 3;
-	int w = 4;
+	if(m_same_range && m_same_range->isChecked())
+	{
+		int h = 0, w = 0;
 
-	if(m_tab->currentIndex() == 0)
-	{
-		h = m_plot->viewport().height();
-		w = m_plot->viewport().width();
-	}
-	else
-	{
-		h = m_map->height();
-		w = m_map->width();
-	}
+		if(m_tab->currentIndex() == 0 && m_track_plot->isVisible()) // track
+		{
+			h = m_track_plot->viewport().height();
+			w = m_track_plot->viewport().width();
+		}
+		else if(m_tab->currentIndex() == 2 && m_map->isVisible())   // map
+		{
+			h = m_map->height();
+			w = m_map->width();
+		}
 
-	if(h <= 0 || w <= 0)
-	{
-		h = 3;
-		w = 4;
-	}
-	t_real aspect = t_real(h) / t_real(w);
+		if(h <= 0 || w <= 0)
+		{
+			h = 3;
+			w = 4;
+		}
 
-	if(m_same_range->isChecked())
-	{
+		t_real aspect = t_real(h) / t_real(w);
+
 		t_real range_long = m_max_long - m_min_long;
 		t_real range_lat = m_max_lat - m_min_lat;
 
@@ -186,69 +224,150 @@ void TrackInfos::CalcPlotRange()
 }
 
 
-void TrackInfos::ResetPlotRange()
+void TrackInfos::ResetTrackPlotRange()
 {
-	CalcPlotRange();
+	CalcTrackPlotRange();
 
-	if(!m_plot || !m_same_range)
+	if(!m_track_plot || !m_same_range)
 		return;
 
 	t_real range_long = m_max_long_plot - m_min_long_plot;
 	t_real range_lat = m_max_lat_plot - m_min_lat_plot;
 
-	m_plot->xAxis->setRange(
+	m_track_plot->xAxis->setRange(
 		(m_min_long_plot - range_long / 20.) * t_real(180) / num::pi_v<t_real>,
 		(m_max_long_plot + range_long / 20.) * t_real(180) / num::pi_v<t_real>);
 
-	m_plot->yAxis->setRange(
+	m_track_plot->yAxis->setRange(
 		(m_min_lat_plot - range_lat / 20.) * t_real(180) / num::pi_v<t_real>,
 		(m_max_lat_plot + range_lat / 20.) * t_real(180) / num::pi_v<t_real>);
 
-	m_plot->replot();
+	m_track_plot->replot();
 }
 
 
-/**
- * sets the current track and shows it in the plotter
- */
-void TrackInfos::ShowTrack(const t_track& track)
+void TrackInfos::PlotTrack()
 {
-	m_track = &track;
-
-	// print track infos
-	m_infos->setHtml(track.PrintHtml(g_prec_gui).c_str());
+	if(!m_track)
+		return;
 
 	// prepare track plot
-	std::tie(m_min_lat, m_max_lat) = track.GetLatitudeRange();
-	std::tie(m_min_long, m_max_long) = track.GetLongitudeRange();
-	CalcPlotRange();
+	std::tie(m_min_lat, m_max_lat) = m_track->GetLatitudeRange();
+	std::tie(m_min_long, m_max_long) = m_track->GetLongitudeRange();
+	CalcTrackPlotRange();
 
+	// plot track
+	if(!m_track_plot)
+		return;
 	QVector<t_real> latitudes, longitudes;
-	latitudes.reserve(track.GetPoints().size());
-	longitudes.reserve(track.GetPoints().size());
+	latitudes.reserve(m_track->GetPoints().size());
+	longitudes.reserve(m_track->GetPoints().size());
 
-	for(const t_track_pt& pt : track.GetPoints())
+	for(const t_track_pt& pt : m_track->GetPoints())
 	{
 		latitudes.push_back(pt.latitude * t_real(180) / num::pi_v<t_real>);
 		longitudes.push_back(pt.longitude * t_real(180) / num::pi_v<t_real>);
 	}
 
-	// plot map and track
-	if(!m_plot)
-		return;
-	m_plot->clearPlottables();
+	m_track_plot->clearPlottables();
 
-	PlotMap(true);
-
-	QCPCurve *curve = new QCPCurve(m_plot->xAxis, m_plot->yAxis);
+	QCPCurve *curve = new QCPCurve(m_track_plot->xAxis, m_track_plot->yAxis);
 	curve->setData(longitudes, latitudes);
-	curve->setLineStyle(QCPCurve::lsLine);
+	//curve->setLineStyle(QCPCurve::lsLine);
 	QPen pen = curve->pen();
 	pen.setWidthF(2.);
 	pen.setColor(QColor{0x00, 0x00, 0xff, 0xff});
 	curve->setPen(pen);
 
-	ResetPlotRange();
+	ResetTrackPlotRange();
+}
+
+
+void TrackInfos::ResetPacePlotRange()
+{
+	if(!m_pace_plot)
+		return;
+
+	t_real pace_range = m_max_pace - m_min_pace;
+
+	m_pace_plot->xAxis->setRange(0., m_max_dist);
+	m_pace_plot->yAxis->setRange(
+		m_min_pace - pace_range / 20.,
+		m_max_pace + pace_range / 20.);
+
+	m_pace_plot->replot();
+}
+
+
+void TrackInfos::PlotPace()
+{
+	if(!m_track || !m_pace_plot)
+		return;
+
+	m_pace_plot->clearPlottables();
+
+	t_real dist_bin = 250.;
+	auto [times, dists] = m_track->GetTimePerDistance<QVector>(dist_bin, false);
+	auto [times_planar, dists_planar] = m_track->GetTimePerDistance<QVector>(dist_bin, true);
+	if(!times.size() || times.size() != dists.size()
+		|| !times_planar.size() || times_planar.size() != dists_planar.size())
+		return;
+
+	for(int i = 0; i < times.size(); ++i)
+	{
+		times[i] /= 60. * (dist_bin / 1000.);  // to [min/km]
+		dists[i] -= dist_bin / 2.;             // centre histogram bar
+		dists[i] /= 1000.;                     // to [km]
+	}
+
+	for(int i = 0; i < times_planar.size(); ++i)
+	{
+		times_planar[i] /= 60. * (dist_bin / 1000.);  // to [min/km]
+		dists_planar[i] -= dist_bin / 2.;             // centre histogram bar
+		dists_planar[i] /= 1000.;                     // to [km]
+	}
+
+	auto [min_dist_iter, max_dist_iter] = std::minmax_element(dists.begin(), dists.end());
+	auto [min_time_iter, max_time_iter] = std::minmax_element(times.begin(), times.end());
+	auto [min_dist_pl_iter, max_dist_pl_iter] = std::minmax_element(dists_planar.begin(), dists_planar.end());
+	auto [min_time_pl_iter, max_time_pl_iter] = std::minmax_element(times_planar.begin(), times_planar.end());
+
+	m_min_dist = std::min(*min_dist_iter, *min_dist_pl_iter);
+	m_max_dist = std::max(*max_dist_iter, *max_dist_pl_iter) + dist_bin / 2000.;
+	m_min_pace = std::min(*min_time_iter, *min_time_pl_iter);
+	m_max_pace = std::max(*max_time_iter, *max_time_pl_iter);
+
+	QCPBars *curve_planar = new QCPBars(m_pace_plot->xAxis, m_pace_plot->yAxis);
+	curve_planar->setWidth(dist_bin / 1000.);
+	curve_planar->setData(dists_planar, times_planar);
+
+	QPen pen_planar = curve_planar->pen();
+	pen_planar.setWidthF(2.);
+	pen_planar.setColor(QColor{0xff, 0, 0, 0xff});
+	curve_planar->setPen(pen_planar);
+
+	QBrush brush_planar = curve_planar->brush();
+	brush_planar.setStyle(Qt::SolidPattern);
+	brush_planar.setColor(QColor{0xff, 0, 0, 0x99});
+	curve_planar->setBrush(brush_planar);
+
+	//QCPCurve *curve = new QCPCurve(m_pace_plot->xAxis, m_pace_plot->yAxis);
+	QCPBars *curve = new QCPBars(m_pace_plot->xAxis, m_pace_plot->yAxis);
+	curve->setWidth(dist_bin / 1000.);
+	curve->setData(dists, times);
+	//curve->setLineStyle(QCPCurve::lsLine);
+
+	QPen pen = curve->pen();
+	pen.setWidthF(2.);
+	pen.setColor(QColor{0, 0, 0xff, 0xff});
+	curve->setPen(pen);
+
+	QBrush brush = curve->brush();
+	brush.setStyle(Qt::SolidPattern);
+	brush.setColor(QColor{0, 0, 0xff, 0x99});
+	curve->setBrush(brush);
+
+	ResetPacePlotRange();
 }
 
 
@@ -273,9 +392,7 @@ void TrackInfos::SelectMap()
 		return;
 
 	m_mapfile->setText(files[0]);
-
-	fs::path dir{files[0].toStdString()};
-	m_mapdir = dir/*.parent_path()*/.string();
+	m_mapdir = files[0].toStdString();
 }
 
 
@@ -402,7 +519,7 @@ void TrackInfos::PlotMap(bool load_cached)
 			m_max_long_plot + lon_range*g_map_overdraw,
 			m_min_lat_plot - lat_range*g_map_overdraw,
 			m_max_lat_plot + lat_range*g_map_overdraw);
-		map.Plot(m_plot);
+		map.Plot(m_track_plot);
 	}*/
 }
 
@@ -452,10 +569,10 @@ void TrackInfos::Clear()
 	m_track = nullptr;
 	m_infos->clear();
 
-	if(m_plot)
+	if(m_track_plot)
 	{
-		m_plot->clearPlottables();
-		m_plot->replot();
+		m_track_plot->clearPlottables();
+		m_track_plot->replot();
 	}
 
 	if(m_map)
@@ -469,9 +586,9 @@ void TrackInfos::Clear()
 /**
  * the mouse has moved in the plot widget
  */
-void TrackInfos::PlotMouseMove(QMouseEvent *evt)
+void TrackInfos::TrackPlotMouseMove(QMouseEvent *evt)
 {
-	if(!m_plot)
+	if(!m_track_plot)
 		return;
 
 #if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
@@ -482,8 +599,8 @@ void TrackInfos::PlotMouseMove(QMouseEvent *evt)
 	qreal y = evt->y();
 #endif
 
-	t_real longitude = m_plot->xAxis->pixelToCoord(x);
-	t_real latitude = m_plot->yAxis->pixelToCoord(y);
+	t_real longitude = m_track_plot->xAxis->pixelToCoord(x);
+	t_real latitude = m_track_plot->yAxis->pixelToCoord(y);
 
 	emit PlotCoordsChanged(longitude, latitude);
 }
