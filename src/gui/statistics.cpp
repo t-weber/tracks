@@ -329,7 +329,11 @@ void Statistics::PlotMouseMove(QMouseEvent *evt)
 
 	std::ostringstream ostr;
 	ostr.precision(g_prec_gui);
-	ostr << "Date: " << date << ", Pace: " << get_pace_str(pace) << ".";
+	ostr << "Date: " << date;
+	if(m_speed_check->isChecked())
+		ostr << ", Speed: " << pace << " km/h.";
+	else
+		ostr << ", Pace: " << get_pace_str(pace) << ".";
 	m_status->setText(ostr.str().c_str());
 }
 

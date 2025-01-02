@@ -90,6 +90,13 @@ void TracksWnd::SetupGUI()
 		this, &TracksWnd::TrackDeleted);
 	connect(m_track->GetWidget(), &TrackInfos::PlotCoordsChanged,
 		this, &TracksWnd::PlotCoordsChanged);
+	//connect(m_track->GetWidget(), &TrackInfos::StatusMessageChanged,
+	//	this, &TracksWnd::SetStatusMessage);
+	connect(m_track->GetWidget(), &TrackInfos::StatusMessageChanged,
+		[this](const QString& msg)
+	{
+		SetStatusMessage(msg);
+	});
 
 	setDockOptions(QMainWindow::AnimatedDocks);
 	setDockNestingEnabled(false);

@@ -85,7 +85,6 @@ public:
 	void SaveSettings();
 
 	void SetupGUI();
-	void SetStatusMessage(const QString& msg, int display_ms = 0) const;
 
 	void Clear();
 	void FileNew();
@@ -169,6 +168,7 @@ protected slots:
 	void TrackDeleted(t_size idx);
 
 	void PlotCoordsChanged(t_real, t_real);
+	void SetStatusMessage(const QString& msg, int display_ms = 0) const;
 	void PopulateTrackList(bool resort = true);
 };
 

@@ -16,6 +16,7 @@
 #include <QtWidgets/QCheckBox>
 #include <QtWidgets/QSplitter>
 #include <QtWidgets/QLineEdit>
+#include <QtWidgets/QDoubleSpinBox>
 #include <QtWidgets/QMenu>
 
 // https://gcc.gnu.org/onlinedocs/gcc/Diagnostic-Pragmas.html
@@ -65,6 +66,7 @@ protected:
 	void PlotMap(bool load_cached = false);
 	void SaveMapSvg();
 
+	void PacePlotMouseMove(QMouseEvent *evt);
 	void ResetPacePlotRange();
 	void PlotPace();
 
@@ -82,6 +84,8 @@ private:
 	std::shared_ptr<QMenu> m_map_context{};
 
 	std::shared_ptr<QCustomPlot> m_pace_plot{};
+	std::shared_ptr<QDoubleSpinBox> m_dist_binlen{};
+	std::shared_ptr<QCheckBox> m_speed_check{};
 
 	// svg image of the map
 	QByteArray m_map_image{};
@@ -110,6 +114,7 @@ private:
 
 signals:
 	void PlotCoordsChanged(t_real, t_real);
+	void StatusMessageChanged(const QString&);
 };
 
 
