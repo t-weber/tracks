@@ -29,8 +29,8 @@
 
 #include <memory>
 
-#include "globals.h"
 #include "map.h"
+#include "../globals.h"
 
 
 /**
@@ -70,19 +70,30 @@ protected:
 	void ResetPacePlotRange();
 	void PlotPace();
 
+	void AltPlotMouseMove(QMouseEvent *evt);
+	void ResetAltPlotRange();
+	void PlotAlt();
+
 
 private:
 	std::shared_ptr<QSplitter> m_split{};
 	std::shared_ptr<QTabWidget> m_tab{};
 	std::shared_ptr<QTextEdit> m_infos{};
 
+	// track tab
 	std::shared_ptr<QCustomPlot> m_track_plot{};
 	std::shared_ptr<QCheckBox> m_same_range{};
 
+	// map tab
 	std::shared_ptr<MapDrawer> m_map{};
 	std::shared_ptr<QLineEdit> m_mapfile{};
 	std::shared_ptr<QMenu> m_map_context{};
 
+	// altitude tab
+	std::shared_ptr<QCustomPlot> m_alt_plot{};
+	std::shared_ptr<QCheckBox> m_time_check{};
+
+	// pace tab
 	std::shared_ptr<QCustomPlot> m_pace_plot{};
 	std::shared_ptr<QDoubleSpinBox> m_dist_binlen{};
 	std::shared_ptr<QCheckBox> m_speed_check{};
@@ -93,6 +104,10 @@ private:
 	// track coordinate ranges
 	t_real m_min_long{}, m_max_long{};
 	t_real m_min_lat{}, m_max_lat{};
+
+	// altitutde range
+	t_real m_min_dist_alt{}, m_max_dist_alt{};
+	t_real m_min_alt{}, m_max_alt{};
 
 	// plotted coordinate ranges
 	t_real m_min_long_plot{}, m_max_long_plot{};

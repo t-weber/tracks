@@ -16,8 +16,8 @@
 #include <memory>
 #include <map>
 
-#include "globals.h"
 #include "lib/trackdb.h"
+#include "../globals.h"
 
 
 /**

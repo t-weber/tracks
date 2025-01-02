@@ -18,8 +18,8 @@
 
 #include <QtSvg/QSvgWidget>
 
-#include "globals.h"
 #include "lib/map.h"
+#include "../globals.h"
 
 
 // --------------------------------------------------------------------------------

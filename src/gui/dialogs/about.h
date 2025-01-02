@@ -13,7 +13,7 @@
 
 #include <memory>
 
-#include "resources.h"
+#include "../resources.h"
 
 
 class About : public QDialog

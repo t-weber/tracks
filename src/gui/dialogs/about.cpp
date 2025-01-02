@@ -6,6 +6,7 @@
  */
 
 #include "about.h"
+#include "common/version.h"
 
 #include <QtCore/QSettings>
 #include <QtWidgets/QApplication>
@@ -76,7 +77,7 @@ About::About(QWidget *parent, const QIcon *progIcon)
 
 	// add description items
 	//AddTitle(QApplication::applicationDisplayName().toStdString().c_str());
-	AddTitle("Tracks", progIcon);
+	AddTitle(TRACKS_TITLE, progIcon);
 
 	AddSpacer(15);
 

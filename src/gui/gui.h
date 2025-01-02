@@ -20,19 +20,20 @@
 #include "recent.h"
 #include "resources.h"
 #include "globals.h"
-#include "settings.h"
-#include "about.h"
 
 // docks
-#include "track_browser.h"
-#include "track_infos.h"
+#include "docks/track_browser.h"
+#include "docks/track_infos.h"
 
 // dialogs
-#include "conversions.h"
-#include "statistics.h"
-#include "reports.h"
-#include "summary.h"
+#include "dialogs/conversions.h"
+#include "dialogs/statistics.h"
+#include "dialogs/reports.h"
+#include "dialogs/summary.h"
+#include "dialogs/settings.h"
+#include "dialogs/about.h"
 
+// lib
 #include "common/types.h"
 #include "lib/trackdb.h"
 

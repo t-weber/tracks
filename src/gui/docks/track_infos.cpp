@@ -6,8 +6,9 @@
  */
 
 #include "track_infos.h"
-#include "helpers.h"
 #include "lib/calc.h"
+#include "common/version.h"
+#include "../helpers.h"
 namespace fs = __map_fs;
 
 #include <QtCore/QDir>
@@ -23,18 +24,30 @@ namespace fs = __map_fs;
 #include <iomanip>
 #include <cmath>
 #include <optional>
+#include <limits>
 #include <algorithm>
 #include <numbers>
 namespace num = std::numbers;
 
 
+#define TAB_TRACK  0
+#define TAB_ALT    1
+#define TAB_PACE   2
+#define TAB_MAP    3
+
+
+/**
+ * setup tabs
+ */
 TrackInfos::TrackInfos(QWidget* parent) : QWidget{parent}
 {
 	m_tab = std::make_shared<QTabWidget>(this);
 	QWidget *plot_panel = new QWidget(m_tab.get());
+	QWidget *alt_panel = new QWidget(m_tab.get());
 	QWidget *pace_panel = new QWidget(m_tab.get());
 	QWidget *map_panel = new QWidget(m_tab.get());
 	m_tab->addTab(plot_panel, "Track");
+	m_tab->addTab(alt_panel, "Altitude");
 	m_tab->addTab(pace_panel, "Pace");
 	m_tab->addTab(map_panel, "Map");
 #ifndef _TRACKS_USE_OSMIUM_
@@ -70,6 +83,33 @@ TrackInfos::TrackInfos(QWidget* parent) : QWidget{parent}
 	plot_panel_layout->addWidget(m_same_range.get(), 1, 0, 1, 1);
 	plot_panel_layout->addWidget(btn_replot, 1, 3, 1, 1);
 
+	// altitude plot panel
+	m_alt_plot = std::make_shared<QCustomPlot>(alt_panel);
+	m_alt_plot->setSelectionRectMode(QCP::srmZoom);
+	m_alt_plot->setInteraction(QCP::Interaction(int(QCP::iRangeZoom) | int(QCP::iRangeDrag)));
+	m_alt_plot->yAxis->setLabel("Altitude (m)");
+	m_alt_plot->legend->setVisible(false);
+	connect(m_alt_plot.get(), &QCustomPlot::mouseMove, this, &TrackInfos::AltPlotMouseMove);
+
+	m_time_check = std::make_shared<QCheckBox>(alt_panel);
+	m_time_check->setText("Plot Times");
+	m_time_check->setToolTip("Show elapsed time instead of distance.");
+	m_time_check->setChecked(false);
+	connect(m_time_check.get(), &QCheckBox::toggled, this, &TrackInfos::PlotAlt);
+
+	QPushButton *btn_replot_alt = new QPushButton(alt_panel);
+	btn_replot_alt->setText("Reset Plot");
+	btn_replot_alt->setToolTip("Reset the plotting range.");
+	connect(btn_replot_alt, &QAbstractButton::clicked, this, &TrackInfos::ResetAltPlotRange);
+
+	QGridLayout *alt_panel_layout = new QGridLayout(alt_panel);
+	alt_panel_layout->setContentsMargins(4, 4, 4, 4);
+	alt_panel_layout->setVerticalSpacing(4);
+	alt_panel_layout->setHorizontalSpacing(4);
+	alt_panel_layout->addWidget(m_alt_plot.get(), 0, 0, 1, 4);
+	alt_panel_layout->addWidget(m_time_check.get(), 1, 0, 1, 1);
+	alt_panel_layout->addWidget(btn_replot_alt, 1, 3, 1, 1);
+
 	// pace plot panel
 	m_pace_plot = std::make_shared<QCustomPlot>(pace_panel);
 	m_pace_plot->setSelectionRectMode(QCP::srmZoom);
@@ -77,6 +117,12 @@ TrackInfos::TrackInfos(QWidget* parent) : QWidget{parent}
 	m_pace_plot->xAxis->setLabel("Distance (km)");
 	m_pace_plot->legend->setVisible(true);
 	connect(m_pace_plot.get(), &QCustomPlot::mouseMove, this, &TrackInfos::PacePlotMouseMove);
+
+	m_speed_check = std::make_shared<QCheckBox>(pace_panel);
+	m_speed_check->setText("Plot Speeds");
+	m_speed_check->setToolTip("Show speeds instead of paces.");
+	m_speed_check->setChecked(false);
+	connect(m_speed_check.get(), &QCheckBox::toggled, this, &TrackInfos::PlotPace);
 
 	m_dist_binlen = std::make_shared<QDoubleSpinBox>(pace_panel);
 	m_dist_binlen->setDecimals(2);
@@ -89,12 +135,6 @@ TrackInfos::TrackInfos(QWidget* parent) : QWidget{parent}
 		static_cast<void (QDoubleSpinBox::*)(double)>(&QDoubleSpinBox::valueChanged),
 		this, &TrackInfos::PlotPace);
 
-	m_speed_check = std::make_shared<QCheckBox>(this);
-	m_speed_check->setText("Plot Speeds");
-	m_speed_check->setToolTip("Show speeds instead of paces.");
-	m_speed_check->setChecked(false);
-	connect(m_speed_check.get(), &QCheckBox::toggled, this, &TrackInfos::PlotPace);
-
 	QPushButton *btn_replot_pace = new QPushButton(pace_panel);
 	btn_replot_pace->setText("Reset Plot");
 	btn_replot_pace->setToolTip("Reset the plotting range.");
@@ -105,9 +145,9 @@ TrackInfos::TrackInfos(QWidget* parent) : QWidget{parent}
 	pace_panel_layout->setVerticalSpacing(4);
 	pace_panel_layout->setHorizontalSpacing(4);
 	pace_panel_layout->addWidget(m_pace_plot.get(), 0, 0, 1, 4);
-	pace_panel_layout->addWidget(new QLabel("Distance Binning:", pace_panel), 1, 0, 1, 1);
-	pace_panel_layout->addWidget(m_dist_binlen.get(), 1, 1, 1, 1);
-	pace_panel_layout->addWidget(m_speed_check.get(), 1, 2, 1, 1);
+	pace_panel_layout->addWidget(m_speed_check.get(), 1, 0, 1, 1);
+	pace_panel_layout->addWidget(new QLabel("Distance Binning:", pace_panel), 1, 1, 1, 1);
+	pace_panel_layout->addWidget(m_dist_binlen.get(), 1, 2, 1, 1);
 	pace_panel_layout->addWidget(btn_replot_pace, 1, 3, 1, 1);
 
 	// map plot panel
@@ -187,6 +227,7 @@ void TrackInfos::ShowTrack(const t_track& track)
 
 	PlotTrack();
 	PlotPace();
+	PlotAlt();
 	PlotMap(true);
 }
 
@@ -205,12 +246,14 @@ void TrackInfos::CalcTrackPlotRange()
 	{
 		int h = 0, w = 0;
 
-		if(m_tab->currentIndex() == 0 && m_track_plot->isVisible()) // track
+		if(m_tab->currentIndex() == TAB_TRACK
+			&& m_track_plot->isVisible())  // track
 		{
 			h = m_track_plot->viewport().height();
 			w = m_track_plot->viewport().width();
 		}
-		else if(m_tab->currentIndex() == 2 && m_map->isVisible())   // map
+		else if(m_tab->currentIndex() == TAB_MAP
+			&& m_map->isVisible())         // map
 		{
 			h = m_map->height();
 			w = m_map->width();
@@ -297,12 +340,90 @@ void TrackInfos::PlotTrack()
 	QCPCurve *curve = new QCPCurve(m_track_plot->xAxis, m_track_plot->yAxis);
 	curve->setData(longitudes, latitudes);
 	//curve->setLineStyle(QCPCurve::lsLine);
+
 	QPen pen = curve->pen();
 	pen.setWidthF(2.);
 	pen.setColor(QColor{0x00, 0x00, 0xff, 0xff});
 	curve->setPen(pen);
 
 	ResetTrackPlotRange();
+}
+
+
+void TrackInfos::ResetAltPlotRange()
+{
+	if(!m_alt_plot)
+		return;
+
+	t_real alt_range = m_max_alt - m_min_alt;
+
+	m_alt_plot->xAxis->setRange(m_min_dist_alt, m_max_dist_alt);
+	m_alt_plot->yAxis->setRange(
+		m_min_alt - alt_range / 20.,
+		m_max_alt + alt_range / 20.);
+
+	m_alt_plot->replot();
+}
+
+
+void TrackInfos::PlotAlt()
+{
+	if(!m_track || !m_alt_plot)
+		return;
+
+	m_alt_plot->clearPlottables();
+
+	const bool plot_time = m_time_check->isChecked();
+	if(plot_time)
+		m_alt_plot->xAxis->setLabel("Time (min)");
+	else
+		m_alt_plot->xAxis->setLabel("Distance (km)");
+
+	QVector<t_real> dist, alt;
+
+	dist.reserve(m_track->GetPoints().size());
+	alt.reserve(m_track->GetPoints().size());
+
+	m_min_alt = std::numeric_limits<t_real>::max();
+	m_max_alt = -m_min_alt;
+
+	for(const t_track_pt& pt : m_track->GetPoints())
+	{
+		if(plot_time)
+			dist.push_back(pt.elapsed_total / 60.);
+		else
+			dist.push_back(pt.distance_total / 1000.);
+		alt.push_back(pt.elevation);
+
+		m_min_alt = std::min(m_min_alt, pt.elevation);
+		m_max_alt = std::max(m_max_alt, pt.elevation);
+	}
+
+	if(!alt.size())
+		return;
+
+	if(plot_time)
+	{
+		m_min_dist_alt = *dist.begin();
+		m_max_dist_alt = *dist.rbegin();
+	}
+	else
+	{
+		// use same distance range as in pace plot
+		m_min_dist_alt = m_min_dist;
+		m_max_dist_alt = m_max_dist;
+	}
+
+	QCPGraph *curve = new QCPGraph(m_alt_plot->xAxis, m_alt_plot->yAxis);
+	curve->setData(dist, alt);
+	//curve->setLineStyle(QCPCurve::lsLine);
+
+	QPen pen = curve->pen();
+	pen.setWidthF(2.);
+	pen.setColor(QColor{0x00, 0x00, 0xff, 0xff});
+	curve->setPen(pen);
+
+	ResetAltPlotRange();
 }
 
 
@@ -313,7 +434,7 @@ void TrackInfos::ResetPacePlotRange()
 
 	t_real pace_range = m_max_pace - m_min_pace;
 
-	m_pace_plot->xAxis->setRange(0., m_max_dist);
+	m_pace_plot->xAxis->setRange(m_min_dist, m_max_dist);
 	m_pace_plot->yAxis->setRange(
 		m_min_pace - pace_range / 20.,
 		m_max_pace + pace_range / 20.);
@@ -327,10 +448,10 @@ void TrackInfos::PlotPace()
 	if(!m_track || !m_pace_plot)
 		return;
 
+	m_pace_plot->clearPlottables();
+
 	const t_real dist_bin = m_dist_binlen->value() * 1000.;
 	const bool plot_speed = m_speed_check->isChecked();
-
-	m_pace_plot->clearPlottables();
 	if(plot_speed)
 		m_pace_plot->yAxis->setLabel("Speed (km/h)");
 	else
@@ -367,7 +488,7 @@ void TrackInfos::PlotPace()
 	auto [min_dist_pl_iter, max_dist_pl_iter] = std::minmax_element(dists_planar.begin(), dists_planar.end());
 	auto [min_time_pl_iter, max_time_pl_iter] = std::minmax_element(times_planar.begin(), times_planar.end());
 
-	m_min_dist = std::min(*min_dist_iter, *min_dist_pl_iter);
+	m_min_dist = 0.; //std::min(*min_dist_iter, *min_dist_pl_iter);
 	m_max_dist = std::max(*max_dist_iter, *max_dist_pl_iter) + dist_bin / 2000.;
 	m_min_pace = std::min(*min_time_iter, *min_time_pl_iter);
 	m_max_pace = std::max(*max_time_iter, *max_time_pl_iter);
@@ -488,7 +609,7 @@ void TrackInfos::PlotMap(bool load_cached)
 	progress_dlg.setMinimumDuration(500);
 	progress_dlg.setAutoClose(true);
 	progress_dlg.setWindowModality(Qt::WindowModal);
-	progress_dlg.setWindowTitle("Tracks");
+	progress_dlg.setWindowTitle(TRACKS_TITLE);
 	progress_dlg.setLabelText("Calculating map...");
 
 	// map loading progress callback
@@ -612,6 +733,18 @@ void TrackInfos::Clear()
 		m_track_plot->replot();
 	}
 
+	if(m_alt_plot)
+	{
+		m_alt_plot->clearPlottables();
+		m_alt_plot->replot();
+	}
+
+	if(m_pace_plot)
+	{
+		m_pace_plot->clearPlottables();
+		m_pace_plot->replot();
+	}
+
 	if(m_map)
 	{
 		m_map_image.clear();
@@ -669,6 +802,38 @@ void TrackInfos::PacePlotMouseMove(QMouseEvent *evt)
 		ostr << ", Speed: " << pace << " km/h.";
 	else
 		ostr << ", Pace: " << get_pace_str(pace) << ".";
+
+	emit StatusMessageChanged(ostr.str().c_str());
+}
+
+
+/**
+ * the mouse has moved in the altitude plot widget
+ */
+void TrackInfos::AltPlotMouseMove(QMouseEvent *evt)
+{
+        if(!m_alt_plot)
+                return;
+
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+	qreal x = evt->position().x();
+	qreal y = evt->position().y();
+#else
+	qreal x = evt->x();
+	qreal y = evt->y();
+#endif
+
+	t_real dist = m_pace_plot->xAxis->pixelToCoord(x);
+	t_real alt = m_pace_plot->yAxis->pixelToCoord(y);
+
+	std::ostringstream ostr;
+	ostr.precision(g_prec_gui);
+
+	if(m_time_check->isChecked())
+		ostr << "Time: " << dist << " min";
+	else
+		ostr << "Distance: " << dist << " km";
+	ostr << ", Altitude: " << alt << " m.";
 
 	emit StatusMessageChanged(ostr.str().c_str());
 }
@@ -752,6 +917,7 @@ void TrackInfos::SaveSettings(QSettings& settings)
 	settings.setValue("track_info/recent_tab", m_tab->currentIndex());
 	settings.setValue("track_info/distance_bin", m_dist_binlen->value());
 	settings.setValue("track_info/speed_check", m_speed_check->isChecked());
+	settings.setValue("track_info/time_check", m_time_check->isChecked());
 }
 
 
@@ -781,4 +947,7 @@ void TrackInfos::RestoreSettings(QSettings& settings)
 
 	if(settings.contains("track_info/speed_check"))
 		m_speed_check->setChecked(settings.value("track_info/speed_check").toBool());
+
+	if(settings.contains("track_info/time_check"))
+		m_time_check->setChecked(settings.value("track_info/time_check").toBool());
 }

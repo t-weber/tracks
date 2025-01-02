@@ -6,7 +6,7 @@
  */
 
 #include "track_browser.h"
-#include "helpers.h"
+#include "../helpers.h"
 
 #include <QtWidgets/QListWidgetItem>
 #include <QtWidgets/QGridLayout>

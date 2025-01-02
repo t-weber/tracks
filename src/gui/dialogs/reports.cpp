@@ -6,9 +6,9 @@
  */
 
 #include "reports.h"
-#include "helpers.h"
-#include "tableitems.h"
 #include "lib/calc.h"
+#include "../helpers.h"
+#include "../tableitems.h"
 
 #include <QtCore/QSettings>
 #include <QtCore/QByteArray>

@@ -28,9 +28,9 @@
 #endif
 
 #include "helpers.h"
+#include "common/version.h"
 
 
-#define TRACKS_WND_TITLE  "Tracks"
 #define GUI_THEME_UNSET   "Unset"
 
 
@@ -90,8 +90,6 @@ void TracksWnd::SetupGUI()
 		this, &TracksWnd::TrackDeleted);
 	connect(m_track->GetWidget(), &TrackInfos::PlotCoordsChanged,
 		this, &TracksWnd::PlotCoordsChanged);
-	//connect(m_track->GetWidget(), &TrackInfos::StatusMessageChanged,
-	//	this, &TracksWnd::SetStatusMessage);
 	connect(m_track->GetWidget(), &TrackInfos::StatusMessageChanged,
 		[this](const QString& msg)
 	{
@@ -1008,11 +1006,11 @@ void TracksWnd::SetActiveFile()
 	QString mod{IsWindowModified() ? " *" : ""};
 	if(filename == "")
 	{
-		setWindowTitle(QString(TRACKS_WND_TITLE "%1").arg(mod));
+		setWindowTitle(QString(TRACKS_TITLE "%1").arg(mod));
 	}
 	else
 	{
-		setWindowTitle(QString(TRACKS_WND_TITLE " \u2014 %1%2")
+		setWindowTitle(QString(TRACKS_TITLE " \u2014 %1%2")
 			.arg(QFileInfo{filename}.fileName())
 			.arg(mod));
 	}

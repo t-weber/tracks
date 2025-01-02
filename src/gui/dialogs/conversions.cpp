@@ -6,8 +6,8 @@
  */
 
 #include "conversions.h"
-#include "helpers.h"
 #include "lib/calc.h"
+#include "../helpers.h"
 
 #include <QtCore/QSettings>
 #include <QtCore/QByteArray>

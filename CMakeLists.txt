@@ -89,27 +89,33 @@ set_source_files_properties(
 
 
 add_executable(tracks
+	# main gui
 	src/gui/main.cpp
 	src/gui/gui.cpp src/gui/gui.h
-	src/gui/settings.cpp src/gui/settings.h
 	src/gui/globals.cpp src/gui/globals.h
-	src/gui/about.cpp src/gui/about.h
 	src/gui/resources.cpp src/gui/resources.h
 	src/gui/recent.h src/gui/helpers.h
-	src/gui/track_browser.cpp src/gui/track_browser.h
-	src/gui/track_infos.cpp src/gui/track_infos.h
-	src/gui/conversions.cpp src/gui/conversions.h
-	src/gui/statistics.cpp src/gui/statistics.h
-	src/gui/reports.cpp src/gui/reports.h
-	src/gui/summary.cpp src/gui/summary.h
-	src/gui/map.cpp src/gui/map.h
 
-	src/common/types.h
+	# dock widgets
+	src/gui/docks/track_browser.cpp src/gui/docks/track_browser.h
+	src/gui/docks/track_infos.cpp src/gui/docks/track_infos.h
+	src/gui/docks/map.cpp src/gui/docks/map.h
 
+	# dialogs
+	src/gui/dialogs/conversions.cpp src/gui/dialogs/conversions.h
+	src/gui/dialogs/statistics.cpp src/gui/dialogs/statistics.h
+	src/gui/dialogs/reports.cpp src/gui/dialogs/reports.h
+	src/gui/dialogs/summary.cpp src/gui/dialogs/summary.h
+	src/gui/dialogs/about.cpp src/gui/dialogs/about.h
+	src/gui/dialogs/settings.cpp src/gui/dialogs/settings.h
+
+	# libs
 	src/lib/calc.h src/lib/timepoint.h
 	src/lib/track.h src/lib/trackdb.h
 	src/lib/map.h
+	src/common/types.h
 
+	# external libs
 	ext/qcustomplot.cpp ext/qcustomplot.h
 )
 

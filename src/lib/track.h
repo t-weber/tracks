@@ -530,7 +530,7 @@ public:
 				<< from_timepoint<t_clk, t_timept>(*end_time, false)
 				<< " (" << get_time_str(t) << ").</li>";
 		}
-		ostr << "<li><b>Elevation range</b>: [ " << min_elev << ", " << max_elev << " ] m"
+		ostr << "<li><b>Altitude range</b>: [ " << min_elev << ", " << max_elev << " ] m"
 			<< " (height difference: " << max_elev - min_elev << " m).</li>";
 		ostr << "<li><b>Distance</b>: " << s / 1000. << " km"
 			<< " (planar: " << s_planar / 1000. << " km).</li>";
@@ -592,7 +592,7 @@ public:
 
 		ostr << "\n";
 		ostr << "Number of track points: " << track.GetPoints().size() << "\n";
-		ostr << "Elevation range: [ " << min_elev << ", " << max_elev << " ] m\n";
+		ostr << "Altitude range: [ " << min_elev << ", " << max_elev << " ] m\n";
 		ostr << "Height difference: " << max_elev - min_elev << " m\n";
 		ostr << "Total distance: " << s << " m = " << s / 1000. << " km\n";
 		ostr << "Total planar distance: " << s_planar / 1000. << " km\n";

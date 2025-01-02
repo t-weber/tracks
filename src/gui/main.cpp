@@ -7,6 +7,7 @@
 
 #include "gui.h"
 #include "helpers.h"
+#include "common/version.h"
 
 #include <QtWidgets/QApplication>
 
@@ -21,9 +22,9 @@ int main(int argc, char** argv)
 		// application
 		auto app = std::make_unique<QApplication>(argc, argv);
 		app->setOrganizationName("tw");
-		app->setApplicationName("tracks");
-		//app->setApplicationDisplayName("Tracks");
-		app->setApplicationVersion("0.1");
+		app->setApplicationName(TRACKS_IDENT);
+		//app->setApplicationDisplayName(TRACKS_TITLE);
+		app->setApplicationVersion(TRACKS_VERSION);
 		set_c_locale();
 
 		// main window

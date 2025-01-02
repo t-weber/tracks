@@ -23,8 +23,8 @@
 
 #include <memory>
 
-#include "globals.h"
 #include "lib/trackdb.h"
+#include "../globals.h"
 
 
 /**
