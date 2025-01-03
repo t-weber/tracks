@@ -51,7 +51,7 @@ TrackInfos::TrackInfos(QWidget* parent) : QWidget{parent}
 	m_tab->addTab(pace_panel, "Pace");
 	m_tab->addTab(map_panel, "Map");
 #ifndef _TRACKS_USE_OSMIUM_
-	m_tab->setTabEnabled(1, false);
+	m_tab->setTabEnabled(TAB_MAP, false);
 	map_panel->setEnabled(false);
 #endif
 
@@ -63,6 +63,19 @@ TrackInfos::TrackInfos(QWidget* parent) : QWidget{parent}
 	m_track_plot->yAxis->setLabel("Latitude (Degrees)");
 	m_track_plot->legend->setVisible(false);
 	connect(m_track_plot.get(), &QCustomPlot::mouseMove, this, &TrackInfos::TrackPlotMouseMove);
+	connect(m_track_plot.get(), &QCustomPlot::mousePress, [this](QMouseEvent *evt)
+	{
+		PlotMouseClick(evt, m_track_context.get(), m_track_plot.get());
+	});
+
+	m_track_context = std::make_shared<QMenu>(plot_panel);
+	QIcon iconSaveTrackPdf = QIcon::fromTheme("image-x-generic");
+	QAction *actionSaveTrackPdf = new QAction(iconSaveTrackPdf, "Save Image...", m_track_context.get());
+	m_track_context->addAction(actionSaveTrackPdf);
+	connect(actionSaveTrackPdf, &QAction::triggered, [this]()
+	{
+		SavePlotPdf(m_track_plot.get(), "track");
+	});
 
 	m_same_range = std::make_shared<QCheckBox>(plot_panel);
 	m_same_range->setText("Keep Aspect");
@@ -90,6 +103,19 @@ TrackInfos::TrackInfos(QWidget* parent) : QWidget{parent}
 	m_alt_plot->yAxis->setLabel("Altitude (m)");
 	m_alt_plot->legend->setVisible(false);
 	connect(m_alt_plot.get(), &QCustomPlot::mouseMove, this, &TrackInfos::AltPlotMouseMove);
+	connect(m_alt_plot.get(), &QCustomPlot::mousePress, [this](QMouseEvent *evt)
+	{
+		PlotMouseClick(evt, m_alt_context.get(), m_alt_plot.get());
+	});
+
+	m_alt_context = std::make_shared<QMenu>(alt_panel);
+	QIcon iconSaveAltPdf = QIcon::fromTheme("image-x-generic");
+	QAction *actionSaveAltPdf = new QAction(iconSaveAltPdf, "Save Image...", m_alt_context.get());
+	m_alt_context->addAction(actionSaveAltPdf);
+	connect(actionSaveAltPdf, &QAction::triggered, [this]()
+	{
+		SavePlotPdf(m_alt_plot.get(), "altitude");
+	});
 
 	m_time_check = std::make_shared<QCheckBox>(alt_panel);
 	m_time_check->setText("Plot Times");
@@ -117,6 +143,19 @@ TrackInfos::TrackInfos(QWidget* parent) : QWidget{parent}
 	m_pace_plot->xAxis->setLabel("Distance (km)");
 	m_pace_plot->legend->setVisible(true);
 	connect(m_pace_plot.get(), &QCustomPlot::mouseMove, this, &TrackInfos::PacePlotMouseMove);
+	connect(m_pace_plot.get(), &QCustomPlot::mousePress, [this](QMouseEvent *evt)
+	{
+		PlotMouseClick(evt, m_pace_context.get(), m_pace_plot.get());
+	});
+
+	m_pace_context = std::make_shared<QMenu>(pace_panel);
+	QIcon iconSavePacePdf = QIcon::fromTheme("image-x-generic");
+	QAction *actionSavePacePdf = new QAction(iconSavePacePdf, "Save Image...", m_pace_context.get());
+	m_pace_context->addAction(actionSavePacePdf);
+	connect(actionSavePacePdf, &QAction::triggered, [this]()
+	{
+		SavePlotPdf(m_pace_plot.get(), "pace");
+	});
 
 	m_speed_check = std::make_shared<QCheckBox>(pace_panel);
 	m_speed_check->setText("Plot Speeds");
@@ -155,14 +194,15 @@ TrackInfos::TrackInfos(QWidget* parent) : QWidget{parent}
 	//m_map->renderer()->setAnimationEnabled(false);
 	m_map->renderer()->setAspectRatioMode(Qt::KeepAspectRatio);
 	connect(m_map.get(), &MapDrawer::MouseMoved, this, &TrackInfos::MapMouseMove);
-	connect(m_map.get(), &MapDrawer::MousePressed, this, &TrackInfos::MapMouseClick);
+	connect(m_map.get(), &MapDrawer::MousePressed, [this](QMouseEvent *evt)
+	{
+		PlotMouseClick(evt, m_map_context.get(), m_map.get());
+	});
 
 	m_map_context = std::make_shared<QMenu>(map_panel);
-
 	QIcon iconSaveSvg = QIcon::fromTheme("image-x-generic");
 	QAction *actionSaveSvg = new QAction(iconSaveSvg, "Save Image...", m_map_context.get());
 	connect(actionSaveSvg, &QAction::triggered, this, &TrackInfos::SaveMapSvg);
-
 	m_map_context->addAction(actionSaveSvg);
 
 	m_mapfile = std::make_shared<QLineEdit>(map_panel);
@@ -405,7 +445,7 @@ void TrackInfos::PlotAlt()
 	if(plot_time)
 	{
 		m_min_dist_alt = *dist.begin();
-		m_max_dist_alt = *dist.rbegin();
+		m_max_dist_alt = *dist.rbegin() * 1.01;
 	}
 	else
 	{
@@ -683,6 +723,44 @@ void TrackInfos::PlotMap(bool load_cached)
 
 
 /**
+ * save a plot as a pdf image
+ */
+void TrackInfos::SavePlotPdf(QCustomPlot *plot, const char *name)
+{
+	if(!m_track)
+	{
+		QMessageBox::warning(this, "Warning", "No track is loaded.");
+		return;
+	}
+
+	auto filedlg = std::make_shared<QFileDialog>(
+		this, "Save Plot as Image", m_svgdir.c_str(),
+		"PDF Files (*.pdf)");
+	filedlg->setAcceptMode(QFileDialog::AcceptSave);
+	filedlg->setDefaultSuffix("pdf");
+	filedlg->selectFile(name);
+	filedlg->setFileMode(QFileDialog::AnyFile);
+
+	if(!filedlg->exec())
+		return;
+
+	QStringList files = filedlg->selectedFiles();
+	if(files.size() == 0 || files[0] == "")
+		return;
+
+	if(!plot->savePdf(files[0]))
+	{
+		QMessageBox::critical(this, "Error",
+			QString("File \"%1\" could not be saved.").arg(files[0]));
+		return;
+	}
+
+	fs::path file{files[0].toStdString()};
+	m_svgdir = file.parent_path().string();
+}
+
+
+/**
  * save the map as an svg image
  */
 void TrackInfos::SaveMapSvg()
@@ -875,11 +953,11 @@ void TrackInfos::MapMouseMove(QMouseEvent *evt)
 
 
 /**
- * the mouse has been clicked in the map widget
+ * the mouse has been clicked in one of the plot widgets
  */
-void TrackInfos::MapMouseClick(QMouseEvent *evt)
+void TrackInfos::PlotMouseClick(QMouseEvent *evt, QMenu *context, QWidget *plot)
 {
-	if(!m_map)
+	if(!plot || !context)
 		return;
 
 #if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
@@ -890,11 +968,11 @@ void TrackInfos::MapMouseClick(QMouseEvent *evt)
 
 	if(evt->buttons() & Qt::RightButton)
 	{
-		QPoint posGlobal = m_map->mapToGlobal(pos);
+		QPoint posGlobal = plot->mapToGlobal(pos);
 		posGlobal.rx() += 4;
 		posGlobal.ry() += 4;
 
-		m_map_context->popup(posGlobal);
+		context->popup(posGlobal);
 	}
 }
 

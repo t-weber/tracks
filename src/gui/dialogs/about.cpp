@@ -65,7 +65,7 @@ About::About(QWidget *parent, const QIcon *progIcon)
 {
 	namespace alg = boost::algorithm;
 
-	setWindowTitle("About");
+	setWindowTitle("About " TRACKS_TITLE);
 	setSizeGripEnabled(true);
 
 

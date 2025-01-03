@@ -18,6 +18,14 @@
 #include <limits>
 #include <cmath>
 
+#if __has_include(<filesystem>)
+	#include <filesystem>
+	namespace fs = std::filesystem;
+#else
+	#include <boost/filesystem.hpp>
+	namespace fs = boost::filesystem;
+#endif
+
 
 Statistics::Statistics(QWidget* parent)
 	: QDialog(parent)
@@ -36,8 +44,15 @@ Statistics::Statistics(QWidget* parent)
 	ticker->setDateTimeSpec(Qt::LocalTime);
 	ticker->setDateTimeFormat("yyyy-MM-dd");
 	m_plot->xAxis->setTicker(QSharedPointer<QCPAxisTicker>{ticker});
-
 	connect(m_plot.get(), &QCustomPlot::mouseMove, this, &Statistics::PlotMouseMove);
+	connect(m_plot.get(), &QCustomPlot::mousePress, this, &Statistics::PlotMouseClick);
+
+	// context menu
+	m_context = std::make_shared<QMenu>(this);
+	QIcon iconSavePdf = QIcon::fromTheme("image-x-generic");
+	QAction *actionSavePdf = new QAction(iconSavePdf, "Save Image...", m_context.get());
+	m_context->addAction(actionSavePdf);
+	connect(actionSavePdf, &QAction::triggered, this, &Statistics::SavePlotPdf);
 
 	// speed/pace checkbox
 	m_speed_check = std::make_shared<QCheckBox>(this);
@@ -151,6 +166,9 @@ Statistics::Statistics(QWidget* parent)
 
 	if(settings.contains("dlg_statistics/speed_check"))
 		m_speed_check->setChecked(settings.value("dlg_statistics/speed_check").toBool());
+
+	if(settings.contains("dlg_statistics/recent_pdfs"))
+		m_pdfdir = settings.value("dlg_statistics/recent_pdfs").toString().toStdString();
 }
 
 
@@ -276,7 +294,7 @@ void Statistics::PlotSpeeds()
 
 		graph->setData(epochs, paces, true);
 		graph->setLineStyle(QCPGraph::lsLine);
-		graph->setScatterStyle(QCPScatterStyle{QCPScatterStyle::ssCircle, pen, brush, 6.});
+		graph->setScatterStyle(QCPScatterStyle{QCPScatterStyle::ssDisc, pen, brush, 6.});
 		graph->setPen(pen);
 		//graph->setBrush(brush);
 	};
@@ -305,6 +323,9 @@ void Statistics::PlotSpeeds()
 }
 
 
+/**
+ * the mouse has been moved in the plot widget
+ */
 void Statistics::PlotMouseMove(QMouseEvent *evt)
 {
 	if(!m_plot)
@@ -338,6 +359,66 @@ void Statistics::PlotMouseMove(QMouseEvent *evt)
 }
 
 
+/**
+ * the mouse has been clicked in the plot widget
+ */
+void Statistics::PlotMouseClick(QMouseEvent *evt)
+{
+	if(!m_plot || !m_context)
+		return;
+
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+	QPoint pos = evt->position();
+#else
+	QPoint pos = evt->pos();
+#endif
+
+	if(evt->buttons() & Qt::RightButton)
+	{
+		QPoint posGlobal = m_plot->mapToGlobal(pos);
+		posGlobal.rx() += 4;
+		posGlobal.ry() += 4;
+
+		m_context->popup(posGlobal);
+	}
+}
+
+
+/**
+ * save the plot as a pdf image
+ */
+void Statistics::SavePlotPdf()
+{
+	if(!m_plot)
+		return;
+
+	auto filedlg = std::make_shared<QFileDialog>(
+		this, "Save Plot as Image", m_pdfdir.c_str(),
+		"PDF Files (*.pdf)");
+	filedlg->setAcceptMode(QFileDialog::AcceptSave);
+	filedlg->setDefaultSuffix("pdf");
+	filedlg->selectFile("pace");
+	filedlg->setFileMode(QFileDialog::AnyFile);
+
+	if(!filedlg->exec())
+		return;
+
+	QStringList files = filedlg->selectedFiles();
+	if(files.size() == 0 || files[0] == "")
+		return;
+
+	if(!m_plot->savePdf(files[0]))
+	{
+		QMessageBox::critical(this, "Error",
+			QString("File \"%1\" could not be saved.").arg(files[0]));
+		return;
+	}
+
+	fs::path file{files[0].toStdString()};
+	m_pdfdir = file.parent_path().string();
+}
+
+
 void Statistics::accept()
 {
 	// save settings
@@ -353,6 +434,7 @@ void Statistics::accept()
 	}
 
 	settings.setValue("dlg_statistics/speed_check", m_speed_check->isChecked());
+	settings.setValue("dlg_statistics/recent_pdfs", m_pdfdir.c_str());
 
 	QDialog::accept();
 }

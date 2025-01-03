@@ -14,6 +14,7 @@
 #include <QtWidgets/QTableWidget>
 #include <QtWidgets/QSplitter>
 #include <QtWidgets/QDialogButtonBox>
+#include <QtWidgets/QMenu>
 
 // https://gcc.gnu.org/onlinedocs/gcc/Diagnostic-Pragmas.html
 #pragma GCC diagnostic push
@@ -53,7 +54,9 @@ protected:
 	virtual void reject() override;
 
 	void PlotMouseMove(QMouseEvent *evt);
+	void PlotMouseClick(QMouseEvent *evt);
 	void ResetDistPlotRange();
+	void SavePlotPdf();
 
 
 private:
@@ -64,12 +67,16 @@ private:
 	std::shared_ptr<QCheckBox> m_all_tracks{}, m_cumulative{};
 	std::shared_ptr<QLabel> m_status{};
 	std::shared_ptr<QDialogButtonBox> m_buttonbox{};
+	std::shared_ptr<QMenu> m_context{};
 
 	const t_tracks *m_trackdb{};
 	typename t_tracks::t_timept_map m_monthly{}, m_yearly{};
 
 	t_real m_min_epoch{}, m_max_epoch{};
 	t_real m_min_dist{}, m_max_dist{};
+
+	// directory with recently saved pdf files
+	std::string m_pdfdir{};
 };
 
 

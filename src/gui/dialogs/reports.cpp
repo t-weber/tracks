@@ -19,6 +19,14 @@
 #include <limits>
 #include <cmath>
 
+#if __has_include(<filesystem>)
+	#include <filesystem>
+	namespace fs = std::filesystem;
+#else
+	#include <boost/filesystem.hpp>
+	namespace fs = boost::filesystem;
+#endif
+
 
 // table columns
 #define TAB_DATE      0
@@ -53,6 +61,14 @@ Reports::Reports(QWidget* parent)
 	m_plot->xAxis->setTicker(QSharedPointer<QCPAxisTicker>{ticker});
 
 	connect(m_plot/*.get()*/, &QCustomPlot::mouseMove, this, &Reports::PlotMouseMove);
+	connect(m_plot/*.get()*/, &QCustomPlot::mousePress, this, &Reports::PlotMouseClick);
+
+	// context menu
+	m_context = std::make_shared<QMenu>(this);
+	QIcon iconSavePdf = QIcon::fromTheme("image-x-generic");
+	QAction *actionSavePdf = new QAction(iconSavePdf, "Save Image...", m_context.get());
+	m_context->addAction(actionSavePdf);
+	connect(actionSavePdf, &QAction::triggered, this, &Reports::SavePlotPdf);
 
 	// "all tracks" checkbox
 	m_all_tracks = std::make_shared<QCheckBox>(plot_panel);
@@ -201,6 +217,9 @@ Reports::Reports(QWidget* parent)
 		m_table->setColumnWidth(TAB_TIME_SUM, settings.value("dlg_reports/timesum_col").toInt());
 	else
 		m_table->setColumnWidth(TAB_TIME_SUM, 150);
+
+	if(settings.contains("dlg_reports/recent_pdfs"))
+		m_pdfdir = settings.value("dlg_reports/recent_pdfs").toString().toStdString();
 }
 
 
@@ -442,7 +461,7 @@ void Reports::PlotDistances()
 
 		graph->setData(epochs, dists, true);
 		graph->setLineStyle(QCPGraph::lsLine);
-		graph->setScatterStyle(QCPScatterStyle{QCPScatterStyle::ssCircle, pen, brush, 6.});
+		graph->setScatterStyle(QCPScatterStyle{QCPScatterStyle::ssDisc, pen, brush, 6.});
 		graph->setPen(pen);
 		//graph->setBrush(brush);
 	};
@@ -476,6 +495,9 @@ void Reports::PlotDistances()
 }
 
 
+/**
+ * the mouse has been moved in the plot widget
+ */
 void Reports::PlotMouseMove(QMouseEvent *evt)
 {
 	if(!m_plot)
@@ -504,6 +526,66 @@ void Reports::PlotMouseMove(QMouseEvent *evt)
 }
 
 
+/**
+ * the mouse has been clicked in the plot widget
+ */
+void Reports::PlotMouseClick(QMouseEvent *evt)
+{
+	if(!m_plot || !m_context)
+		return;
+
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+	QPoint pos = evt->position();
+#else
+	QPoint pos = evt->pos();
+#endif
+
+	if(evt->buttons() & Qt::RightButton)
+	{
+		QPoint posGlobal = m_plot->mapToGlobal(pos);
+		posGlobal.rx() += 4;
+		posGlobal.ry() += 4;
+
+		m_context->popup(posGlobal);
+	}
+}
+
+
+/**
+ * save the plot as a pdf image
+ */
+void Reports::SavePlotPdf()
+{
+	if(!m_plot)
+		return;
+
+	auto filedlg = std::make_shared<QFileDialog>(
+		this, "Save Plot as Image", m_pdfdir.c_str(),
+		"PDF Files (*.pdf)");
+	filedlg->setAcceptMode(QFileDialog::AcceptSave);
+	filedlg->setDefaultSuffix("pdf");
+	filedlg->selectFile("distance");
+	filedlg->setFileMode(QFileDialog::AnyFile);
+
+	if(!filedlg->exec())
+		return;
+
+	QStringList files = filedlg->selectedFiles();
+	if(files.size() == 0 || files[0] == "")
+		return;
+
+	if(!m_plot->savePdf(files[0]))
+	{
+		QMessageBox::critical(this, "Error",
+			QString("File \"%1\" could not be saved.").arg(files[0]));
+		return;
+	}
+
+	fs::path file{files[0].toStdString()};
+	m_pdfdir = file.parent_path().string();
+}
+
+
 void Reports::accept()
 {
 	// save settings
@@ -514,6 +596,7 @@ void Reports::accept()
 
 	settings.setValue("dlg_reports/all_tracks", m_all_tracks->isChecked());
 	settings.setValue("dlg_reports/sum_distances", m_cumulative->isChecked());
+	settings.setValue("dlg_reports/recent_pdfs", m_pdfdir.c_str());
 
 	QByteArray split{m_split->saveState()};
 	settings.setValue("dlg_reports/split", split);

@@ -55,13 +55,15 @@ public:
 protected:
 	virtual QSize sizeHint() const override;
 
+	void PlotMouseClick(QMouseEvent *evt, QMenu *context, QWidget *plot);
+	void SavePlotPdf(QCustomPlot *plot, const char *name);
+
 	void TrackPlotMouseMove(QMouseEvent *evt);
 	void CalcTrackPlotRange();
 	void ResetTrackPlotRange();
 	void PlotTrack();
 
 	void MapMouseMove(QMouseEvent *evt);
-	void MapMouseClick(QMouseEvent *evt);
 	void SelectMap();
 	void PlotMap(bool load_cached = false);
 	void SaveMapSvg();
@@ -83,6 +85,7 @@ private:
 	// track tab
 	std::shared_ptr<QCustomPlot> m_track_plot{};
 	std::shared_ptr<QCheckBox> m_same_range{};
+	std::shared_ptr<QMenu> m_track_context{};
 
 	// map tab
 	std::shared_ptr<MapDrawer> m_map{};
@@ -92,11 +95,13 @@ private:
 	// altitude tab
 	std::shared_ptr<QCustomPlot> m_alt_plot{};
 	std::shared_ptr<QCheckBox> m_time_check{};
+	std::shared_ptr<QMenu> m_alt_context{};
 
 	// pace tab
 	std::shared_ptr<QCustomPlot> m_pace_plot{};
 	std::shared_ptr<QDoubleSpinBox> m_dist_binlen{};
 	std::shared_ptr<QCheckBox> m_speed_check{};
+	std::shared_ptr<QMenu> m_pace_context{};
 
 	// svg image of the map
 	QByteArray m_map_image{};
