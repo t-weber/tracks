@@ -182,17 +182,16 @@ t_size TrackBrowser::GetCurrentTrackIndex() const
 
 t_size TrackBrowser::GetTrackIndex(int row) const
 {
-	const t_size invalid = std::numeric_limits<t_size>::max();
 	if(!m_list || row < 0)
-		return invalid;
+		return m_invalid_idx;
 
 	QListWidgetItem *item = m_list->item(row);
 	if(!item)
-		return invalid;
+		return m_invalid_idx;
 
 	QVariant val = item->data(TRACK_IDX);
 	if(!val.isValid())
-		return invalid;
+		return m_invalid_idx;
 
 	return val.value<t_size>();
 }
@@ -262,7 +261,7 @@ void TrackBrowser::DeleteSelectedTracks()
 		for(int row = start_row; row < m_list->count(); ++row)
 		{
 			t_size idx = GetTrackIndex(row);
-			if(idx <= deleted_idx)
+			if(idx <= deleted_idx || idx == m_invalid_idx)
 				continue;
 			SetTrackIndex(row, idx - 1);
 		}
@@ -275,6 +274,9 @@ void TrackBrowser::DeleteSelectedTracks()
 
 		int row = m_list->row(item);
 		t_size idx = GetTrackIndex(row);
+		if(idx == m_invalid_idx)
+			continue;
+
 		decrease_indices(row, idx);
 
 		emit TrackDeleted(idx);

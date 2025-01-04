@@ -50,6 +50,9 @@ protected:
 private:
 	std::shared_ptr<QListWidget> m_list{};
 
+	// an index considered invalid
+	static constexpr t_size m_invalid_idx = std::numeric_limits<t_size>::max();
+
 
 signals:
 	void NewTrackSelected(t_size idx);

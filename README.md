@@ -5,4 +5,4 @@ Fully local calculation and visualisation of running 🏃 tracks.
 - No remote collection or transmission of data.
 - No AI!
 
-Version 0.1.
+Version 0.2.

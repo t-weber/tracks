@@ -206,7 +206,7 @@ TrackInfos::TrackInfos(QWidget* parent) : QWidget{parent}
 	m_map_context->addAction(actionSaveSvg);
 
 	m_mapfile = std::make_shared<QLineEdit>(map_panel);
-	m_mapfile->setPlaceholderText("Directory with Map Files (.osm or .osm.pbf)");
+	m_mapfile->setPlaceholderText("Directory with Map Files (.osm.pbf)");
 	m_mapfile->setToolTip("Directory containing map files.");
 
 	QPushButton *btn_browse_map = new QPushButton(map_panel);
@@ -611,7 +611,10 @@ void TrackInfos::PlotMap(bool load_cached)
 	m_map->load(m_map_image);
 
 	if(m_mapfile->text() == "")
+	{
+		emit StatusMessageChanged("No source maps available. Please specify a map directory with .osm.pbf files.");
 		return;
+	}
 
 	t_real lon_range = m_max_long_plot - m_min_long_plot;
 	t_real lat_range = m_max_lat_plot - m_min_lat_plot;
@@ -685,10 +688,18 @@ void TrackInfos::PlotMap(bool load_cached)
 			static_cast<t_real_map>(m_max_lat_plot + lat_range*g_map_overdraw),
 			&progress);
 
-		if(cached_map_name)
+		if(map_loaded && cached_map_name)
 		{
 			// cache generated map
 			map.Save(*cached_map_name);
+		}
+
+		if(!map_loaded)
+		{
+			progress_dlg.cancel();
+			QMessageBox::critical(this, "Error",
+				"No suitable source maps could be found. "
+				"Please provide .osm.pbf files.");
 		}
 	}
 
@@ -706,6 +717,14 @@ void TrackInfos::PlotMap(bool load_cached)
 		m_map_image = QByteArray{ostr.str().c_str(), static_cast<int>(ostr.str().size())};
 		m_map->load(m_map_image);
 	}
+
+	if(map_loaded)
+		emit StatusMessageChanged("Map successfully loaded.");
+	else if(!load_cached)
+		emit StatusMessageChanged("Error: No map could be generated.");
+	else
+		emit StatusMessageChanged("No map available for this track.");
+
 
 	/*MapPlotter map;
 	if(map.Import(m_mapfile->text().toStdString(),
