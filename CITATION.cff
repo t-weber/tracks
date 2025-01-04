@@ -1,0 +1,17 @@
+#
+# citation file
+# @see: https://github.com/citation-file-format/citation-file-format/blob/main/schema-guide.md
+#
+
+cff-version: 1.2.0
+type: software
+title: Tracks
+message: Visualisation of running 🏃 tracks.
+doi: 10.5281/zenodo.14597733
+authors:
+  - family-names: Weber
+    given-names: Tobias
+    email: tobias.weber@tum.de
+    orcid: "https://orcid.org/0000-0002-7230-1932"
+license: GPL-3.0-only
+repository-code: "https://github.com/t-weber/tracks/"
