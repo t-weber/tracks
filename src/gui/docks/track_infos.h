@@ -18,6 +18,7 @@
 #include <QtWidgets/QLineEdit>
 #include <QtWidgets/QDoubleSpinBox>
 #include <QtWidgets/QMenu>
+#include <QtWidgets/QCalendarWidget>
 
 // https://gcc.gnu.org/onlinedocs/gcc/Diagnostic-Pragmas.html
 #pragma GCC diagnostic push
@@ -78,9 +79,10 @@ protected:
 
 
 private:
-	std::shared_ptr<QSplitter> m_split{};
+	std::shared_ptr<QSplitter> m_split{}, m_split_infos{};
 	std::shared_ptr<QTabWidget> m_tab{};
 	std::shared_ptr<QTextEdit> m_infos{};
+	std::shared_ptr<QCalendarWidget> m_calendar{};
 
 	// track tab
 	std::shared_ptr<QCustomPlot> m_track_plot{};

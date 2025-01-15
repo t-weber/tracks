@@ -15,6 +15,7 @@ namespace fs = __map_fs;
 #include <QtWidgets/QGridLayout>
 #include <QtWidgets/QPushButton>
 #include <QtWidgets/QLabel>
+#include <QtWidgets/QScrollArea>
 #include <QtWidgets/QFileDialog>
 #include <QtWidgets/QProgressDialog>
 #include <QtWidgets/QMessageBox>
@@ -235,10 +236,24 @@ TrackInfos::TrackInfos(QWidget* parent) : QWidget{parent}
 	m_infos = std::make_shared<QTextEdit>(this);
 	m_infos->setReadOnly(true);
 
+	// calendar
+	m_calendar = std::make_shared<QCalendarWidget>(this);
+	m_calendar->setDateEditEnabled(false);
+	m_calendar->setSelectionMode(QCalendarWidget::NoSelection);
+	QScrollArea *scroll_calendar = new QScrollArea(this);
+	scroll_calendar->setWidget(m_calendar.get());
+
+	m_split_infos = std::make_shared<QSplitter>(this);
+	m_split_infos->setOrientation(Qt::Horizontal);
+	m_split_infos->addWidget(m_infos.get());
+	m_split_infos->addWidget(scroll_calendar);
+	m_split_infos->setStretchFactor(0, 10);
+	m_split_infos->setStretchFactor(1, 1);
+
 	m_split = std::make_shared<QSplitter>(this);
 	m_split->setOrientation(Qt::Vertical);
 	m_split->addWidget(m_tab.get());
-	m_split->addWidget(m_infos.get());
+	m_split->addWidget(m_split_infos.get());
 	m_split->setStretchFactor(0, 10);
 	m_split->setStretchFactor(1, 1);
 
@@ -264,6 +279,18 @@ void TrackInfos::ShowTrack(const t_track& track)
 
 	// print track infos
 	m_infos->setHtml(track.PrintHtml(g_prec_gui).c_str());
+
+	// set day in calendar
+	t_real epoch = std::chrono::duration_cast<typename t_track::t_sec>(
+		m_track->GetStartTime()->time_since_epoch()).count();
+	auto [year, mon, day] = date_from_epoch<typename t_track::t_clk>(epoch);
+	m_calendar->setCurrentPage(year, mon);
+	m_calendar->setNavigationBarVisible(true);
+	m_calendar->setHorizontalHeaderFormat(QCalendarWidget::SingleLetterDayNames);
+	m_calendar->setVerticalHeaderFormat(QCalendarWidget::NoVerticalHeader);
+	QDate date{year, mon, day};
+	m_calendar->setDateRange(date, date);
+	m_calendar->setSelectedDate(date);
 
 	PlotTrack();
 	PlotPace();
@@ -1008,6 +1035,10 @@ void TrackInfos::SaveSettings(QSettings& settings)
 {
 	QByteArray split{m_split->saveState()};
 	settings.setValue("track_info/split", split);
+
+	QByteArray split_infos{m_split_infos->saveState()};
+	settings.setValue("track_info/split_infos", split_infos);
+
 	settings.setValue("track_info/keep_aspect", m_same_range->isChecked());
 	settings.setValue("track_info/recent_maps", m_mapdir.c_str());
 	settings.setValue("track_info/recent_svgs", m_svgdir.c_str());
@@ -1023,6 +1054,10 @@ void TrackInfos::RestoreSettings(QSettings& settings)
 	QByteArray split = settings.value("track_info/split").toByteArray();
 	if(split.size())
 		m_split->restoreState(split);
+
+	QByteArray split_infos = settings.value("track_info/split_infos").toByteArray();
+	if(split_infos.size())
+		m_split_infos->restoreState(split_infos);
 
 	if(settings.contains("track_info/keep_aspect"))
 		m_same_range->setChecked(settings.value("track_info/keep_aspect").toBool());

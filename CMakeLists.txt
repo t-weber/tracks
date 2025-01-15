@@ -73,7 +73,7 @@ include_directories(
 	${PROJECT_SOURCE_DIR} ${PROJECT_SOURCE_DIR}/src
 	${OSMIUM_INCLUDE_DIRS}
 	${Boost_INCLUDE_DIRS} ${Boost_INCLUDE_DIRS}/..
-	${Qt5Svg_INCLUDE_DIRS}
+	${Qt5Svg_INCLUDE_DIRS} ${Qt6Svg_INCLUDE_DIRS}
 	ext/
 )
 
