@@ -239,7 +239,10 @@ TrackInfos::TrackInfos(QWidget* parent) : QWidget{parent}
 	// calendar
 	m_calendar = std::make_shared<QCalendarWidget>(this);
 	m_calendar->setDateEditEnabled(false);
+	m_calendar->setNavigationBarVisible(false);
 	m_calendar->setSelectionMode(QCalendarWidget::NoSelection);
+	m_calendar->setHorizontalHeaderFormat(QCalendarWidget::SingleLetterDayNames);
+	m_calendar->setVerticalHeaderFormat(QCalendarWidget::NoVerticalHeader);
 	QScrollArea *scroll_calendar = new QScrollArea(this);
 	scroll_calendar->setWidget(m_calendar.get());
 
@@ -285,9 +288,6 @@ void TrackInfos::ShowTrack(const t_track& track)
 		m_track->GetStartTime()->time_since_epoch()).count();
 	auto [year, mon, day] = date_from_epoch<typename t_track::t_clk>(epoch);
 	m_calendar->setCurrentPage(year, mon);
-	m_calendar->setNavigationBarVisible(true);
-	m_calendar->setHorizontalHeaderFormat(QCalendarWidget::SingleLetterDayNames);
-	m_calendar->setVerticalHeaderFormat(QCalendarWidget::NoVerticalHeader);
 	QDate date{year, mon, day};
 	m_calendar->setDateRange(date, date);
 	m_calendar->setSelectedDate(date);

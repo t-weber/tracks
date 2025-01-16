@@ -27,6 +27,7 @@
 
 // dialogs
 #include "dialogs/conversions.h"
+#include "dialogs/distances.h"
 #include "dialogs/statistics.h"
 #include "dialogs/reports.h"
 #include "dialogs/summary.h"
@@ -103,6 +104,7 @@ public:
 	// dialogs
 	void ShowSettings(bool only_create = false);
 	void ShowConversions();
+	void ShowDistances();
 	void ShowStatistics();
 	void ShowReports();
 	void ShowSummary();
@@ -154,6 +156,7 @@ private:
 
 	// dialogs
 	std::shared_ptr<Conversions> m_conversions{};
+	std::shared_ptr<Distances> m_distances{};
 	std::shared_ptr<Statistics> m_statistics{};
 	std::shared_ptr<Reports> m_reports{};
 	std::shared_ptr<Summary> m_summary{};

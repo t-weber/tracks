@@ -26,9 +26,6 @@
 #include "../globals.h"
 
 
-/**
- * widget for listing tracks
- */
 class Conversions : public QDialog
 { Q_OBJECT
 public:

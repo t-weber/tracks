@@ -237,10 +237,15 @@ void TracksWnd::SetupGUI()
 	QMenu *menuTools = new QMenu{"Tools", this};
 
 	QIcon iconConversions = QIcon::fromTheme("accessories-calculator");
-	QAction *actionConversions = new QAction{iconConversions, "Speed Conversions...", this};
+	QAction *actionConversions = new QAction{iconConversions, "Speed Conversion...", this};
 	connect(actionConversions, &QAction::triggered, this, &TracksWnd::ShowConversions);
 
+	QIcon iconDistances = QIcon::fromTheme("accessories-calculator");
+	QAction *actionDistances = new QAction{iconConversions, "Distance Calculation...", this};
+	connect(actionDistances, &QAction::triggered, this, &TracksWnd::ShowDistances);
+
 	menuTools->addAction(actionConversions);
+	menuTools->addAction(actionDistances);
 	// ------------------------------------------------------------------------
 
 
@@ -921,7 +926,7 @@ void TracksWnd::CreateTempDir()
 
 
 /**
- * show speed conversions dialog
+ * show speed conversion dialog
  */
 void TracksWnd::ShowConversions()
 {
@@ -929,6 +934,18 @@ void TracksWnd::ShowConversions()
 		m_conversions = std::make_shared<Conversions>(this);
 
 	show_dialog(m_conversions.get());
+}
+
+
+/**
+ * show distance calculation dialog
+ */
+void TracksWnd::ShowDistances()
+{
+	if(!m_distances)
+		m_distances = std::make_shared<Distances>(this);
+
+	show_dialog(m_distances.get());
 }
 
 

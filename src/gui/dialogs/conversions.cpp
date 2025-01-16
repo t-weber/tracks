@@ -21,7 +21,7 @@
 Conversions::Conversions(QWidget* parent)
 	: QDialog(parent)
 {
-	setWindowTitle("Speed Conversions");
+	setWindowTitle("Speed Conversion");
 	setSizeGripEnabled(true);
 
 	// plot

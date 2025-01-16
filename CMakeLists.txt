@@ -103,6 +103,7 @@ add_executable(tracks
 
 	# dialogs
 	src/gui/dialogs/conversions.cpp src/gui/dialogs/conversions.h
+	src/gui/dialogs/distances.cpp src/gui/dialogs/distances.h
 	src/gui/dialogs/statistics.cpp src/gui/dialogs/statistics.h
 	src/gui/dialogs/reports.cpp src/gui/dialogs/reports.h
 	src/gui/dialogs/summary.cpp src/gui/dialogs/summary.h
