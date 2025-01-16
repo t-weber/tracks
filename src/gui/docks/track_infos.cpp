@@ -67,6 +67,7 @@ TrackInfos::TrackInfos(QWidget* parent) : QWidget{parent}
 	connect(m_track_plot.get(), &QCustomPlot::mousePress, [this](QMouseEvent *evt)
 	{
 		PlotMouseClick(evt, m_track_context.get(), m_track_plot.get());
+		TrackPlotMouseClick(evt);
 	});
 
 	m_track_context = std::make_shared<QMenu>(plot_panel);
@@ -198,6 +199,7 @@ TrackInfos::TrackInfos(QWidget* parent) : QWidget{parent}
 	connect(m_map.get(), &MapDrawer::MousePressed, [this](QMouseEvent *evt)
 	{
 		PlotMouseClick(evt, m_map_context.get(), m_map.get());
+		MapMouseClick(evt);
 	});
 
 	m_map_context = std::make_shared<QMenu>(map_panel);
@@ -425,9 +427,7 @@ void TrackInfos::ResetAltPlotRange()
 	t_real alt_range = m_max_alt - m_min_alt;
 
 	m_alt_plot->xAxis->setRange(m_min_dist_alt, m_max_dist_alt);
-	m_alt_plot->yAxis->setRange(
-		m_min_alt - alt_range / 20.,
-		m_max_alt + alt_range / 20.);
+	m_alt_plot->yAxis->setRange(m_min_alt - alt_range / 20., m_max_alt + alt_range / 20.);
 
 	m_alt_plot->replot();
 }
@@ -502,9 +502,7 @@ void TrackInfos::ResetPacePlotRange()
 	t_real pace_range = m_max_pace - m_min_pace;
 
 	m_pace_plot->xAxis->setRange(m_min_dist, m_max_dist);
-	m_pace_plot->yAxis->setRange(
-		m_min_pace - pace_range / 20.,
-		m_max_pace + pace_range / 20.);
+	m_pace_plot->yAxis->setRange(m_min_pace - pace_range / 20., m_max_pace + pace_range / 20.);
 
 	m_pace_plot->replot();
 }
@@ -878,13 +876,10 @@ void TrackInfos::Clear()
 
 
 /**
- * the mouse has moved in the track plot widget
+ * get the longitude and latitude at the mouse position
  */
-void TrackInfos::TrackPlotMouseMove(QMouseEvent *evt)
+std::pair<t_real, t_real> TrackInfos::GetTrackPlotCoords(QMouseEvent *evt, bool deg) const
 {
-	if(!m_track_plot)
-		return;
-
 #if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
 	qreal x = evt->position().x();
 	qreal y = evt->position().y();
@@ -896,7 +891,39 @@ void TrackInfos::TrackPlotMouseMove(QMouseEvent *evt)
 	t_real longitude = m_track_plot->xAxis->pixelToCoord(x);
 	t_real latitude = m_track_plot->yAxis->pixelToCoord(y);
 
+	if(!deg)
+	{
+		longitude *= num::pi_v<t_real> / t_real(180);
+		latitude *= num::pi_v<t_real> / t_real(180);
+	}
+
+	return std::make_pair(longitude, latitude);
+}
+
+
+/**
+ * the mouse has moved in the track plot widget
+ */
+void TrackInfos::TrackPlotMouseMove(QMouseEvent *evt)
+{
+	if(!m_track_plot)
+		return;
+
+	auto [ longitude, latitude ] = GetTrackPlotCoords(evt, true);
 	emit PlotCoordsChanged(longitude, latitude);
+}
+
+
+/**
+ * the mouse has been clicked in the track plot widget
+ */
+void TrackInfos::TrackPlotMouseClick(QMouseEvent *evt)
+{
+	if(!m_track_plot)
+		return;
+
+	auto [ longitude, latitude ] = GetTrackPlotCoords(evt, true);
+	emit PlotCoordsSelected(longitude, latitude);
 }
 
 
@@ -964,13 +991,10 @@ void TrackInfos::AltPlotMouseMove(QMouseEvent *evt)
 
 
 /**
- * the mouse has moved in the map widget
+ * get the longitude and latitude at the mouse position
  */
-void TrackInfos::MapMouseMove(QMouseEvent *evt)
+std::pair<t_real, t_real> TrackInfos::GetMapCoords(QMouseEvent *evt, bool deg) const
 {
-	if(!m_map)
-		return;
-
 #if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
 	qreal x = evt->position().x();
 	qreal y = evt->position().y();
@@ -988,13 +1012,46 @@ void TrackInfos::MapMouseMove(QMouseEvent *evt)
 	t_real lon_range = m_max_long_plot - m_min_long_plot;
 	t_real lat_range = m_max_lat_plot - m_min_lat_plot;
 
-	t_real lon = std::lerp(m_min_long_plot - lon_range/20., m_max_long_plot + lon_range/20., x);
-	t_real lat = std::lerp(m_min_lat_plot - lat_range/20., m_max_lat_plot + lat_range/20., y);
+	t_real lon = std::lerp(
+		m_min_long_plot - lon_range*g_map_overdraw/2.,
+		m_max_long_plot + lon_range*g_map_overdraw/2., x);
+	t_real lat = std::lerp(
+		m_min_lat_plot - lat_range*g_map_overdraw/2.,
+		m_max_lat_plot + lat_range*g_map_overdraw/2., y);
 
-	lon *= t_real(180) / num::pi_v<t_real>;
-	lat *= t_real(180) / num::pi_v<t_real>;
+	if(deg)
+	{
+		lon *= t_real(180) / num::pi_v<t_real>;
+		lat *= t_real(180) / num::pi_v<t_real>;
+	}
 
+	return std::make_pair(lon, lat);
+}
+
+
+/**
+ * the mouse has moved in the map widget
+ */
+void TrackInfos::MapMouseMove(QMouseEvent *evt)
+{
+	if(!m_map)
+		return;
+
+	auto [ lon, lat ] = GetMapCoords(evt, true);
 	emit PlotCoordsChanged(lon, lat);
+}
+
+
+/**
+ * the mouse has been clicked in the map widget
+ */
+void TrackInfos::MapMouseClick(QMouseEvent *evt)
+{
+	if(!m_map)
+		return;
+
+	auto [ lon, lat ] = GetMapCoords(evt, true);
+	emit PlotCoordsSelected(lon, lat);
 }
 
 

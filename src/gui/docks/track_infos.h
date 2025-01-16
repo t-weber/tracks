@@ -59,12 +59,16 @@ protected:
 	void PlotMouseClick(QMouseEvent *evt, QMenu *context, QWidget *plot);
 	void SavePlotPdf(QCustomPlot *plot, const char *name);
 
+	std::pair<t_real, t_real> GetTrackPlotCoords(QMouseEvent *evt, bool deg = true) const;
 	void TrackPlotMouseMove(QMouseEvent *evt);
+	void TrackPlotMouseClick(QMouseEvent *evt);
 	void CalcTrackPlotRange();
 	void ResetTrackPlotRange();
 	void PlotTrack();
 
+	std::pair<t_real, t_real> GetMapCoords(QMouseEvent *evt, bool deg = true) const;
 	void MapMouseMove(QMouseEvent *evt);
+	void MapMouseClick(QMouseEvent *evt);
 	void SelectMap();
 	void PlotMap(bool load_cached = false);
 	void SaveMapSvg();
@@ -135,7 +139,8 @@ private:
 
 
 signals:
-	void PlotCoordsChanged(t_real, t_real);
+	void PlotCoordsChanged(t_real, t_real);     // mouse moved in track or map
+	void PlotCoordsSelected(t_real, t_real);    // mouse clicked in track or map
 	void StatusMessageChanged(const QString&);
 };
 

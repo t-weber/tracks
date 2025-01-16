@@ -943,7 +943,12 @@ void TracksWnd::ShowConversions()
 void TracksWnd::ShowDistances()
 {
 	if(!m_distances)
+	{
 		m_distances = std::make_shared<Distances>(this);
+
+		connect(m_track->GetWidget(), &TrackInfos::PlotCoordsSelected,
+			m_distances.get(), &Distances::PlotCoordsSelected);
+	}
 
 	show_dialog(m_distances.get());
 }

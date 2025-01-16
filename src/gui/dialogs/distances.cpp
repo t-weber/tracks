@@ -61,6 +61,11 @@ Distances::Distances(QWidget* parent)
 	m_result = std::make_shared<QLineEdit>(this);
 	m_result->setReadOnly(true);
 
+	// accept coordinates from main map
+	m_accept_coords = std::make_shared<QCheckBox>("Accept Coordinates", this);
+	m_accept_coords->setToolTip("Select coordinates by clicking on the main track or map.");
+	m_accept_coords->setChecked(true);
+
 	// status bar
 	//m_status = std::make_shared<QLabel>(this);
 
@@ -116,6 +121,7 @@ Distances::Distances(QWidget* parent)
 	mainlayout->addWidget(m_latitude_end.get(), 1, 3, 1, 1);
 	mainlayout->addWidget(labResult, 2, 0, 1, 1);
 	mainlayout->addWidget(m_result.get(), 2, 1, 1, 1);
+	mainlayout->addWidget(m_accept_coords.get(), 2, 2, 1, 2);
 	mainlayout->addItem(new QSpacerItem(4, 4, QSizePolicy::Preferred, QSizePolicy::Expanding), 3, 0, 1, 4);
 	mainlayout->addWidget(panel, 4, 0, 1, 4);
 
@@ -130,6 +136,9 @@ Distances::Distances(QWidget* parent)
 	{
 		this->resize(512, 128);
 	}
+
+	if(settings.contains("dlg_distances/accept_coords"))
+		m_accept_coords->setChecked(settings.value("dlg_distances/accept_coords").toBool());
 
 	Calculate();
 }
@@ -179,12 +188,40 @@ void Distances::Calculate()
 }
 
 
+void Distances::PlotCoordsSelected(t_real longitude, t_real latitude)
+{
+	if(m_accept_coords && !m_accept_coords->isChecked())
+		return;
+
+	QDoubleSpinBox *lon = m_longitude_start.get();
+	QDoubleSpinBox *lat = m_latitude_start.get();
+
+	if(m_active_elem)
+	{
+		lon = m_longitude_start.get();
+		lat = m_latitude_start.get();
+	}
+	else
+	{
+		lon = m_longitude_end.get();
+		lat = m_latitude_end.get();
+	}
+
+	lon->setValue(longitude);
+	lat->setValue(latitude);
+
+	m_active_elem = !m_active_elem;
+}
+
+
 void Distances::accept()
 {
 	// save settings
 	QSettings settings{this};
 	QByteArray geo{this->saveGeometry()};
 	settings.setValue("dlg_distances/wnd_geo", geo);
+
+	settings.setValue("dlg_distances/accept_coords", m_accept_coords->isChecked());
 
 	QDialog::accept();
 }
