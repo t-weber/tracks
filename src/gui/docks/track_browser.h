@@ -9,6 +9,7 @@
 #define __TRACKS_BROWSER_H__
 
 #include <QtWidgets/QWidget>
+#include <QtWidgets/QLineEdit>
 #include <QtWidgets/QListWidget>
 
 #include <memory>
@@ -40,6 +41,9 @@ public:
 	void SelectTrack(t_size idx);
 	void DeleteSelectedTracks();
 
+	void SearchTrack(const QString& name);
+	void SearchNextTrack();
+
 	void SetFocus();
 
 
@@ -49,6 +53,9 @@ protected:
 
 private:
 	std::shared_ptr<QListWidget> m_list{};
+	std::shared_ptr<QLineEdit> m_search{};
+
+	QList<QListWidgetItem*> m_search_results{};
 
 	// an index considered invalid
 	static constexpr t_size m_invalid_idx = std::numeric_limits<t_size>::max();

@@ -209,7 +209,7 @@ TrackInfos::TrackInfos(QWidget* parent) : QWidget{parent}
 	m_map_context->addAction(actionSaveSvg);
 
 	m_mapfile = std::make_shared<QLineEdit>(map_panel);
-	m_mapfile->setPlaceholderText("Directory with Map Files (.osm.pbf)");
+	m_mapfile->setPlaceholderText("Directory with Map Files (.osm.pbf).");
 	m_mapfile->setToolTip("Directory containing map files.");
 
 	QPushButton *btn_browse_map = new QPushButton(map_panel);

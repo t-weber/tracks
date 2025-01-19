@@ -68,6 +68,7 @@ public:
 	using t_dur = typename t_clk::duration;
 	using t_sec = std::chrono::duration<t_real, std::ratio<1, 1>>;
 	using t_TrackPoint = TrackPoint<t_timept, t_real>;
+	using t_char = typename std::string::value_type;
 
 
 
@@ -82,9 +83,6 @@ public:
 	 */
 	void Calculate()
 	{
-		// minimum height difference [m] before counted as climb
-		const t_real asc_eps = 1.;
-
 		// clear old values
 		m_total_dist = 0.;
 		m_total_dist_planar = 0.;
@@ -101,6 +99,7 @@ public:
 		m_max_long = -m_min_long;
 
 		std::optional<t_real> latitude_last, longitude_last, elevation_last;
+		std::optional<t_real> elevation_last_asc;
 		std::optional<t_timept> time_pt_last;
 
 		// get distance function
@@ -132,14 +131,20 @@ public:
 					*elevation_last, trackpt.elevation);
 			}
 
-			// ascent and descent (TODO)
-			if(elevation_last)
+			// ascent and descent
+			if(elevation_last_asc)
 			{
-				t_real elev_diff = trackpt.elevation - *elevation_last;
-				if(elev_diff > asc_eps)
+				t_real elev_diff = trackpt.elevation - *elevation_last_asc;
+				if(elev_diff > m_asc_eps)
+				{
 					m_ascent += elev_diff;
-				else if(elev_diff < asc_eps)
+					elevation_last_asc = trackpt.elevation;
+				}
+				else if(elev_diff < -m_asc_eps)
+				{
 					m_descent += -elev_diff;
+					elevation_last_asc = trackpt.elevation;
+				}
 			}
 
 			// cumulative values
@@ -164,6 +169,8 @@ public:
 			longitude_last = trackpt.longitude;
 			elevation_last = trackpt.elevation;
 			time_pt_last = trackpt.timept;
+			if(!elevation_last_asc)  // only first point
+				elevation_last_asc = trackpt.elevation;
 		}
 	}
 
@@ -359,6 +366,21 @@ public:
 
 
 
+	const std::string& GetComment() const
+	{
+		return m_comment;
+	}
+
+
+
+	void SetComment(const std::string& comment)
+	{
+		m_comment = comment;
+	}
+
+
+
+
 	t_real GetTotalDistance(bool planar = false) const
 	{
 		return planar ? m_total_dist_planar : m_total_dist;
@@ -415,6 +437,16 @@ public:
 
 
 
+	/**
+	 * minimum height difference [m] before being counted as climb
+	 */
+	void SetAscentEpsilon(t_real eps)
+	{
+		m_asc_eps = eps;
+	}
+
+
+
 	bool Save(std::ofstream& ofstr) const
 	{
 		if(!ofstr)
@@ -466,7 +498,12 @@ public:
 		// write track name
 		const t_size name_len = m_filename.size();
 		ofstr.write(reinterpret_cast<const char*>(&name_len), sizeof(name_len));
-		ofstr.write(reinterpret_cast<const char*>(m_filename.data()), m_filename.size() * sizeof(char));
+		ofstr.write(reinterpret_cast<const char*>(m_filename.data()), m_filename.size() * sizeof(t_char));
+
+		// write comment
+		const t_size comment_len = m_comment.size();
+		ofstr.write(reinterpret_cast<const char*>(&comment_len), sizeof(comment_len));
+		ofstr.write(reinterpret_cast<const char*>(m_comment.data()), m_comment.size() * sizeof(t_char));
 
 		return true;
 	}
@@ -530,7 +567,13 @@ public:
 		t_size name_len{};
 		ifstr.read(reinterpret_cast<char*>(&name_len), sizeof(name_len));
 		m_filename.resize(name_len);
-		ifstr.read(reinterpret_cast<char*>(m_filename.data()), m_filename.size() * sizeof(char));
+		ifstr.read(reinterpret_cast<char*>(m_filename.data()), m_filename.size() * sizeof(t_char));
+
+		// read comment
+		t_size comment_len{};
+		ifstr.read(reinterpret_cast<char*>(&comment_len), sizeof(comment_len));
+		m_comment.resize(comment_len);
+		ifstr.read(reinterpret_cast<char*>(m_comment.data()), m_comment.size() * sizeof(t_char));
 
 		if(recalculate)
 		{
@@ -553,7 +596,7 @@ public:
 		t_real s = GetTotalDistance(false);
 		t_real s_planar = GetTotalDistance(true);
 		auto [ min_elev, max_elev ] = GetElevationRange();
-		//auto [ asc, desc ] = GetAscentDescent();
+		auto [ asc, desc ] = GetAscentDescent();
 		std::optional<t_timept> start_time = GetStartTime();
 		std::optional<t_timept> end_time = GetEndTime();
 
@@ -570,14 +613,15 @@ public:
 		}
 		ostr << "<li><b>Altitude range</b>: [ " << min_elev << ", " << max_elev << " ] m"
 			<< " (height difference: " << max_elev - min_elev << " m).</li>";
-		// TODO
-		//ostr << "<li><b>Climb</b>: " << asc << " m, <b>fall</b>: " << desc << " m.</li>";
+		ostr << "<li><b>Climb</b>: " << asc << " m, <b>down</b>: " << desc << " m.</li>";
 		ostr << "<li><b>Distance</b>: " << s / 1000. << " km"
 			<< " (planar: " << s_planar / 1000. << " km).</li>";
 		ostr << "<li><b>Pace</b>: " << get_pace_str((t / 60.) / (s / 1000.))
 			<< " (planar: " << get_pace_str((t / 60.) / (s_planar / 1000.)) << ").</li>";
-		ostr << "<li><b>Speed</b>: " << s / t << " m/s" << " = " << (s / 1000.) / (t / 60. / 60.) << " km/h"
-			<< " (planar: " << s_planar / t << " m/s" << " = " << (s_planar / 1000.) / (t / 60. / 60.) << " km/h).</li>";
+		ostr << "<li><b>Speed</b>: " << (s / 1000.) / (t / 60. / 60.) << " km/h"
+			<< " = " << s / t << " m/s" << " (planar: "
+			<< (s_planar / 1000.) / (t / 60. / 60.) << " km/h"
+			<< " = " << s_planar / t << " m/s" << ").</li>";
 
 		ostr << "</ul>";
 		ostr << "</html>";
@@ -675,6 +719,7 @@ private:
 
 	std::string m_filename{};
 	std::string m_version{}, m_creator{};
+	std::string m_comment{};
 
 	t_real m_total_time{};
 	t_real m_total_dist_planar{};
@@ -684,6 +729,8 @@ private:
 	t_real m_min_long{}, m_max_long{};
 	t_real m_min_elev{}, m_max_elev{};
 
+	// minimum height difference [m] before being counted as climb
+	t_real m_asc_eps{10.};
 	t_real m_ascent{}, m_descent{};
 
 	int m_distance_function{0};

@@ -38,12 +38,20 @@ TrackBrowser::TrackBrowser(QWidget* parent)
 		DeleteSelectedTracks();
 	});
 
+	// search field
+	m_search = std::make_shared<QLineEdit>(this);
+	m_search->setPlaceholderText("Search for a track.");
+	m_search->setClearButtonEnabled(true);
+
+	// layout
 	QGridLayout *mainlayout = new QGridLayout(this);
 	mainlayout->setContentsMargins(4, 4, 4, 4);
 	mainlayout->setVerticalSpacing(4);
 	mainlayout->setHorizontalSpacing(4);
 	mainlayout->addWidget(m_list.get(), 0, 0, 1, 1);
+	mainlayout->addWidget(m_search.get(), 1, 0, 1, 1);
 
+	// connections
 	connect(m_list.get(), &QListWidget::currentRowChanged,
 		[this](int row)
 	{
@@ -75,6 +83,11 @@ TrackBrowser::TrackBrowser(QWidget* parent)
 
 		context_menu->popup(m_list->mapToGlobal(pt));
 	});
+
+	connect(m_search.get(), &QLineEdit::textChanged,
+		this, &TrackBrowser::SearchTrack);
+	connect(m_search.get(), &QLineEdit::returnPressed,
+		this, &TrackBrowser::SearchNextTrack);
 }
 
 
@@ -167,10 +180,10 @@ void TrackBrowser::AddTrack(const std::string& name, t_size idx,
 
 void TrackBrowser::ClearTracks()
 {
-	if(!m_list)
-		return;
+	if(m_list)
+		m_list->clear();
 
-	m_list->clear();
+	//m_search_results.clear();
 }
 
 
@@ -233,6 +246,57 @@ void TrackBrowser::SelectTrack(t_size idx)
 			m_list->setCurrentItem(item);
 			break;
 		}
+	}
+}
+
+
+/**
+ * search for a track containing the given name and select it
+ */
+void TrackBrowser::SearchTrack(const QString& name)
+{
+	if(!m_list || name == "")
+		return;
+
+	m_search_results = m_list->findItems(name, Qt::MatchContains);
+	if(m_search_results.size() == 0)
+		return;
+
+	m_list->setCurrentItem(*m_search_results.begin());
+}
+
+
+/**
+ * select the next track in the search results
+ */
+void TrackBrowser::SearchNextTrack()
+{
+	if(!m_list || m_search_results.size() == 0)
+		return;
+
+	QListWidgetItem *cur = m_list->currentItem();
+	if(!cur)
+	{
+		// nothing selected -> select first result
+		m_list->setCurrentItem(*m_search_results.begin());
+		return;
+	}
+
+	// if the current item is in the search results, select the next result
+	if(int idx = m_search_results.indexOf(cur); idx >= 0)
+	{
+		++idx;
+
+		// after last result -> wrap around
+		if(idx >= m_search_results.size())
+			m_list->setCurrentItem(*m_search_results.begin());
+		else
+			m_list->setCurrentItem(m_search_results[idx]);
+	}
+	else
+	{
+		// nothing found -> select first result
+		m_list->setCurrentItem(*m_search_results.begin());
 	}
 }
 

@@ -39,6 +39,9 @@ extern bool g_reload_last;
 // distance calculation function index
 extern int g_dist_func;
 
+// minimum height difference [m] before being counted as climb
+extern t_real g_asc_eps;
+
 
 // assumed time interval if non is given (for import)
 extern t_real g_assume_dt;

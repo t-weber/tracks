@@ -195,7 +195,7 @@ void TracksWnd::SetupGUI()
 	connect(actionResort, &QAction::triggered, [this]()
 	{
 		PopulateTrackList(true);
-		SetStatusMessage("Resorted all values.");
+		SetStatusMessage("Resorted all tracks.");
 	});
 
 	QIcon iconStatistics = QIcon::fromTheme("applications-science");
@@ -754,14 +754,22 @@ bool TracksWnd::FileImport()
 	if(!ImportFiles(files))
 	{
 		QMessageBox::critical(this, "Error",
-			QString("Selected files could not be imported.").arg(files[0]));
+			QString("Selected files could not be imported."));
 		return false;
 	}
 
 	fs::path file{files[0].toStdString()};
 	m_recent.SetRecentImportDir(file.parent_path().string().c_str());
-	SetWindowModified(true);
 
+	if(QMessageBox::question(this, "Sort Tracks?",
+		"New tracks have been inserted to the end of the list. "
+		"Re-sort the track list?") == QMessageBox::Yes)
+	{
+		PopulateTrackList(true);
+		SetStatusMessage(QString("%1 track(s) imported and sorted.").arg(files.size()));
+	}
+
+	SetWindowModified(true);
 	return true;
 }
 
@@ -810,6 +818,7 @@ bool TracksWnd::ImportFiles(const QStringList& filenames)
 	{
 		t_track track{};
 		track.SetDistanceFunction(g_dist_func);
+		track.SetAscentEpsilon(g_asc_eps);
 
 		if(!track.Import(filename.toStdString(), g_assume_dt))
 		{
@@ -823,7 +832,7 @@ bool TracksWnd::ImportFiles(const QStringList& filenames)
 		m_trackdb.EmplaceTrack(std::move(track));
 	}
 
-	SetStatusMessage(QString("Imported %1 file(s).").arg(filenames.size()));
+	SetStatusMessage(QString("%1 track(s) imported.").arg(filenames.size()));
 	return true;
 }
 
@@ -844,6 +853,8 @@ void TracksWnd::ShowSettings(bool only_create)
 			"Number precision:", g_prec_gui, 0, 99, 1);
 		m_settings->AddDoubleSpinbox("settings/epsilon",
 			"Calculation epsilon:", g_eps, 0., 1., 1e-6, 8);
+		m_settings->AddDoubleSpinbox("settings/epsilon_ascent",
+			"Ascent epsilon:", g_asc_eps, 0.1, 999., 1., 1, " m");
 		m_settings->AddCombobox("settings/distance_function",
 			"Distance calculation:",
 			{ "Haversine Formula", "Thomas Formula",
@@ -885,6 +896,8 @@ void TracksWnd::ApplySettings()
 		value<decltype(g_prec_gui)>();
 	g_eps = m_settings->GetValue("settings/epsilon").
 		value<decltype(g_eps)>();
+	g_asc_eps = m_settings->GetValue("settings/epsilon_ascent").
+		value<decltype(g_asc_eps)>();
 	g_dist_func = m_settings->GetValue("settings/distance_function").
 		value<decltype(g_dist_func)>();
 	g_assume_dt = m_settings->GetValue("settings/assume_dt").
@@ -903,6 +916,7 @@ void TracksWnd::ApplySettings()
 
 	CreateTempDir();
 	m_trackdb.SetDistanceFunction(g_dist_func);
+	m_trackdb.SetAscentEpsilon(g_asc_eps);
 	update();
 }
 

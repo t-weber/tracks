@@ -35,9 +35,11 @@ public:
 		std::tuple<t_real /*dist*/, t_real /*time*/, t_size /*# tracks*/>>;
 
 
+
 public:
 	MultipleTracks() = default;
 	~MultipleTracks() = default;
+
 
 
 	t_track* GetTrack(t_size idx)
@@ -49,6 +51,7 @@ public:
 	}
 
 
+
 	const t_track* GetTrack(t_size idx) const
 	{
 		if(idx >= GetTrackCount())
@@ -58,18 +61,23 @@ public:
 	}
 
 
+
 	void EmplaceTrack(t_track&& track)
 	{
 		m_tracks.emplace_back(std::forward<t_track>(track));
 		m_tracks.rbegin()->SetDistanceFunction(m_distance_function);
+		m_tracks.rbegin()->SetAscentEpsilon(m_asc_eps);
 	}
+
 
 
 	void AddTrack(const t_track& track)
 	{
 		m_tracks.push_back(track);
 		m_tracks.rbegin()->SetDistanceFunction(m_distance_function);
+		m_tracks.rbegin()->SetAscentEpsilon(m_asc_eps);
 	}
+
 
 
 	t_size GetTrackCount() const
@@ -78,10 +86,12 @@ public:
 	}
 
 
+
 	void ClearTracks()
 	{
 		m_tracks.clear();
 	}
+
 
 
 	void DeleteTrack(t_size idx)
@@ -91,6 +101,7 @@ public:
 
 		m_tracks.erase(m_tracks.begin() + idx);
 	}
+
 
 
 	/**
@@ -112,6 +123,7 @@ public:
 	}
 
 
+
 	/**
 	 * calculate track properties
 	 */
@@ -120,6 +132,7 @@ public:
 		for(t_track& track : m_tracks)
 			track.Calculate();
 	}
+
 
 
 	bool Save(const std::string& filename) const
@@ -159,6 +172,7 @@ public:
 	}
 
 
+
 	bool Load(const std::string& filename)
 	{
 		ClearTracks();
@@ -191,6 +205,7 @@ public:
 
 			t_track track{};
 			track.SetDistanceFunction(m_distance_function);
+			track.SetAscentEpsilon(m_asc_eps);
 			if(!track.Load(ifstr))
 				return false;
 
@@ -202,6 +217,7 @@ public:
 	}
 
 
+
 	void SetDistanceFunction(int dist_func)
 	{
 		m_distance_function = dist_func;
@@ -209,6 +225,20 @@ public:
 		for(t_track& track : m_tracks)
 			track.SetDistanceFunction(m_distance_function);
 	}
+
+
+
+	/**
+	 * minimum height difference [m] before being counted as climb
+	 */
+	void SetAscentEpsilon(t_real eps)
+	{
+		m_asc_eps = eps;
+
+		for(t_track& track : m_tracks)
+			track.SetAscentEpsilon(m_asc_eps);
+	}
+
 
 
 	/**
@@ -223,6 +253,7 @@ public:
 
 		return dist;
 	}
+
 
 
 	/**
@@ -258,10 +289,13 @@ public:
 	}
 
 
+
 private:
 	std::vector<t_track> m_tracks{};
 
 	int m_distance_function{0};
+
+	t_real m_asc_eps{10.};
 };
 
 
