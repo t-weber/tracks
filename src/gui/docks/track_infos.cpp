@@ -974,8 +974,8 @@ void TrackInfos::AltPlotMouseMove(QMouseEvent *evt)
 	qreal y = evt->y();
 #endif
 
-	t_real dist = m_pace_plot->xAxis->pixelToCoord(x);
-	t_real alt = m_pace_plot->yAxis->pixelToCoord(y);
+	t_real dist = m_alt_plot->xAxis->pixelToCoord(x);
+	t_real alt = m_alt_plot->yAxis->pixelToCoord(y);
 
 	std::ostringstream ostr;
 	ostr.precision(g_prec_gui);

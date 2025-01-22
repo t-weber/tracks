@@ -65,6 +65,8 @@ signals:
 	void NewTrackSelected(t_size idx);
 	void TrackNameChanged(t_size idx, const std::string& name);
 	void TrackDeleted(t_size idx);
+
+	void StatusMessageChanged(const QString&);
 };
 
 

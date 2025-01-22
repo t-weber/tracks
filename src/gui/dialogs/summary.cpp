@@ -23,8 +23,9 @@
 #define TAB_DURATION  2
 #define TAB_DISTANCE  3
 #define TAB_PACE      4
-#define TAB_HEIGHT    5
-#define TAB_NUM_COLS  6
+#define TAB_CLIMB     5
+#define TAB_HEIGHT    6
+#define TAB_NUM_COLS  7
 
 
 #define TRACK_IDX     Qt::UserRole + 0
@@ -51,6 +52,7 @@ Summary::Summary(QWidget* parent)
 	m_table->setHorizontalHeaderItem(TAB_DURATION, new QTableWidgetItem{"Duration"});
 	m_table->setHorizontalHeaderItem(TAB_DISTANCE, new QTableWidgetItem{"Distance"});
 	m_table->setHorizontalHeaderItem(TAB_PACE, new QTableWidgetItem{"Pace"});
+	m_table->setHorizontalHeaderItem(TAB_CLIMB, new QTableWidgetItem{"Climb"});
 	m_table->setHorizontalHeaderItem(TAB_HEIGHT, new QTableWidgetItem{"Height"});
 
 	m_table->horizontalHeader()->setDefaultSectionSize(150);
@@ -60,13 +62,28 @@ Summary::Summary(QWidget* parent)
 	connect(m_table.get(), &QTableWidget::cellDoubleClicked,
 		this, &Summary::TableDoubleClicked);
 
+	// search field
+	m_search = std::make_shared<QLineEdit>(this);
+	m_search->setPlaceholderText("Search for a track.");
+	m_search->setClearButtonEnabled(true);
+	m_search->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+
+	QPushButton *next_match = new QPushButton("Next Match", this);
+	next_match->setToolTip("Search for next matching track.");
+	next_match->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Preferred);
+
+	connect(m_search.get(), &QLineEdit::textChanged, this, &Summary::SearchTrack);
+	connect(next_match, &QAbstractButton::clicked, this, &Summary::SearchNextTrack);
+
 	// status bar
 	m_status = std::make_shared<QLabel>(this);
+	m_status->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
 
 	// button box
 	m_buttonbox = std::make_shared<QDialogButtonBox>(this);
 	m_buttonbox->setStandardButtons(QDialogButtonBox::Ok);
 	m_buttonbox->button(QDialogButtonBox::Ok)->setDefault(true);
+	m_buttonbox->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Preferred);
 
 	connect(m_buttonbox.get(), &QDialogButtonBox::clicked,
 		[this](QAbstractButton *btn) -> void
@@ -88,8 +105,10 @@ Summary::Summary(QWidget* parent)
 	status_panel_layout->setContentsMargins(0, 0, 0, 0);
 	status_panel_layout->setVerticalSpacing(0);
 	status_panel_layout->setHorizontalSpacing(0);
-	status_panel_layout->addWidget(m_status.get(), 0, 0, 1, 3);
-	status_panel_layout->addWidget(m_buttonbox.get(), 0, 3, 1, 1);
+	status_panel_layout->addWidget(m_search.get(), 0, 0, 1, 1);
+	status_panel_layout->addWidget(next_match, 0, 1, 1, 1);
+	status_panel_layout->addWidget(m_status.get(), 0, 2, 1, 3);
+	status_panel_layout->addWidget(m_buttonbox.get(), 0, 5, 1, 1);
 
 	// main grid
 	QGridLayout *main_layout = new QGridLayout(this);
@@ -133,6 +152,10 @@ Summary::Summary(QWidget* parent)
 		m_table->setColumnWidth(TAB_PACE, settings.value("dlg_summary/pace_col").toInt());
 	else
 		m_table->setColumnWidth(TAB_PACE, 115);
+	if(settings.contains("dlg_summary/climb_col"))
+		m_table->setColumnWidth(TAB_CLIMB, settings.value("dlg_summary/climb_col").toInt());
+	else
+		m_table->setColumnWidth(TAB_CLIMB, 115);
 	if(settings.contains("dlg_summary/height_col"))
 		m_table->setColumnWidth(TAB_HEIGHT, settings.value("dlg_summary/height_col").toInt());
 	else
@@ -171,6 +194,7 @@ void Summary::FillTable()
 			start_time->time_since_epoch()).count() : 0.;
 		const t_real duration = track->GetTotalTime() / 60.;
 		const t_real distance = track->GetTotalDistance() / 1000.;
+		const auto [ climb, climb_down ] = track->GetAscentDescent();
 		const auto [ min_elev, max_elev ] = track->GetElevationRange();
 		const t_real height = max_elev - min_elev;
 
@@ -180,6 +204,7 @@ void Summary::FillTable()
 		m_table->setItem(row, TAB_DURATION, new NumericTableWidgetItem<t_real>(duration, g_prec_gui, " min"));
 		m_table->setItem(row, TAB_DISTANCE, new NumericTableWidgetItem<t_real>(distance, g_prec_gui, " km"));
 		m_table->setItem(row, TAB_PACE, new NumericTableWidgetItem<t_real>(duration / distance, g_prec_gui, " min/km"));
+		m_table->setItem(row, TAB_CLIMB, new NumericTableWidgetItem<t_real>(climb, g_prec_gui, " m"));
 		m_table->setItem(row, TAB_HEIGHT, new NumericTableWidgetItem<t_real>(height, g_prec_gui, " m"));
 
 		// set all items read-only
@@ -196,6 +221,78 @@ void Summary::FillTable()
 	}
 
 	m_table->setSortingEnabled(true);
+}
+
+
+/**
+ * search for a track containing the given name and select it
+ */
+void Summary::SearchTrack(const QString& name)
+{
+	if(!m_table || name == "")
+	{
+		m_search_results.clear();
+		m_status->setText("");
+		return;
+	}
+
+	m_search_results = m_table->findItems(name, Qt::MatchContains);
+
+	m_status->setText(QString("%1 match(es).").arg(m_search_results.size()));
+	if(m_search_results.size() == 0)
+		return;
+
+	m_table->setCurrentItem(*m_search_results.begin());
+}
+
+
+/**
+ * select the next track in the search results
+ */
+void Summary::SearchNextTrack()
+{
+	if(!m_table || m_search_results.size() == 0)
+		return;
+
+	bool select_first = false;
+	if(QTableWidgetItem *cur = m_table->currentItem())
+	{
+		// if the current item is in the search results, select the next result
+		if(int idx = m_search_results.indexOf(cur); idx >= 0)
+		{
+			++idx;
+
+			if(idx >= m_search_results.size())
+			{
+				// after last result -> wrap around
+				select_first = true;
+			}
+			else
+			{
+				m_table->setCurrentItem(m_search_results[idx]);
+				m_status->setText(QString("Match %1 of %2.")
+					.arg(idx + 1)
+					.arg(m_search_results.size()));
+			}
+		}
+		else
+		{
+			// nothing found -> select first result
+			select_first = true;
+		}
+	}
+	else
+	{
+		// nothing selected -> select first result
+		select_first = true;
+	}
+
+	if(select_first)
+	{
+		m_table->setCurrentItem(*m_search_results.begin());
+		m_status->setText(QString("Match 1 of %1.").arg(m_search_results.size()));
+	}
+
 }
 
 
@@ -232,6 +329,7 @@ void Summary::accept()
 		settings.setValue("dlg_summary/duration_col", m_table->columnWidth(TAB_DURATION));
 		settings.setValue("dlg_summary/distance_col", m_table->columnWidth(TAB_DISTANCE));
 		settings.setValue("dlg_summary/pace_col", m_table->columnWidth(TAB_PACE));
+		settings.setValue("dlg_summary/climb_col", m_table->columnWidth(TAB_CLIMB));
 		settings.setValue("dlg_summary/height_col", m_table->columnWidth(TAB_HEIGHT));
 	}
 

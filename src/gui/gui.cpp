@@ -88,6 +88,11 @@ void TracksWnd::SetupGUI()
 		this, &TracksWnd::TrackNameChanged);
 	connect(m_tracks->GetWidget(), &TrackBrowser::TrackDeleted,
 		this, &TracksWnd::TrackDeleted);
+	connect(m_tracks->GetWidget(), &TrackBrowser::StatusMessageChanged,
+		[this](const QString& msg)
+	{
+		SetStatusMessage(msg);
+	});
 	connect(m_track->GetWidget(), &TrackInfos::PlotCoordsChanged,
 		this, &TracksWnd::PlotCoordsChanged);
 	connect(m_track->GetWidget(), &TrackInfos::StatusMessageChanged,
@@ -236,7 +241,7 @@ void TracksWnd::SetupGUI()
 	// tools menu
 	QMenu *menuTools = new QMenu{"Tools", this};
 
-	QIcon iconConversions = QIcon::fromTheme("accessories-calculator");
+	QIcon iconConversions = QIcon::fromTheme("applications-office");
 	QAction *actionConversions = new QAction{iconConversions, "Speed Conversion...", this};
 	connect(actionConversions, &QAction::triggered, this, &TracksWnd::ShowConversions);
 
@@ -246,6 +251,18 @@ void TracksWnd::SetupGUI()
 
 	menuTools->addAction(actionConversions);
 	menuTools->addAction(actionDistances);
+	// ------------------------------------------------------------------------
+
+
+	// ------------------------------------------------------------------------
+	// tools tool bar
+	QToolBar *toolbarTools = new QToolBar{"Tools", this};
+
+	toolbarTools->setObjectName("TracksToolbar");
+	toolbarTools->addAction(actionConversions);
+	toolbarTools->addAction(actionDistances);
+
+	addToolBar(toolbarTools);
 	// ------------------------------------------------------------------------
 
 

@@ -256,9 +256,15 @@ void TrackBrowser::SelectTrack(t_size idx)
 void TrackBrowser::SearchTrack(const QString& name)
 {
 	if(!m_list || name == "")
+	{
+		m_search_results.clear();
+		emit StatusMessageChanged("");
 		return;
+	}
 
 	m_search_results = m_list->findItems(name, Qt::MatchContains);
+	emit StatusMessageChanged(QString("%1 matching track(s).").arg(m_search_results.size()));
+
 	if(m_search_results.size() == 0)
 		return;
 
@@ -274,29 +280,44 @@ void TrackBrowser::SearchNextTrack()
 	if(!m_list || m_search_results.size() == 0)
 		return;
 
-	QListWidgetItem *cur = m_list->currentItem();
-	if(!cur)
+	bool select_first = false;
+	if(QListWidgetItem *cur = m_list->currentItem())
 	{
-		// nothing selected -> select first result
-		m_list->setCurrentItem(*m_search_results.begin());
-		return;
-	}
+		// if the current item is in the search results, select the next result
+		if(int idx = m_search_results.indexOf(cur); idx >= 0)
+		{
+			++idx;
 
-	// if the current item is in the search results, select the next result
-	if(int idx = m_search_results.indexOf(cur); idx >= 0)
-	{
-		++idx;
-
-		// after last result -> wrap around
-		if(idx >= m_search_results.size())
-			m_list->setCurrentItem(*m_search_results.begin());
+			if(idx >= m_search_results.size())
+			{
+				// after last result -> wrap around
+				select_first = true;
+			}
+			else
+			{
+				m_list->setCurrentItem(m_search_results[idx]);
+				emit StatusMessageChanged(QString("Matching track %1 of %2.")
+					.arg(idx + 1)
+					.arg(m_search_results.size()));
+			}
+		}
 		else
-			m_list->setCurrentItem(m_search_results[idx]);
+		{
+			// nothing found -> select first result
+			select_first = true;
+		}
 	}
 	else
 	{
-		// nothing found -> select first result
+		// nothing selected -> select first result
+		select_first = true;
+	}
+
+	if(select_first)
+	{
 		m_list->setCurrentItem(*m_search_results.begin());
+		emit StatusMessageChanged(QString("Matching track 1 of %1.")
+			.arg(m_search_results.size()));
 	}
 }
 

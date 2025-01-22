@@ -11,6 +11,8 @@
 #include <QtWidgets/QDialog>
 #include <QtWidgets/QLabel>
 #include <QtWidgets/QTableWidget>
+#include <QtWidgets/QTableWidgetItem>
+#include <QtWidgets/QLineEdit>
 #include <QtWidgets/QDialogButtonBox>
 
 #include <memory>
@@ -42,13 +44,19 @@ protected:
 
 	void TableDoubleClicked(int row, int col);
 
+	void SearchTrack(const QString& name);
+	void SearchNextTrack();
+
 
 private:
 	std::shared_ptr<QTableWidget> m_table{};
+	std::shared_ptr<QLineEdit> m_search{};
 	std::shared_ptr<QLabel> m_status{};
 	std::shared_ptr<QDialogButtonBox> m_buttonbox{};
 
 	const t_tracks *m_trackdb{};
+
+	QList<QTableWidgetItem*> m_search_results{};
 
 
 signals:
