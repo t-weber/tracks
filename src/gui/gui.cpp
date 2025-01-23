@@ -100,6 +100,10 @@ void TracksWnd::SetupGUI()
 	{
 		SetStatusMessage(msg);
 	});
+	connect(m_track->GetWidget(), &TrackInfos::TrackChanged, [this]()
+	{
+		SetWindowModified(true);
+	});
 
 	setDockOptions(QMainWindow::AnimatedDocks);
 	setDockNestingEnabled(false);
@@ -574,8 +578,8 @@ void TracksWnd::NewTrackSelected(t_size idx)
 		return;
 	}
 
-	const t_track *track = GetTrack(idx);
-	m_track->GetWidget()->ShowTrack(*track);
+	t_track *track = GetTrack(idx);
+	m_track->GetWidget()->ShowTrack(track);
 }
 
 

@@ -50,7 +50,7 @@ public:
 	void RestoreSettings(QSettings& settings);
 
 	void Clear();
-	void ShowTrack(const t_track& track);
+	void ShowTrack(t_track *track);
 
 
 protected:
@@ -81,8 +81,11 @@ protected:
 	void ResetAltPlotRange();
 	void PlotAlt();
 
+	void CommentChanged();
+
 
 private:
+	// main layout
 	std::shared_ptr<QSplitter> m_split{}, m_split_infos{};
 	std::shared_ptr<QTabWidget> m_tab{};
 	std::shared_ptr<QTextEdit> m_infos{};
@@ -97,6 +100,9 @@ private:
 	std::shared_ptr<MapDrawer> m_map{};
 	std::shared_ptr<QLineEdit> m_mapfile{};
 	std::shared_ptr<QMenu> m_map_context{};
+
+	// comment tab
+	std::shared_ptr<QTextEdit> m_comments{};
 
 	// altitude tab
 	std::shared_ptr<QCustomPlot> m_alt_plot{};
@@ -129,7 +135,7 @@ private:
 	t_real m_min_pace{}, m_max_pace{};
 
 	// currently selected track
-	const t_track *m_track{};
+	t_track *m_track{};
 
 	// directory with recently used map files
 	std::string m_mapdir{};
@@ -142,6 +148,7 @@ signals:
 	void PlotCoordsChanged(t_real, t_real);     // mouse moved in track or map
 	void PlotCoordsSelected(t_real, t_real);    // mouse clicked in track or map
 	void StatusMessageChanged(const QString&);
+	void TrackChanged();                        // the track has been modified
 };
 
 

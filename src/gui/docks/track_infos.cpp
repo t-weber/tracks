@@ -31,10 +31,11 @@ namespace fs = __map_fs;
 namespace num = std::numbers;
 
 
-#define TAB_TRACK  0
-#define TAB_ALT    1
-#define TAB_PACE   2
-#define TAB_MAP    3
+#define TAB_TRACK    0
+#define TAB_ALT      1
+#define TAB_PACE     2
+#define TAB_MAP      3
+#define TAB_COMMENT  4
 
 
 /**
@@ -43,14 +44,19 @@ namespace num = std::numbers;
 TrackInfos::TrackInfos(QWidget* parent) : QWidget{parent}
 {
 	m_tab = std::make_shared<QTabWidget>(this);
+
 	QWidget *plot_panel = new QWidget(m_tab.get());
 	QWidget *alt_panel = new QWidget(m_tab.get());
 	QWidget *pace_panel = new QWidget(m_tab.get());
 	QWidget *map_panel = new QWidget(m_tab.get());
+	QWidget *comment_panel = new QWidget(m_tab.get());
+
 	m_tab->addTab(plot_panel, "Track");
 	m_tab->addTab(alt_panel, "Altitude");
 	m_tab->addTab(pace_panel, "Pace");
 	m_tab->addTab(map_panel, "Map");
+	m_tab->addTab(comment_panel, "Comment");
+
 #ifndef _TRACKS_USE_OSMIUM_
 	m_tab->setTabEnabled(TAB_MAP, false);
 	map_panel->setEnabled(false);
@@ -234,6 +240,19 @@ TrackInfos::TrackInfos(QWidget* parent) : QWidget{parent}
 	map_panel_layout->addWidget(btn_browse_map, 1, 2, 1, 1);
 	map_panel_layout->addWidget(btn_calc_map, 1, 3, 1, 1);
 
+	// comment panel
+	m_comments = std::make_shared<QTextEdit>(comment_panel);
+	m_comments->setReadOnly(false);
+	m_comments->setPlaceholderText("Write a comment for this track. Markdown is supported.");
+	connect(m_comments.get(), &QTextEdit::textChanged,
+		this, &TrackInfos::CommentChanged);
+
+	QGridLayout *comment_panel_layout = new QGridLayout(comment_panel);
+	comment_panel_layout->setContentsMargins(4, 4, 4, 4);
+	comment_panel_layout->setVerticalSpacing(4);
+	comment_panel_layout->setHorizontalSpacing(4);
+	comment_panel_layout->addWidget(m_comments.get(), 0, 0, 1, 4);
+
 	// text infos
 	m_infos = std::make_shared<QTextEdit>(this);
 	m_infos->setReadOnly(true);
@@ -255,6 +274,7 @@ TrackInfos::TrackInfos(QWidget* parent) : QWidget{parent}
 	m_split_infos->setStretchFactor(0, 10);
 	m_split_infos->setStretchFactor(1, 1);
 
+	// main splitter
 	m_split = std::make_shared<QSplitter>(this);
 	m_split->setOrientation(Qt::Vertical);
 	m_split->addWidget(m_tab.get());
@@ -262,6 +282,7 @@ TrackInfos::TrackInfos(QWidget* parent) : QWidget{parent}
 	m_split->setStretchFactor(0, 10);
 	m_split->setStretchFactor(1, 1);
 
+	// main layout
 	QGridLayout *main_layout = new QGridLayout(this);
 	main_layout->setContentsMargins(4, 4, 4, 4);
 	main_layout->setVerticalSpacing(4);
@@ -278,12 +299,16 @@ TrackInfos::~TrackInfos()
 /**
  * sets the current track and shows it in the plotter
  */
-void TrackInfos::ShowTrack(const t_track& track)
+void TrackInfos::ShowTrack(t_track *track)
 {
-	m_track = &track;
+	m_track = track;
 
 	// print track infos
-	m_infos->setHtml(track.PrintHtml(g_prec_gui).c_str());
+	m_infos->setHtml(m_track->PrintHtml(g_prec_gui).c_str());
+	m_comments->blockSignals(true);
+	m_comments->setMarkdown(m_track->GetComment().c_str());
+	m_comments->setReadOnly(false);
+	m_comments->blockSignals(false);
 
 	// set day in calendar
 	t_real epoch = std::chrono::duration_cast<typename t_track::t_sec>(
@@ -298,6 +323,19 @@ void TrackInfos::ShowTrack(const t_track& track)
 	PlotPace();
 	PlotAlt();
 	PlotMap(true);
+}
+
+
+/**
+ * update the track's comment
+ */
+void TrackInfos::CommentChanged()
+{
+	if(!m_track || !m_comments)
+		return;
+
+	m_track->SetComment(m_comments->toMarkdown().toStdString());
+	emit TrackChanged();
 }
 
 
@@ -637,7 +675,13 @@ void TrackInfos::PlotMap(bool load_cached)
 
 	if(m_mapfile->text() == "")
 	{
-		emit StatusMessageChanged("No source maps available. Please specify a map directory with .osm.pbf files.");
+		QString msg{"No source maps available."
+			" Please specify a map directory with .osm.pbf files."};
+		emit StatusMessageChanged(msg);
+
+		// only show a message box when the "calculate" button was explicitly clicked
+		if(!load_cached)
+			QMessageBox::critical(this, "Error", msg);
 		return;
 	}
 
@@ -848,6 +892,12 @@ void TrackInfos::Clear()
 {
 	m_track = nullptr;
 	m_infos->clear();
+
+	if(m_comments)
+	{
+		m_comments->setReadOnly(true);
+		m_comments->clear();
+	}
 
 	if(m_track_plot)
 	{
