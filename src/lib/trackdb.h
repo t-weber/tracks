@@ -14,6 +14,7 @@
 #include <map>
 #include <tuple>
 #include <string_view>
+#include <concepts>
 
 
 #define TRACKDB_MAGIC "TRACKDB"
@@ -24,11 +25,11 @@
  * represents a collection of running tracks
  */
 template<class t_real = double, class t_size = std::size_t>
+requires std::floating_point<t_real> && std::integral<t_size>
 class MultipleTracks
 {
 public:
 	using t_track = SingleTrack<t_real, t_size>;
-	using t_TrackPoint = typename t_track::t_TrackPoint;
 	using t_clk = typename t_track::t_clk;
 	using t_timept = typename t_track::t_timept;
 	using t_timept_map = std::map<t_timept,
@@ -67,6 +68,7 @@ public:
 		m_tracks.emplace_back(std::forward<t_track>(track));
 		m_tracks.rbegin()->SetDistanceFunction(m_distance_function);
 		m_tracks.rbegin()->SetAscentEpsilon(m_asc_eps);
+		m_tracks.rbegin()->SetSmoothRadius(m_smooth_rad);
 	}
 
 
@@ -76,6 +78,7 @@ public:
 		m_tracks.push_back(track);
 		m_tracks.rbegin()->SetDistanceFunction(m_distance_function);
 		m_tracks.rbegin()->SetAscentEpsilon(m_asc_eps);
+		m_tracks.rbegin()->SetSmoothRadius(m_smooth_rad);
 	}
 
 
@@ -206,6 +209,8 @@ public:
 			t_track track{};
 			track.SetDistanceFunction(m_distance_function);
 			track.SetAscentEpsilon(m_asc_eps);
+			track.SetSmoothRadius(m_smooth_rad);
+
 			if(!track.Load(ifstr))
 				return false;
 
@@ -237,6 +242,19 @@ public:
 
 		for(t_track& track : m_tracks)
 			track.SetAscentEpsilon(m_asc_eps);
+	}
+
+
+
+	/**
+	 * number of neighbouring point to include in data smoothing
+	 */
+	void SetSmoothRadius(t_size rad)
+	{
+		m_smooth_rad = rad;
+
+		for(t_track& track : m_tracks)
+			track.SetSmoothRadius(m_smooth_rad);
 	}
 
 
@@ -295,7 +313,8 @@ private:
 
 	int m_distance_function{0};
 
-	t_real m_asc_eps{10.};
+	t_real m_asc_eps{5.};
+	t_size m_smooth_rad{10};
 };
 
 

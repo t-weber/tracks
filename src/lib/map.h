@@ -18,10 +18,11 @@
 #include <list>
 #include <vector>
 #include <tuple>
-#include <optional>
-#include <functional>
 #include <unordered_map>
 #include <unordered_set>
+#include <optional>
+#include <functional>
+#include <concepts>
 #include <stdexcept>
 #include <cstdint>
 
@@ -52,6 +53,7 @@
 
 
 template<class t_tags, class t_real = double>
+requires std::floating_point<t_real>
 struct MapVertex
 {
 	t_real longitude{};
@@ -64,6 +66,7 @@ struct MapVertex
 
 
 template<class t_tags, class t_size = std::size_t>
+requires std::integral<t_size>
 struct MapSegment
 {
 	std::list<t_size> vertex_ids{};
@@ -76,6 +79,7 @@ struct MapSegment
 
 
 template<class t_tags, class t_size = std::size_t>
+requires std::integral<t_size>
 struct MapMultiSegment
 {
 	std::list<t_size> vertex_ids{};
@@ -97,6 +101,7 @@ enum class MapObjType
 
 
 template<class t_real = double, class t_size = std::size_t>
+requires std::floating_point<t_real> && std::integral<t_size>
 class Map
 {
 public:

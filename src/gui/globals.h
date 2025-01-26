@@ -19,7 +19,7 @@
 // track types
 using t_tracks = MultipleTracks<t_real, t_size>;
 using t_track = typename t_tracks::t_track;
-using t_track_pt = typename t_track::t_TrackPoint;
+using t_track_pt = typename t_track::t_trackpt;
 
 
 // map types
@@ -29,6 +29,9 @@ using t_map = Map<t_real_map, t_size_map>;
 // epsilon and precision values
 extern t_real g_eps;
 extern t_int g_prec_gui;
+
+// radius for data smoothing
+extern t_int g_smooth_rad;
 
 
 // use recently used directory or a special document folder

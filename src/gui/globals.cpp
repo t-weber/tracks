@@ -19,6 +19,9 @@ t_real g_eps = 1e-6;
 // precision for showing numbers in the gui
 t_int g_prec_gui = 4;
 
+// radius for data smoothing
+t_int g_smooth_rad = 10;
+
 
 bool g_use_recent_dir = true;
 bool g_reload_last = true;
@@ -28,7 +31,7 @@ bool g_reload_last = true;
 int g_dist_func = 0;
 
 // minimum height difference [m] before being counted as climb
-t_real g_asc_eps = 10.;
+t_real g_asc_eps = 5.;
 
 
 // assumed time interval if non is given (for import)

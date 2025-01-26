@@ -171,7 +171,8 @@ protected slots:
 	void TrackNameChanged(t_size idx, const std::string& name);
 	void TrackDeleted(t_size idx);
 
-	void PlotCoordsChanged(t_real longitude, t_real latitude);
+	void PlotCoordsChanged(t_real longitude, t_real latitude,
+		t_real distance, t_real time);
 	void SetStatusMessage(const QString& msg, int display_ms = 0) const;
 	void PopulateTrackList(bool resort = true);
 };

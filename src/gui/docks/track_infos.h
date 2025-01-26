@@ -107,6 +107,7 @@ private:
 	// altitude tab
 	std::shared_ptr<QCustomPlot> m_alt_plot{};
 	std::shared_ptr<QCheckBox> m_time_check{};
+	std::shared_ptr<QCheckBox> m_smooth_check{};
 	std::shared_ptr<QMenu> m_alt_context{};
 
 	// pace tab
@@ -145,10 +146,10 @@ private:
 
 
 signals:
-	void PlotCoordsChanged(t_real, t_real);     // mouse moved in track or map
-	void PlotCoordsSelected(t_real, t_real);    // mouse clicked in track or map
+	void PlotCoordsChanged(t_real, t_real, t_real, t_real);  // mouse moved in track or map
+	void PlotCoordsSelected(t_real, t_real);                 // mouse clicked in track or map
 	void StatusMessageChanged(const QString&);
-	void TrackChanged();                        // the track has been modified
+	void TrackChanged();                                     // the track has been modified
 };
 
 

@@ -10,6 +10,8 @@
 
 #include <tuple>
 #include <cmath>
+#include <concepts>
+#include <type_traits>
 
 #include <boost/geometry.hpp>
 
@@ -21,6 +23,7 @@
  */
 template<typename t_real = double>
 t_real havsin(t_real th)
+requires std::floating_point<t_real>
 {
 	return t_real(0.5) - t_real(0.5)*std::cos(th);
 }
@@ -33,6 +36,7 @@ t_real havsin(t_real th)
  */
 template<typename t_real = double>
 t_real arcaversin(t_real x)
+requires std::floating_point<t_real>
 {
 	return std::acos(t_real(1) - t_real(2)*x);
 }
@@ -45,6 +49,7 @@ t_real arcaversin(t_real x)
  */
 template<typename t_real = double>
 t_real earth_radius(t_real lat)
+requires std::floating_point<t_real>
 {
 	t_real rad_pol = 6.3567523e6;
 	t_real rad_equ = 6.3781370e6;
@@ -73,6 +78,7 @@ std::tuple<t_real, t_real>  // [ planar distance, distance including heights ]
 geo_dist(t_real lat1, t_real lat2,
 	t_real lon1, t_real lon2,
 	t_real elev1, t_real elev2)
+requires std::floating_point<t_real>
 {
 	t_real rad = earth_radius<t_real>((lat1 + lat2) / t_real(2));
 	rad += (elev1 + elev2) * t_real(0.5);
@@ -98,6 +104,7 @@ std::tuple<t_real, t_real>  // [ planar distance, distance including heights ]
 geo_dist_2(t_real lat1, t_real lat2,
 	t_real lon1, t_real lon2,
 	[[__maybe_unused__]] t_real elev1, [[__maybe_unused__]] t_real elev2)
+requires std::floating_point<t_real>
 {
 	namespace geo = boost::geometry;
 	using t_pt = geo::model::point<t_real, 2, geo::cs::geographic<geo::radian>>;
@@ -144,8 +151,53 @@ geo_dist_2(t_real lat1, t_real lat2,
  */
 template<typename t_real = double>
 t_real speed_to_pace(t_real speed)
+requires std::floating_point<t_real>
 {
 	return t_real(60.) / speed;
+}
+
+
+
+/**
+ * smoothing of data points
+ * see: https://en.wikipedia.org/wiki/Laplacian_smoothing
+ */
+template<class t_cont>
+t_cont smooth_data(const t_cont& vec, int N = 1)
+requires requires(t_cont cont)
+{
+	typename t_cont::value_type;
+	cont.size();
+	cont[0] = cont[1];
+}
+{
+	if(N <= 0)
+		return vec;
+
+	using t_val = typename t_cont::value_type;
+	const int SIZE = static_cast<int>(vec.size());
+
+	t_cont smoothed = vec;
+
+	for(int i = 0; i < SIZE; ++i)
+	{
+		t_val elem{};
+		t_val num{};
+
+		for(int j = -N; j <= N; ++j)
+		{
+			int idx = i + j;
+			if(idx >= SIZE || idx < 0)
+				continue;
+
+			elem += vec[i + j];
+			num += 1;
+		}
+
+		smoothed[i] = elem / num;
+	}
+
+	return smoothed;
 }
 
 

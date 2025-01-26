@@ -16,6 +16,7 @@
 #include <cmath>
 #include <numbers>
 #include <vector>
+#include <concepts>
 
 #if __has_include(<filesystem>)
 	#include <filesystem>
@@ -35,6 +36,7 @@
 
 
 template<class t_timept, class t_real = double>
+requires std::floating_point<t_real>
 struct TrackPoint
 {
 	t_real latitude{};               // [deg]
@@ -43,13 +45,13 @@ struct TrackPoint
 
 	t_timept timept{};
 
-	t_real elapsed{};                // time elapsed since last point  [s]
+	t_real elapsed{};                // time elapsed since previous point  [s]
 	t_real elapsed_total{};          // time elapsed since first point [s]
 
-	t_real distance_planar{};        // planar distance to last point  [m]
+	t_real distance_planar{};        // planar distance to previous point  [m]
 	t_real distance_planar_total{};  // planar distance to first point [m]
 
-	t_real distance{};               // full distance to last point  [m]
+	t_real distance{};               // full distance to previous point  [m]
 	t_real distance_total{};         // full distance to first point [m]
 };
 
@@ -59,6 +61,7 @@ struct TrackPoint
  * represents a single running track
  */
 template<class t_real = double, class t_size = std::size_t>
+requires std::floating_point<t_real> && std::integral<t_size>
 class SingleTrack
 {
 public:
@@ -67,7 +70,7 @@ public:
 	using t_timept = typename t_clk::time_point;
 	using t_dur = typename t_clk::duration;
 	using t_sec = std::chrono::duration<t_real, std::ratio<1, 1>>;
-	using t_TrackPoint = TrackPoint<t_timept, t_real>;
+	using t_trackpt = TrackPoint<t_timept, t_real>;
 	using t_char = typename std::string::value_type;
 
 
@@ -75,6 +78,35 @@ public:
 public:
 	SingleTrack() = default;
 	~SingleTrack() = default;
+
+
+
+	/**
+	 * get the function used for distance calculations
+	 */
+	std::tuple<t_real, t_real>
+	(*GetDistanceFunction() const) (
+		t_real lat1, t_real lat2,
+		t_real lon1, t_real lon2,
+		t_real elev1, t_real elev2)
+
+	{
+		// default distance function
+		std::tuple<t_real, t_real> (*dist_func)(t_real lat1, t_real lat2,
+			t_real lon1, t_real lon2,
+			t_real elev1, t_real elev2) = &geo_dist<t_real>;
+
+		//std::cout << "distance function: " << m_distance_function << std::endl;
+		switch(m_distance_function)
+		{
+			case 0: dist_func = &geo_dist<t_real>; break;
+			case 1: dist_func = &geo_dist_2<t_real, 1>; break;
+			case 2: dist_func = &geo_dist_2<t_real, 2>; break;
+			case 3: dist_func = &geo_dist_2<t_real, 3>; break;
+		}
+
+		return dist_func;
+	}
 
 
 
@@ -99,25 +131,20 @@ public:
 		m_max_long = -m_min_long;
 
 		std::optional<t_real> latitude_last, longitude_last, elevation_last;
-		std::optional<t_real> elevation_last_asc;
 		std::optional<t_timept> time_pt_last;
 
-		// get distance function
+		// distance function
 		std::tuple<t_real, t_real> (*dist_func)(t_real lat1, t_real lat2,
 			t_real lon1, t_real lon2,
-			t_real elev1, t_real elev2) = &geo_dist<t_real>;
+			t_real elev1, t_real elev2) = GetDistanceFunction();
 
-		//std::cout << "distance function: " << m_distance_function << std::endl;
-		switch(m_distance_function)
-		{
-			case 0: dist_func = &geo_dist<t_real>; break;
-			case 1: dist_func = &geo_dist_2<t_real, 1>; break;
-			case 2: dist_func = &geo_dist_2<t_real, 2>; break;
-			case 3: dist_func = &geo_dist_2<t_real, 3>; break;
-		}
+		std::vector<t_real> elevations;
+		elevations.reserve(m_points.size());
 
-		for(t_TrackPoint& trackpt : m_points)
+		for(t_trackpt& trackpt : m_points)
 		{
+			elevations.push_back(trackpt.elevation);
+
 			// elapsed seconds since last track point
 			if(time_pt_last)
 				trackpt.elapsed = t_sec{trackpt.timept - *time_pt_last}.count();
@@ -129,22 +156,6 @@ public:
 					*latitude_last, trackpt.latitude,
 					*longitude_last, trackpt.longitude,
 					*elevation_last, trackpt.elevation);
-			}
-
-			// ascent and descent
-			if(elevation_last_asc)
-			{
-				t_real elev_diff = trackpt.elevation - *elevation_last_asc;
-				if(elev_diff > m_asc_eps)
-				{
-					m_ascent += elev_diff;
-					elevation_last_asc = trackpt.elevation;
-				}
-				else if(elev_diff < -m_asc_eps)
-				{
-					m_descent += -elev_diff;
-					elevation_last_asc = trackpt.elevation;
-				}
 			}
 
 			// cumulative values
@@ -169,9 +180,34 @@ public:
 			longitude_last = trackpt.longitude;
 			elevation_last = trackpt.elevation;
 			time_pt_last = trackpt.timept;
-			if(!elevation_last_asc)  // only first point
-				elevation_last_asc = trackpt.elevation;
-		}
+		}  // loop over track points
+
+		if(m_smooth_rad > 0)
+			elevations = smooth_data(elevations, static_cast<int>(m_smooth_rad));
+
+		// calulate ascent & descent
+		std::optional<t_real> elevation_last_asc;
+		for(t_real elevation : elevations)
+		{
+			// ascent and descent
+			if(elevation_last_asc)
+			{
+				t_real elev_diff = elevation - *elevation_last_asc;
+				if(elev_diff > m_asc_eps)
+				{
+					m_ascent += elev_diff;
+					elevation_last_asc = elevation;
+				}
+				else if(elev_diff < -m_asc_eps)
+				{
+					m_descent += -elev_diff;
+					elevation_last_asc = elevation;
+				}
+			}
+
+			if(!elevation_last_asc)  // only assign at first point
+				elevation_last_asc = elevation;
+		}  // loop over elevations
 	}
 
 
@@ -191,7 +227,7 @@ public:
 		t_real time = 0., dist = 0.;
 		t_size bin_idx = 0;
 
-		for(const t_TrackPoint& pt : m_points)
+		for(const t_trackpt& pt : m_points)
 		{
 			time += pt.elapsed;
 			dist += planar ? pt.distance_planar : pt.distance;
@@ -278,7 +314,7 @@ public:
 					if(pt.first != "trkpt")
 						continue;
 
-					t_TrackPoint trackpt
+					t_trackpt trackpt
 					{
 						.latitude = pt.second.get<t_real>("<xmlattr>.lat") / t_real(180) * num::pi_v<t_real>,
 						.longitude = pt.second.get<t_real>("<xmlattr>.lon") / t_real(180) * num::pi_v<t_real>,
@@ -311,9 +347,39 @@ public:
 
 
 
-	const std::vector<t_TrackPoint>& GetPoints() const
+	const std::vector<t_trackpt>& GetPoints() const
 	{
 		return m_points;
+	}
+
+
+
+	/**
+	 * find the track point that is closest to the given coordinates
+	 */
+	const t_trackpt* GetClosestPoint(t_real lon, t_real lat) const
+	{
+		if(m_points.size() == 0)
+			return nullptr;
+
+		// distance function
+		std::tuple<t_real, t_real> (*dist_func)(t_real lat1, t_real lat2,
+			t_real lon1, t_real lon2,
+			t_real elev1, t_real elev2) = GetDistanceFunction();
+
+		auto iter = std::min_element(m_points.begin(), m_points.end(),
+			[dist_func, lon, lat](const t_trackpt& pt1, const t_trackpt& pt2)
+		{
+			auto [ dist1_pl, dist1 ] = (*dist_func)(pt1.latitude, lat, pt1.longitude, lon, 0., 0.);
+			auto [ dist2_pl, dist2 ] = (*dist_func)(pt2.latitude, lat, pt2.longitude, lon, 0., 0.);
+
+			return dist1_pl < dist2_pl;
+		});
+
+		if(iter == m_points.end())
+			return nullptr;
+
+		return &*iter;
 	}
 
 
@@ -447,6 +513,16 @@ public:
 
 
 
+	/**
+	 * number of neighbouring point to include in data smoothing
+	 */
+	void SetSmoothRadius(t_size rad)
+	{
+		m_smooth_rad = rad;
+	}
+
+
+
 	bool Save(std::ofstream& ofstr) const
 	{
 		if(!ofstr)
@@ -460,7 +536,7 @@ public:
 		// write track points
 		for(t_size ptidx = 0; ptidx < num_points; ++ptidx)
 		{
-			const t_TrackPoint& pt = GetPoints()[ptidx];
+			const t_trackpt& pt = GetPoints()[ptidx];
 
 			ofstr.write(reinterpret_cast<const char*>(&pt.latitude), sizeof(pt.latitude));
 			ofstr.write(reinterpret_cast<const char*>(&pt.longitude), sizeof(pt.longitude));
@@ -524,7 +600,7 @@ public:
 		// read track points
 		for(t_size ptidx = 0; ptidx < num_points; ++ptidx)
 		{
-			t_TrackPoint pt{};
+			t_trackpt pt{};
 
 			ifstr.read(reinterpret_cast<char*>(&pt.latitude), sizeof(pt.latitude));
 			ifstr.read(reinterpret_cast<char*>(&pt.longitude), sizeof(pt.longitude));
@@ -647,7 +723,7 @@ public:
 			<< std::left << std::setw(field_width) << "t" << " "
 			<< std::left << std::setw(field_width) << "s" << "\n";
 
-		for(const t_TrackPoint& pt : track.GetPoints())
+		for(const t_trackpt& pt : track.GetPoints())
 		{
 			t_real latitude_deg = pt.latitude * t_real(180) / num::pi_v<t_real>;
 			t_real longitude_deg = pt.longitude * t_real(180) / num::pi_v<t_real>;
@@ -698,7 +774,7 @@ protected:
 	{
 		m_hash = 0;
 
-		for(const t_TrackPoint& pt : m_points)
+		for(const t_trackpt& pt : m_points)
 		{
 			t_size lat_hash = std::hash<t_real>{}(pt.latitude);
 			t_size lon_hash = std::hash<t_real>{}(pt.longitude);
@@ -715,7 +791,7 @@ protected:
 
 
 private:
-	std::vector<t_TrackPoint> m_points{};
+	std::vector<t_trackpt> m_points{};
 
 	std::string m_filename{};
 	std::string m_version{}, m_creator{};
@@ -730,7 +806,8 @@ private:
 	t_real m_min_elev{}, m_max_elev{};
 
 	// minimum height difference [m] before being counted as climb
-	t_real m_asc_eps{10.};
+	t_real m_asc_eps{5.};
+	t_size m_smooth_rad{10};
 	t_real m_ascent{}, m_descent{};
 
 	int m_distance_function{0};

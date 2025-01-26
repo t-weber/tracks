@@ -131,6 +131,12 @@ TrackInfos::TrackInfos(QWidget* parent) : QWidget{parent}
 	m_time_check->setChecked(false);
 	connect(m_time_check.get(), &QCheckBox::toggled, this, &TrackInfos::PlotAlt);
 
+	m_smooth_check = std::make_shared<QCheckBox>(alt_panel);
+	m_smooth_check->setText("Smooth Curve");
+	m_smooth_check->setToolTip("Smooth altitude curve.");
+	m_smooth_check->setChecked(true);
+	connect(m_smooth_check.get(), &QCheckBox::toggled, this, &TrackInfos::PlotAlt);
+
 	QPushButton *btn_replot_alt = new QPushButton(alt_panel);
 	btn_replot_alt->setText("Reset Plot");
 	btn_replot_alt->setToolTip("Reset the plotting range.");
@@ -142,6 +148,7 @@ TrackInfos::TrackInfos(QWidget* parent) : QWidget{parent}
 	alt_panel_layout->setHorizontalSpacing(4);
 	alt_panel_layout->addWidget(m_alt_plot.get(), 0, 0, 1, 4);
 	alt_panel_layout->addWidget(m_time_check.get(), 1, 0, 1, 1);
+	alt_panel_layout->addWidget(m_smooth_check.get(), 1, 1, 1, 1);
 	alt_panel_layout->addWidget(btn_replot_alt, 1, 3, 1, 1);
 
 	// pace plot panel
@@ -485,7 +492,6 @@ void TrackInfos::PlotAlt()
 		m_alt_plot->xAxis->setLabel("Distance (km)");
 
 	QVector<t_real> dist, alt;
-
 	dist.reserve(m_track->GetPoints().size());
 	alt.reserve(m_track->GetPoints().size());
 
@@ -495,14 +501,26 @@ void TrackInfos::PlotAlt()
 	for(const t_track_pt& pt : m_track->GetPoints())
 	{
 		if(plot_time)
+		{
+			if(std::abs(pt.elapsed) < g_eps)
+				continue;
 			dist.push_back(pt.elapsed_total / 60.);
+		}
 		else
+		{
+			if(std::abs(pt.distance) < g_eps)
+				continue;
 			dist.push_back(pt.distance_total / 1000.);
+		}
 		alt.push_back(pt.elevation);
 
 		m_min_alt = std::min(m_min_alt, pt.elevation);
 		m_max_alt = std::max(m_max_alt, pt.elevation);
 	}
+
+	// smooth curve
+	if(m_smooth_check->isChecked() && g_smooth_rad > 0)
+		alt = smooth_data(alt, g_smooth_rad);
 
 	if(!alt.size())
 		return;
@@ -521,7 +539,7 @@ void TrackInfos::PlotAlt()
 
 	QCPGraph *curve = new QCPGraph(m_alt_plot->xAxis, m_alt_plot->yAxis);
 	curve->setData(dist, alt);
-	//curve->setLineStyle(QCPCurve::lsLine);
+	curve->setLineStyle(QCPGraph::lsLine);
 
 	QPen pen = curve->pen();
 	pen.setWidthF(2.);
@@ -960,7 +978,20 @@ void TrackInfos::TrackPlotMouseMove(QMouseEvent *evt)
 		return;
 
 	auto [ longitude, latitude ] = GetTrackPlotCoords(evt, true);
-	emit PlotCoordsChanged(longitude, latitude);
+	t_real dist = -1., time = -1.;
+
+	if(m_track)
+	{
+		auto [ lon_rad, lat_rad ] = GetTrackPlotCoords(evt, false);
+
+		if(const t_track_pt* pt = m_track->GetClosestPoint(lon_rad, lat_rad); pt)
+		{
+			dist = pt->distance_total;
+			time = pt->elapsed_total;
+		}
+	}
+
+	emit PlotCoordsChanged(longitude, latitude, dist, time);
 }
 
 
@@ -1088,7 +1119,20 @@ void TrackInfos::MapMouseMove(QMouseEvent *evt)
 		return;
 
 	auto [ lon, lat ] = GetMapCoords(evt, true);
-	emit PlotCoordsChanged(lon, lat);
+	t_real dist = -1., time = -1.;
+
+	if(m_track)
+	{
+		auto [ lon_rad, lat_rad ] = GetMapCoords(evt, false);
+
+		if(const t_track_pt* pt = m_track->GetClosestPoint(lon_rad, lat_rad); pt)
+		{
+			dist = pt->distance_total;
+			time = pt->elapsed_total;
+		}
+	}
+
+	emit PlotCoordsChanged(lon, lat, dist, time);
 }
 
 
@@ -1153,6 +1197,7 @@ void TrackInfos::SaveSettings(QSettings& settings)
 	settings.setValue("track_info/distance_bin", m_dist_binlen->value());
 	settings.setValue("track_info/speed_check", m_speed_check->isChecked());
 	settings.setValue("track_info/time_check", m_time_check->isChecked());
+	settings.setValue("track_info/smooth_check", m_smooth_check->isChecked());
 }
 
 
@@ -1189,4 +1234,7 @@ void TrackInfos::RestoreSettings(QSettings& settings)
 
 	if(settings.contains("track_info/time_check"))
 		m_time_check->setChecked(settings.value("track_info/time_check").toBool());
+
+	if(settings.contains("track_info/smooth_check"))
+		m_smooth_check->setChecked(settings.value("track_info/smooth_check").toBool());
 }

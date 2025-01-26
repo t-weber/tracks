@@ -12,6 +12,7 @@
 #include <iomanip>
 #include <chrono>
 #include <tuple>
+#include <concepts>
 
 #include <boost/date_time/c_time.hpp>
 
@@ -162,6 +163,7 @@ std::tuple<int, int, int, int, int, int> date_time_from_epoch(t_epoch epoch)
 
 template<class t_real = double, class t_int = int>
 std::string get_time_str(t_real secs)
+requires std::floating_point<t_real> && std::integral<t_int>
 {
 	t_int h = std::floor(secs / 60. / 60.);
 	secs = std::fmod(secs, 60. * 60.);
@@ -198,6 +200,7 @@ std::string get_time_str(t_real secs)
 
 template<class t_real = double, class t_int = int>
 std::string get_pace_str(t_real min)
+requires std::floating_point<t_real> && std::integral<t_int>
 {
 	t_int secs = std::round(std::fmod(min*60., 60.));
 	t_int mins = std::floor(min);
