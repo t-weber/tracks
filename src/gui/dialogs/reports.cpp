@@ -248,16 +248,16 @@ void Reports::FillDistancesTable()
 	int row = 0;
 	t_real total_dist = 0.;
 	t_real total_time = 0.;
-	for(const auto& pair : m_yearly)
+	for(auto iter = m_yearly.rbegin(); iter != m_yearly.rend(); ++iter)
 	{
 		t_real epoch = std::chrono::duration_cast<typename t_track::t_sec>(
-			pair.first.time_since_epoch()).count();
-		t_size num_tracks = std::get<2>(pair.second);
+			iter->first.time_since_epoch()).count();
+		t_size num_tracks = std::get<2>(iter->second);
 
-		t_real dist = std::get<0>(pair.second) / 1000.;
+		t_real dist = std::get<0>(iter->second) / 1000.;
 		total_dist += dist;
 
-		t_real time = std::get<1>(pair.second) / 3600.;;
+		t_real time = std::get<1>(iter->second) / 3600.;;
 		total_time += time;
 
 		m_table->setItem(row, TAB_DATE, new DateTableWidgetItem<
@@ -268,11 +268,22 @@ void Reports::FillDistancesTable()
 		m_table->setItem(row, TAB_TIME, new NumericTableWidgetItem<t_real>(time, g_prec_gui, " h"));
 		m_table->setItem(row, TAB_TIME_SUM, new NumericTableWidgetItem<t_real>(total_time, g_prec_gui, " h"));
 
-		// set read-only
 		for(int col = 0; col < TAB_NUM_COLS; ++col)
 		{
-			m_table->item(row, col)->setFlags(
-				m_table->item(row, col)->flags() & ~Qt::ItemIsEditable);
+			QTableWidgetItem *item = m_table->item(row, col);
+
+			// set read-only
+			item->setFlags(m_table->item(row, col)->flags() & ~Qt::ItemIsEditable);
+
+			// swap colours
+			QBrush bg = item->background();
+			QBrush fg = item->foreground();
+			fg.setColor(QColor{0x00, 0x00, 0x00, 0xff});
+			bg.setColor(QColor{0xff, 0xff, 0xff, 0xff});
+			fg.setStyle(Qt::SolidPattern);
+			bg.setStyle(Qt::SolidPattern);
+			item->setBackground(fg);
+			item->setForeground(bg);
 		}
 
 		++row;
@@ -281,16 +292,16 @@ void Reports::FillDistancesTable()
 	// monthly distances
 	total_dist = 0.;
 	total_time = 0.;
-	for(const auto& pair : m_monthly)
+	for(auto iter = m_monthly.rbegin(); iter != m_monthly.rend(); ++iter)
 	{
 		t_real epoch = std::chrono::duration_cast<typename t_track::t_sec>(
-			pair.first.time_since_epoch()).count();
-		t_size num_tracks = std::get<2>(pair.second);
+			iter->first.time_since_epoch()).count();
+		t_size num_tracks = std::get<2>(iter->second);
 
-		t_real dist = std::get<0>(pair.second) / 1000.;
+		t_real dist = std::get<0>(iter->second) / 1000.;
 		total_dist += dist;
 
-		t_real time = std::get<1>(pair.second) / 3600.;
+		t_real time = std::get<1>(iter->second) / 3600.;
 		total_time += time;
 
 		m_table->setItem(row, TAB_DATE, new DateTableWidgetItem<

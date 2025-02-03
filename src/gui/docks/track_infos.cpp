@@ -311,7 +311,7 @@ void TrackInfos::ShowTrack(t_track *track)
 	m_track = track;
 
 	// print track infos
-	m_infos->setHtml(m_track->PrintHtml(g_prec_gui).c_str());
+	m_infos->setHtml(m_track->PrintHtml(g_prec_gui, g_show_icons).c_str());
 	m_comments->blockSignals(true);
 	m_comments->setMarkdown(m_track->GetComment().c_str());
 	m_comments->setReadOnly(false);

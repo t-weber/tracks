@@ -38,6 +38,9 @@ extern t_int g_smooth_rad;
 extern bool g_use_recent_dir;
 extern bool g_reload_last;
 
+// show UTF8 icons
+extern bool g_show_icons;
+
 
 // distance calculation function index
 extern int g_dist_func;

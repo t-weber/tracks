@@ -872,11 +872,16 @@ void TracksWnd::ShowSettings(bool only_create)
 {
 	if(!m_settings)
 	{
+		const bool tabs = false;
+		const bool scrolling = false;
+
 		// populate the settings dialog
-		m_settings = std::make_shared<Settings>(this);
+		m_settings = std::make_shared<Settings>(this, scrolling, tabs);
 		connect(m_settings.get(), &Settings::SignalApplySettings,
 			this, &TracksWnd::ApplySettings);
 
+		if(tabs)
+			m_settings->AddTabPage("General");
 		m_settings->AddSpinbox("settings/precision_gui",
 			"Number precision:", g_prec_gui, 0, 99, 1);
 		m_settings->AddDoubleSpinbox("settings/epsilon",
@@ -890,7 +895,11 @@ void TracksWnd::ShowSettings(bool only_create)
 			{ "Haversine Formula", "Thomas Formula",
 			"Vincenty Formula", "Karney Formula" },
 			g_dist_func);
-		m_settings->AddLine();
+
+		if(tabs)
+			m_settings->AddTabPage("Maps");
+		else
+			m_settings->AddLine();
 		m_settings->AddDoubleSpinbox("settings/assume_dt",
 			"Assumed time interval:", g_assume_dt, 0.1, 99., 1., 1, " s");
 		m_settings->AddDoubleSpinbox("settings/map_scale",
@@ -898,14 +907,21 @@ void TracksWnd::ShowSettings(bool only_create)
 		m_settings->AddDoubleSpinbox("settings/map_overdraw",
 			"Map overdrawing factor:", g_map_overdraw, 0., 9., 0.1, 2);
 		m_settings->AddCheckbox("settings/show_buildings",
-			"Show buildings in map", g_map_show_buildings);
+			"Show buildings in map.", g_map_show_buildings);
 		m_settings->AddCheckbox("settings/show_labels",
-			"Show labels in map", g_map_show_labels);
-		m_settings->AddLine();
+			"Show labels in map.", g_map_show_labels);
+		m_settings->AddCheckbox("settings/show_icons",
+			"Show icons in text.", g_show_icons);
+
+		if(tabs)
+			m_settings->AddTabPage("Files");
+		else
+			m_settings->AddLine();
 		m_settings->AddCheckbox("settings/load_last_file",
-			"Reload last file on startup", g_reload_last);
+			"Reload last file on startup.", g_reload_last);
 		m_settings->AddDirectorybox("settings/temp_dir",
 			"Temporary directory:", g_temp_dir);
+
 		m_settings->FinishSetup();
 	}
 
@@ -942,6 +958,8 @@ void TracksWnd::ApplySettings()
 		value<decltype(g_map_show_buildings)>();
 	g_map_show_labels = m_settings->GetValue("settings/show_labels").
 		value<decltype(g_map_show_labels)>();
+	g_show_icons = m_settings->GetValue("settings/show_icons").
+		value<decltype(g_show_icons)>();
 	g_reload_last = m_settings->GetValue("settings/load_last_file").
 		value<decltype(g_reload_last)>();
 	g_temp_dir = m_settings->GetValue("settings/temp_dir").toString();

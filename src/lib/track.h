@@ -662,7 +662,7 @@ public:
 
 
 
-	std::string PrintHtml(int prec = -1) const
+	std::string PrintHtml(int prec = -1, bool show_icons = true) const
 	{
 		std::ostringstream ostr;
 		if(prec >= 0)
@@ -677,24 +677,53 @@ public:
 		std::optional<t_timept> end_time = GetEndTime();
 
 		ostr << "<html>";
-		ostr << "<ul>";
+		if(show_icons)
+			ostr << "<ul style=\"list-style-type: none; margin-left: -32px;\">";
+		else
+			ostr << "<ul>";
 
-		ostr << "<li><b>Number of track points</b>: " << GetPoints().size() << ".</li>";
+		ostr << "<li>";
+		if(show_icons)
+			ostr << "&#x1f6f0; ";
+		ostr << "<b>Number of track points</b>: " << GetPoints().size() << ".</li>";
+
 		if(start_time && end_time)
 		{
-			ostr << "<li><b>Track time</b>: "
+			ostr << "<li>";
+			if(show_icons)
+				ostr << "&#x23f0; ";
+			ostr << "<b>Time</b>: "
 				<< from_timepoint<t_clk, t_timept>(*start_time, true) << " - "
 				<< from_timepoint<t_clk, t_timept>(*end_time, false)
 				<< " (" << get_time_str(t) << ").</li>";
 		}
-		ostr << "<li><b>Altitude range</b>: [ " << min_elev << ", " << max_elev << " ] m"
+		ostr << "<li>";
+		if(show_icons)
+			ostr << "&#x26f0; ";
+		ostr << "<b>Altitudes</b>: [ " << min_elev << ", " << max_elev << " ] m"
 			<< " (height difference: " << max_elev - min_elev << " m).</li>";
-		ostr << "<li><b>Climb</b>: " << asc << " m, <b>down</b>: " << desc << " m.</li>";
-		ostr << "<li><b>Distance</b>: " << s / 1000. << " km"
+
+		ostr << "<li>";
+		if(show_icons)
+			ostr << "&#x26f0; ";
+		ostr << "<b>Climb</b>: " << asc << " m, <b>down</b>: " << desc << " m.</li>";
+
+		ostr << "<li>";
+		if(show_icons)
+			ostr << "&#x1f4cf; ";
+		ostr << "<b>Distance</b>: " << s / 1000. << " km"
 			<< " (planar: " << s_planar / 1000. << " km).</li>";
-		ostr << "<li><b>Pace</b>: " << get_pace_str((t / 60.) / (s / 1000.))
+
+		ostr << "<li>";
+		if(show_icons)
+			ostr << "&#x1f3c3; ";
+		ostr << "<b>Pace</b>: " << get_pace_str((t / 60.) / (s / 1000.))
 			<< " (planar: " << get_pace_str((t / 60.) / (s_planar / 1000.)) << ").</li>";
-		ostr << "<li><b>Speed</b>: " << (s / 1000.) / (t / 60. / 60.) << " km/h"
+
+		ostr << "<li>";
+		if(show_icons)
+			ostr << "&#x1f3c3; ";
+		ostr << "<b>Speed</b>: " << (s / 1000.) / (t / 60. / 60.) << " km/h"
 			<< " = " << s / t << " m/s" << " (planar: "
 			<< (s_planar / 1000.) / (t / 60. / 60.) << " km/h"
 			<< " = " << s_planar / t << " m/s" << ").</li>";

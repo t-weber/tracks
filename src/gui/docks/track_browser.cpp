@@ -146,8 +146,7 @@ void TrackBrowser::CreateHeaders()
 		{
 			insert_header(row, cur_year, cur_mon);
 		}
-
-		if(cur_year != next_year || cur_mon != next_mon)
+		else if(cur_year != next_year || cur_mon != next_mon)
 		{
 			insert_header(row + 1, next_year, next_mon);
 			++row;

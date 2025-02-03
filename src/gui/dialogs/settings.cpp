@@ -17,6 +17,11 @@
 #include <QtWidgets/QFileDialog>
 
 
+
+// ----------------------------------------------------------------------------
+// helper functions
+// ----------------------------------------------------------------------------
+
 const QColor& get_foreground_colour()
 {
 	QPalette palette = dynamic_cast<QGuiApplication*>(
@@ -35,13 +40,15 @@ const QColor& get_background_colour()
 
 	return col;
 }
+// ----------------------------------------------------------------------------
+
 
 
 // ----------------------------------------------------------------------------
 // settings dialog
 // ----------------------------------------------------------------------------
 
-Settings::Settings(QWidget *parent, bool scrolling)
+Settings::Settings(QWidget *parent, bool scrolling, bool tabs)
 	: QDialog(parent)
 {
 	setWindowTitle("Settings");
@@ -49,28 +56,32 @@ Settings::Settings(QWidget *parent, bool scrolling)
 
 
 	// layout
-	if(scrolling)
+	m_main_grid = std::make_shared<QGridLayout>(this);
+	m_main_grid->setSpacing(4);
+	m_main_grid->setContentsMargins(8, 8, 8, 8);
+	m_grid = m_main_grid;
+
+
+	// layout style
+	if(tabs)
 	{
-		QScrollArea *scroll = new QScrollArea(this);
-		QWidget *scrollwidget = new QWidget(scroll);
+		//m_tabs = std::make_shared<QTabWidget>(this);
+		m_tabs = new QTabWidget{this};
+
+		m_main_grid->addWidget(m_tabs/*.get()*/, 0, 0, 1, 1);
+	}
+	else if(scrolling)
+	{
+		QScrollArea *scroll = new QScrollArea{this};
+		QWidget *scrollwidget = new QWidget{scroll};
 		scroll->setWidgetResizable(true);
 		scroll->setWidget(scrollwidget);
 		scroll->setFrameStyle(QFrame::NoFrame);
 
 		m_grid = std::make_shared<QGridLayout>(scrollwidget);
 
-		QGridLayout *mainlayout = new QGridLayout(this);
-		mainlayout->setContentsMargins(0, 0, 0, 0);
-		mainlayout->setSpacing(0);
-		mainlayout->addWidget(scroll, 0, 0, 1, 1);
+		m_main_grid->addWidget(scroll, 0, 0, 1, 1);
 	}
-	else
-	{
-		m_grid = std::make_shared<QGridLayout>(this);
-	}
-
-	m_grid->setSpacing(4);
-	m_grid->setContentsMargins(8, 8, 8, 8);
 
 
 	// button box
@@ -121,6 +132,24 @@ void Settings::SetCurGridColumn(unsigned int num)
 }
 
 
+void Settings::AddTabPage(const QString& title)
+{
+	if(!m_tabs)
+		return;
+
+	QWidget *tab = new QWidget{this};
+	std::shared_ptr<QGridLayout> grid = std::make_shared<QGridLayout>(tab);
+	grid->setSpacing(4);
+	grid->setContentsMargins(4, 4, 4, 4);
+
+	m_tabs->addTab(tab, title);
+	m_tab_grids.push_back(grid);
+
+	// set as currently active grid
+	m_grid = grid;
+}
+
+
 /**
  * adds a check box to the end of the grid layout
  */
@@ -133,7 +162,7 @@ void Settings::AddCheckbox(const QString& key, const QString& descr, bool value)
 	if(settings.contains(key))
 		value = settings.value(key).toBool();
 
-	QCheckBox *box = new QCheckBox(this);
+	QCheckBox *box = new QCheckBox{this};
 	box->setText(descr);
 	box->setChecked(value);
 	box->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
@@ -158,11 +187,11 @@ void Settings::AddSpinbox(const QString& key, const QString& descr,
 	if(settings.contains(key))
 		value = settings.value(key).value<decltype(value)>();
 
-	QLabel *label = new QLabel(this);
+	QLabel *label = new QLabel{this};
 	label->setText(descr);
 	label->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Preferred);
 
-	QSpinBox *box = new QSpinBox(this);
+	QSpinBox *box = new QSpinBox{this};
 	box->setValue(value);
 	box->setMinimum(min);
 	box->setMaximum(max);
@@ -192,11 +221,11 @@ void Settings::AddDoubleSpinbox(const QString& key, const QString& descr,
 	if(settings.contains(key))
 		value = settings.value(key).value<decltype(value)>();
 
-	QLabel *label = new QLabel(this);
+	QLabel *label = new QLabel{this};
 	label->setText(descr);
 	label->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Preferred);
 
-	QDoubleSpinBox *box = new QDoubleSpinBox(this);
+	QDoubleSpinBox *box = new QDoubleSpinBox{this};
 	box->setDecimals(decimals);
 	box->setValue(value);
 	box->setMinimum(min);
@@ -226,11 +255,11 @@ void Settings::AddCombobox(const QString& key, const QString& descr,
 	if(settings.contains(key))
 		idx = settings.value(key).value<decltype(idx)>();
 
-	QLabel *label = new QLabel(this);
+	QLabel *label = new QLabel{this};
 	label->setText(descr);
 	label->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Preferred);
 
-	QComboBox *box = new QComboBox(this);
+	QComboBox *box = new QComboBox{this};
 	box->addItems(items);
 	box->setCurrentIndex(idx);
 	box->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
@@ -255,11 +284,11 @@ void Settings::AddEditbox(const QString& key, const QString& descr,
 	if(settings.contains(key))
 		value = settings.value(key).toString();
 
-	QLabel *label = new QLabel(this);
+	QLabel *label = new QLabel{this};
 	label->setText(descr);
 	label->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Preferred);
 
-	QLineEdit *box = new QLineEdit(this);
+	QLineEdit *box = new QLineEdit{this};
 	box->setText(value);
 	box->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
 
@@ -283,15 +312,15 @@ void Settings::AddDirectorybox(const QString& key, const QString& descr,
 	if(settings.contains(key))
 		value = settings.value(key).toString();
 
-	QLabel *label = new QLabel(this);
+	QLabel *label = new QLabel{this};
 	label->setText(descr);
 	label->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Preferred);
 
-	QLineEdit *box = new QLineEdit(this);
+	QLineEdit *box = new QLineEdit{this};
 	box->setText(value);
 	box->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
 
-	QPushButton *btn = new QPushButton(this);
+	QPushButton *btn = new QPushButton{this};
 	btn->setText("Browse...");
 	btn->setToolTip("Browse for temporary directory.");
 	btn->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Preferred);
@@ -325,6 +354,19 @@ void Settings::AddDirectorybox(const QString& key, const QString& descr,
 
 
 /**
+ * adds a horizontal line to the end of the grid layout
+ */
+void Settings::AddLine()
+{
+	QFrame *frame = new QFrame{this};
+	frame->setFrameStyle(QFrame::HLine);
+	frame->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+
+	m_grid->addWidget(frame, m_grid->rowCount(), 0, 1, m_numGridColumns);
+}
+
+
+/**
  * adds a spacer to the end of the grid layout
  */
 void Settings::AddSpacer(int size_v)
@@ -339,23 +381,35 @@ void Settings::AddSpacer(int size_v)
 		size_v = 1;
 	}
 
-	QSpacerItem *spacer_end = new QSpacerItem(1, size_v, policy_h, policy_v);
-	m_grid->addItem(spacer_end,
-		m_grid->rowCount(), 0, 1, m_numGridColumns);
+	QSpacerItem *spacer_end = new QSpacerItem{1, size_v, policy_h, policy_v};
+
+	if(m_tabs)
+		m_main_grid->addItem(spacer_end, m_main_grid->rowCount(), 0, 1, 1);
+	else
+		m_grid->addItem(spacer_end, m_grid->rowCount(), 0, 1, m_numGridColumns);
 }
 
 
 /**
- * adds a horizontal line to the end of the grid layout
+ * adds spacers to the end of the grid layout of each tab page
  */
-void Settings::AddLine()
+void Settings::AddTabSpacers(int size_v)
 {
-	QFrame *frame = new QFrame(this);
-	frame->setFrameStyle(QFrame::HLine);
-	frame->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+	QSizePolicy::Policy policy_h = QSizePolicy::Fixed;
+	QSizePolicy::Policy policy_v = QSizePolicy::Fixed;
 
-	m_grid->addWidget(frame,
-		m_grid->rowCount(), 0, 1, m_numGridColumns);
+	// expanding spacer?
+	if(size_v < 0)
+	{
+		policy_v = QSizePolicy::Expanding;
+		size_v = 1;
+	}
+
+	for(auto grid : m_tab_grids)
+	{
+		QSpacerItem *spacer_end = new QSpacerItem{1, size_v, policy_h, policy_v};
+		grid->addItem(spacer_end, grid->rowCount(), 0, 1, m_numGridColumns);
+	}
 }
 
 
@@ -364,9 +418,15 @@ void Settings::AddLine()
  */
 void Settings::FinishSetup()
 {
-	AddSpacer();
-	m_grid->addWidget(m_buttonbox.get(),
-		m_grid->rowCount(), 0, 1, m_numGridColumns);
+	if(m_tabs)
+		AddTabSpacers();
+	else if(m_main_grid == m_grid)
+		AddSpacer();
+
+	if(m_tabs || m_main_grid != m_grid)
+		m_main_grid->addWidget(m_buttonbox.get(), m_main_grid->rowCount(), 0, 1, 1);
+	else
+		m_grid->addWidget(m_buttonbox.get(), m_grid->rowCount(), 0, 1, m_numGridColumns);
 
 	ApplySettings();
 }

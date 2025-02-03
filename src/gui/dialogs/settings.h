@@ -13,6 +13,7 @@
 #include <QtCore/QStringList>
 #include <QtGui/QColor>
 #include <QtWidgets/QDialog>
+#include <QtWidgets/QTabWidget>
 #include <QtWidgets/QGridLayout>
 #include <QtWidgets/QDialogButtonBox>
 #include <QtWidgets/QCheckBox>
@@ -22,6 +23,7 @@
 #include <QtWidgets/QLineEdit>
 
 #include <memory>
+#include <vector>
 
 #include "common/types.h"
 
@@ -38,12 +40,13 @@ extern const QColor& get_background_colour();
 class Settings : public QDialog
 { Q_OBJECT
 public:
-	Settings(QWidget *parent = nullptr, bool scrolling = false);
+	Settings(QWidget *parent = nullptr, bool scrolling = false, bool tabs = false);
 	virtual ~Settings() = default;
 
 	Settings(const Settings&) = delete;
 	const Settings& operator=(const Settings&) = delete;
 
+	void AddTabPage(const QString& title);
 	void AddCheckbox(const QString& key, const QString& descr, bool value);
 	void AddSpinbox(const QString& key, const QString& descr,
 		int value, int min = 0, int max = 100, int step = 1,
@@ -56,6 +59,7 @@ public:
 	void AddEditbox(const QString& key, const QString& descr, const QString& initial_value);
 	void AddDirectorybox(const QString& key, const QString& descr, const QString& initial_value);
 	void AddSpacer(int size_v = -1);
+	void AddTabSpacers(int size_v = -1);
 	void AddLine();
 	void FinishSetup();
 
@@ -77,7 +81,10 @@ private:
 	unsigned int m_numGridColumns{3};
 	unsigned int m_curGridColumn{0};
 
-	std::shared_ptr<QGridLayout> m_grid{};
+	std::shared_ptr<QGridLayout> m_main_grid{}, m_grid{};
+	//std::shared_ptr<QTabWidget> m_tabs{};
+	QTabWidget *m_tabs{};
+	std::vector<std::shared_ptr<QGridLayout>> m_tab_grids{};
 	std::shared_ptr<QDialogButtonBox> m_buttonbox{};
 
 	// check box, key, and initial value

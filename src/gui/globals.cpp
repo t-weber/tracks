@@ -26,6 +26,9 @@ t_int g_smooth_rad = 10;
 bool g_use_recent_dir = true;
 bool g_reload_last = true;
 
+// show UTF8 icons
+bool g_show_icons = true;
+
 
 // distance calculation function index
 int g_dist_func = 0;
