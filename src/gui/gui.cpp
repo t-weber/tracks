@@ -130,7 +130,7 @@ void TracksWnd::SetupGUI()
 	connect(actionSave, &QAction::triggered, this, &TracksWnd::FileSave);
 
 	QIcon iconSaveAs = QIcon::fromTheme("document-save-as");
-	QAction *actionSaveAs = new QAction{iconSaveAs, "Save as...", this};
+	QAction *actionSaveAs = new QAction{iconSaveAs, "Save As...", this};
 	connect(actionSaveAs, &QAction::triggered, this, &TracksWnd::FileSaveAs);
 
 	QIcon iconImport = QIcon::fromTheme("document-open");

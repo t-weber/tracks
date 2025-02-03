@@ -248,7 +248,7 @@ void Reports::FillDistancesTable()
 	int row = 0;
 	t_real total_dist = 0.;
 	t_real total_time = 0.;
-	for(auto iter = m_yearly.rbegin(); iter != m_yearly.rend(); ++iter)
+	for(auto iter = m_yearly.begin(); iter != m_yearly.end(); ++iter)
 	{
 		t_real epoch = std::chrono::duration_cast<typename t_track::t_sec>(
 			iter->first.time_since_epoch()).count();
@@ -257,23 +257,24 @@ void Reports::FillDistancesTable()
 		t_real dist = std::get<0>(iter->second) / 1000.;
 		total_dist += dist;
 
-		t_real time = std::get<1>(iter->second) / 3600.;;
+		t_real time = std::get<1>(iter->second) / 3600.;
 		total_time += time;
 
-		m_table->setItem(row, TAB_DATE, new DateTableWidgetItem<
+		int item_row = m_yearly.size() - row - 1;
+		m_table->setItem(item_row, TAB_DATE, new DateTableWidgetItem<
 			typename t_track::t_clk, typename t_track::t_timept, t_real>(epoch, false, " (full year)"));
-		m_table->setItem(row, TAB_COUNT, new NumericTableWidgetItem<t_size>(num_tracks, g_prec_gui));
-		m_table->setItem(row, TAB_DIST, new NumericTableWidgetItem<t_real>(dist, g_prec_gui, " km"));
-		m_table->setItem(row, TAB_DIST_SUM, new NumericTableWidgetItem<t_real>(total_dist, g_prec_gui, " km"));
-		m_table->setItem(row, TAB_TIME, new NumericTableWidgetItem<t_real>(time, g_prec_gui, " h"));
-		m_table->setItem(row, TAB_TIME_SUM, new NumericTableWidgetItem<t_real>(total_time, g_prec_gui, " h"));
+		m_table->setItem(item_row, TAB_COUNT, new NumericTableWidgetItem<t_size>(num_tracks, g_prec_gui));
+		m_table->setItem(item_row, TAB_DIST, new NumericTableWidgetItem<t_real>(dist, g_prec_gui, " km"));
+		m_table->setItem(item_row, TAB_DIST_SUM, new NumericTableWidgetItem<t_real>(total_dist, g_prec_gui, " km"));
+		m_table->setItem(item_row, TAB_TIME, new NumericTableWidgetItem<t_real>(time, g_prec_gui, " h"));
+		m_table->setItem(item_row, TAB_TIME_SUM, new NumericTableWidgetItem<t_real>(total_time, g_prec_gui, " h"));
 
 		for(int col = 0; col < TAB_NUM_COLS; ++col)
 		{
-			QTableWidgetItem *item = m_table->item(row, col);
+			QTableWidgetItem *item = m_table->item(item_row, col);
 
 			// set read-only
-			item->setFlags(m_table->item(row, col)->flags() & ~Qt::ItemIsEditable);
+			item->setFlags(item->flags() & ~Qt::ItemIsEditable);
 
 			// swap colours
 			QBrush bg = item->background();
@@ -292,7 +293,7 @@ void Reports::FillDistancesTable()
 	// monthly distances
 	total_dist = 0.;
 	total_time = 0.;
-	for(auto iter = m_monthly.rbegin(); iter != m_monthly.rend(); ++iter)
+	for(auto iter = m_monthly.begin(); iter != m_monthly.end(); ++iter)
 	{
 		t_real epoch = std::chrono::duration_cast<typename t_track::t_sec>(
 			iter->first.time_since_epoch()).count();
@@ -304,19 +305,21 @@ void Reports::FillDistancesTable()
 		t_real time = std::get<1>(iter->second) / 3600.;
 		total_time += time;
 
-		m_table->setItem(row, TAB_DATE, new DateTableWidgetItem<
+		int item_row = m_yearly.size()*2 + m_monthly.size() - row - 1;
+		m_table->setItem(item_row, TAB_DATE, new DateTableWidgetItem<
 			typename t_track::t_clk, typename t_track::t_timept, t_real>(epoch, true));
-		m_table->setItem(row, TAB_COUNT, new NumericTableWidgetItem<t_size>(num_tracks, g_prec_gui));
-		m_table->setItem(row, TAB_DIST, new NumericTableWidgetItem<t_real>(dist, g_prec_gui, " km"));
-		m_table->setItem(row, TAB_DIST_SUM, new NumericTableWidgetItem<t_real>(total_dist, g_prec_gui, " km"));
-		m_table->setItem(row, TAB_TIME, new NumericTableWidgetItem<t_real>(time, g_prec_gui, " h"));
-		m_table->setItem(row, TAB_TIME_SUM, new NumericTableWidgetItem<t_real>(total_time, g_prec_gui, " h"));
+		m_table->setItem(item_row, TAB_COUNT, new NumericTableWidgetItem<t_size>(num_tracks, g_prec_gui));
+		m_table->setItem(item_row, TAB_DIST, new NumericTableWidgetItem<t_real>(dist, g_prec_gui, " km"));
+		m_table->setItem(item_row, TAB_DIST_SUM, new NumericTableWidgetItem<t_real>(total_dist, g_prec_gui, " km"));
+		m_table->setItem(item_row, TAB_TIME, new NumericTableWidgetItem<t_real>(time, g_prec_gui, " h"));
+		m_table->setItem(item_row, TAB_TIME_SUM, new NumericTableWidgetItem<t_real>(total_time, g_prec_gui, " h"));
 
-		// set read-only
 		for(int col = 0; col < TAB_NUM_COLS; ++col)
 		{
-			m_table->item(row, col)->setFlags(
-				m_table->item(row, col)->flags() & ~Qt::ItemIsEditable);
+			QTableWidgetItem *item = m_table->item(item_row, col);
+
+			// set read-only
+			item->setFlags(item->flags() & ~Qt::ItemIsEditable);
 		}
 
 		++row;
