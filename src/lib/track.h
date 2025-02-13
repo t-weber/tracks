@@ -706,7 +706,7 @@ public:
 		ostr << "<li>";
 		if(show_icons)
 			ostr << "&#x26f0; ";
-		ostr << "<b>Climb</b>: " << asc << " m, <b>down</b>: " << desc << " m.</li>";
+		ostr << "<b>Uphill</b>: " << asc << " m, <b>downhill</b>: " << desc << " m.</li>";
 
 		ostr << "<li>";
 		if(show_icons)
@@ -784,7 +784,7 @@ public:
 		ostr << "Number of track points: " << track.GetPoints().size() << "\n";
 		ostr << "Altitude range: [ " << min_elev << ", " << max_elev << " ] m\n";
 		ostr << "Height difference: " << max_elev - min_elev << " m\n";
-		ostr << "Climb: " << asc << " m, descent: " << desc << " m\n";
+		ostr << "Uphill: " << asc << " m, downhill: " << desc << " m\n";
 		ostr << "Total distance: " << s << " m = " << s / 1000. << " km\n";
 		ostr << "Total planar distance: " << s_planar / 1000. << " km\n";
 		ostr << "Total time: " << get_time_str(t) << "\n";
