@@ -23,7 +23,7 @@
 #define TAB_DURATION  2
 #define TAB_DISTANCE  3
 #define TAB_PACE      4
-#define TAB_CLIMB     5
+#define TAB_UPHILL    5
 #define TAB_HEIGHT    6
 #define TAB_NUM_COLS  7
 
@@ -52,7 +52,7 @@ Summary::Summary(QWidget* parent)
 	m_table->setHorizontalHeaderItem(TAB_DURATION, new QTableWidgetItem{"Duration"});
 	m_table->setHorizontalHeaderItem(TAB_DISTANCE, new QTableWidgetItem{"Distance"});
 	m_table->setHorizontalHeaderItem(TAB_PACE, new QTableWidgetItem{"Pace"});
-	m_table->setHorizontalHeaderItem(TAB_CLIMB, new QTableWidgetItem{"Climb"});
+	m_table->setHorizontalHeaderItem(TAB_UPHILL, new QTableWidgetItem{"Uphill"});
 	m_table->setHorizontalHeaderItem(TAB_HEIGHT, new QTableWidgetItem{"Height"});
 
 	m_table->horizontalHeader()->setDefaultSectionSize(150);
@@ -153,9 +153,9 @@ Summary::Summary(QWidget* parent)
 	else
 		m_table->setColumnWidth(TAB_PACE, 115);
 	if(settings.contains("dlg_summary/climb_col"))
-		m_table->setColumnWidth(TAB_CLIMB, settings.value("dlg_summary/climb_col").toInt());
+		m_table->setColumnWidth(TAB_UPHILL, settings.value("dlg_summary/climb_col").toInt());
 	else
-		m_table->setColumnWidth(TAB_CLIMB, 115);
+		m_table->setColumnWidth(TAB_UPHILL, 115);
 	if(settings.contains("dlg_summary/height_col"))
 		m_table->setColumnWidth(TAB_HEIGHT, settings.value("dlg_summary/height_col").toInt());
 	else
@@ -204,7 +204,7 @@ void Summary::FillTable()
 		m_table->setItem(row, TAB_DURATION, new NumericTableWidgetItem<t_real>(duration, g_prec_gui, " min"));
 		m_table->setItem(row, TAB_DISTANCE, new NumericTableWidgetItem<t_real>(distance, g_prec_gui, " km"));
 		m_table->setItem(row, TAB_PACE, new NumericTableWidgetItem<t_real>(duration / distance, g_prec_gui, " min/km"));
-		m_table->setItem(row, TAB_CLIMB, new NumericTableWidgetItem<t_real>(climb, g_prec_gui, " m"));
+		m_table->setItem(row, TAB_UPHILL, new NumericTableWidgetItem<t_real>(climb, g_prec_gui, " m"));
 		m_table->setItem(row, TAB_HEIGHT, new NumericTableWidgetItem<t_real>(height, g_prec_gui, " m"));
 
 		// set all items read-only
@@ -329,7 +329,7 @@ void Summary::accept()
 		settings.setValue("dlg_summary/duration_col", m_table->columnWidth(TAB_DURATION));
 		settings.setValue("dlg_summary/distance_col", m_table->columnWidth(TAB_DISTANCE));
 		settings.setValue("dlg_summary/pace_col", m_table->columnWidth(TAB_PACE));
-		settings.setValue("dlg_summary/climb_col", m_table->columnWidth(TAB_CLIMB));
+		settings.setValue("dlg_summary/climb_col", m_table->columnWidth(TAB_UPHILL));
 		settings.setValue("dlg_summary/height_col", m_table->columnWidth(TAB_HEIGHT));
 	}
 
