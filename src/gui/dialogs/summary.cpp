@@ -18,14 +18,15 @@
 
 
 // table columns
-#define TAB_NAME      0
-#define TAB_DATE      1
-#define TAB_DURATION  2
-#define TAB_DISTANCE  3
-#define TAB_PACE      4
-#define TAB_UPHILL    5
-#define TAB_HEIGHT    6
-#define TAB_NUM_COLS  7
+#define TAB_NAME       0
+#define TAB_DATE       1
+#define TAB_DURATION   2
+#define TAB_DISTANCE   3
+#define TAB_PACE       4
+#define TAB_UPHILL     5
+#define TAB_HEIGHT     6
+#define TAB_LASTTRACK  7
+#define TAB_NUM_COLS   8
 
 
 #define TRACK_IDX     Qt::UserRole + 0
@@ -54,6 +55,7 @@ Summary::Summary(QWidget* parent)
 	m_table->setHorizontalHeaderItem(TAB_PACE, new QTableWidgetItem{"Pace"});
 	m_table->setHorizontalHeaderItem(TAB_UPHILL, new QTableWidgetItem{"Uphill"});
 	m_table->setHorizontalHeaderItem(TAB_HEIGHT, new QTableWidgetItem{"Height"});
+	m_table->setHorizontalHeaderItem(TAB_LASTTRACK, new QTableWidgetItem{"Since Last"});
 
 	m_table->horizontalHeader()->setDefaultSectionSize(150);
 	m_table->verticalHeader()->setDefaultSectionSize(24);
@@ -160,6 +162,10 @@ Summary::Summary(QWidget* parent)
 		m_table->setColumnWidth(TAB_HEIGHT, settings.value("dlg_summary/height_col").toInt());
 	else
 		m_table->setColumnWidth(TAB_HEIGHT, 115);
+	if(settings.contains("dlg_summary/lasttrack_col"))
+		m_table->setColumnWidth(TAB_LASTTRACK, settings.value("dlg_summary/lasttrack_col").toInt());
+	else
+		m_table->setColumnWidth(TAB_LASTTRACK, 115);
 }
 
 
@@ -189,7 +195,16 @@ void Summary::FillTable()
 	{
 		const t_track *track = m_trackdb->GetTrack(track_idx);
 		const int row = static_cast<int>(track_idx);
-		const auto start_time = track->GetStartTime();
+		const std::optional<typename t_track::t_timept> start_time = track->GetStartTime();
+		t_real sincelasttrack = 99999.;
+		if(track_idx < m_trackdb->GetTrackCount() - 1)
+		{
+			const t_track *last_track = m_trackdb->GetTrack(track_idx + 1);
+			const std::optional<typename t_track::t_timept> last_time
+				= last_track->GetEndTime();
+			sincelasttrack = std::chrono::duration_cast<typename t_track::t_sec>(
+				*start_time - *last_time).count() / 60. / 60. / 24.;
+		}
 		const t_real epoch = start_time ? std::chrono::duration_cast<typename t_track::t_sec>(
 			start_time->time_since_epoch()).count() : 0.;
 		const t_real duration = track->GetTotalTime() / 60.;
@@ -206,6 +221,7 @@ void Summary::FillTable()
 		m_table->setItem(row, TAB_PACE, new NumericTableWidgetItem<t_real>(duration / distance, g_prec_gui, " min/km"));
 		m_table->setItem(row, TAB_UPHILL, new NumericTableWidgetItem<t_real>(climb, g_prec_gui, " m"));
 		m_table->setItem(row, TAB_HEIGHT, new NumericTableWidgetItem<t_real>(height, g_prec_gui, " m"));
+		m_table->setItem(row, TAB_LASTTRACK, new NumericTableWidgetItem<t_real>(sincelasttrack, g_prec_gui, " d"));
 
 		// set all items read-only
 		for(int col = 0; col < TAB_NUM_COLS; ++col)
@@ -331,6 +347,7 @@ void Summary::accept()
 		settings.setValue("dlg_summary/pace_col", m_table->columnWidth(TAB_PACE));
 		settings.setValue("dlg_summary/climb_col", m_table->columnWidth(TAB_UPHILL));
 		settings.setValue("dlg_summary/height_col", m_table->columnWidth(TAB_HEIGHT));
+		settings.setValue("dlg_summary/lasttrack_col", m_table->columnWidth(TAB_LASTTRACK));
 	}
 
 	QDialog::accept();
