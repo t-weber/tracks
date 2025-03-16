@@ -16,7 +16,11 @@
 #include <qcustomplot.h>
 #pragma GCC diagnostic pop
 
-#include <QtSvg/QSvgWidget>
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+	#include <QtSvgWidgets/QSvgWidget>
+#else
+	#include <QtSvg/QSvgWidget>
+#endif
 
 #include "lib/map.h"
 #include "../globals.h"

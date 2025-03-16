@@ -20,7 +20,6 @@ set(CMAKE_CXX_STANDARD 20)
 add_compile_options(-std=c++20)
 add_compile_options(-Wall -Wextra -Weffc++)
 
-
 # see: https://cmake.org/cmake/help/latest/module/FindBoost.html
 find_package(Boost REQUIRED COMPONENTS system filesystem)
 add_compile_options(${Boost_CXX_FLAGS})
@@ -42,17 +41,18 @@ else()
 endif()
 
 
-find_package(Qt5Core REQUIRED)
-find_package(Qt5Gui REQUIRED)
-find_package(Qt5Widgets REQUIRED)
-find_package(Qt5Svg REQUIRED)
-find_package(Qt5PrintSupport REQUIRED)
+#find_package(Qt5Core REQUIRED)
+#find_package(Qt5Gui REQUIRED)
+#find_package(Qt5Widgets REQUIRED)
+#find_package(Qt5Svg REQUIRED)
+#find_package(Qt5PrintSupport REQUIRED)
 
-#find_package(Qt6Core REQUIRED)
-#find_package(Qt6Gui REQUIRED)
-#find_package(Qt6Widgets REQUIRED)
-#find_package(Qt6Svg REQUIRED)
-#find_package(Qt6PrintSupport REQUIRED)
+find_package(Qt6Core REQUIRED)
+find_package(Qt6Gui REQUIRED)
+find_package(Qt6Widgets REQUIRED)
+find_package(Qt6SvgWidgets REQUIRED)
+find_package(Qt6Svg REQUIRED)
+find_package(Qt6PrintSupport REQUIRED)
 
 
 set(CMAKE_AUTOUIC ON)
@@ -61,12 +61,16 @@ set(CMAKE_AUTOMOC ON)
 if(TARGET Qt6::Core)
 	message(NOTICE "Using Qt 6.")
 	list(APPEND QtTargets Qt6::Core Qt6::Gui
-		Qt6::Widgets Qt6::Svg Qt6::PrintSupport)
+		Qt6::Widgets Qt6::SvgWidgets
+		Qt6::Svg Qt6::PrintSupport)
 elseif(TARGET Qt5::Core)
 	message(NOTICE "Using Qt 5.")
 	list(APPEND QtTargets Qt5::Core Qt5::Gui
 		Qt5::Widgets Qt5::Svg Qt5::PrintSupport)
 endif()
+
+
+include(GNUInstallDirs)
 
 
 include_directories(
@@ -126,6 +130,8 @@ target_link_libraries(tracks
 	${QtTargets}
 	Boost::system Boost::filesystem
 )
+
+install(TARGETS tracks RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 # -----------------------------------------------------------------------------
 
 
@@ -142,6 +148,8 @@ add_executable(tracks_cli
 
 target_link_libraries(tracks_cli)
 
+install(TARGETS tracks_cli RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+
 
 add_executable(maps_cli
 	src/cli/maps.cpp
@@ -150,7 +158,17 @@ add_executable(maps_cli
 	src/lib/map.h
 )
 
-target_link_libraries(maps_cli
-	${OSMIUM_LIBRARIES}
-)
+target_link_libraries(maps_cli ${OSMIUM_LIBRARIES})
+
+install(TARGETS maps_cli RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+# -----------------------------------------------------------------------------
+
+
+# -----------------------------------------------------------------------------
+# packaging
+# -----------------------------------------------------------------------------
+set(CPACK_PACKAGE_VERSION "0.3")
+set(CPACK_RESOURCE_FILE_LICENSE "${PROJECT_SOURCE_DIR}/LICENSE")
+
+include(CPack)
 # -----------------------------------------------------------------------------

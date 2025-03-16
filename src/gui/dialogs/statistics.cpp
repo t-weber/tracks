@@ -368,7 +368,7 @@ void Statistics::PlotMouseClick(QMouseEvent *evt)
 		return;
 
 #if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
-	QPoint pos = evt->position();
+	QPoint pos = evt->position().toPoint();
 #else
 	QPoint pos = evt->pos();
 #endif
