@@ -13,8 +13,13 @@
 #include <algorithm>
 #include <map>
 #include <tuple>
+#include <vector>
 #include <string_view>
 #include <concepts>
+#include <thread>
+#include <mutex>
+#include <future>
+#include <boost/asio.hpp>
 
 
 #define TRACKDB_MAGIC "TRACKDB"
@@ -38,7 +43,13 @@ public:
 
 
 public:
-	MultipleTracks() = default;
+	MultipleTracks()
+		: m_num_threads{std::max<unsigned int>(std::thread::hardware_concurrency() / 2, 1)}
+	{
+	}
+
+
+
 	~MultipleTracks() = default;
 
 
@@ -132,8 +143,17 @@ public:
 	 */
 	void Calculate()
 	{
+		boost::asio::thread_pool tp{m_num_threads};
+
 		for(t_track& track : m_tracks)
-			track.Calculate();
+		{
+			boost::asio::post(tp, [&track]() -> void
+			{
+				track.Calculate();
+			});
+		}
+
+		tp.join();
 	}
 
 
@@ -196,27 +216,50 @@ public:
 
 		t_pos pos_addresses = ifstr.tellg();
 
+		boost::asio::thread_pool tp{m_num_threads};
+		std::vector<std::shared_ptr<std::packaged_task<std::optional<t_track>()>>> tasks;
+		tasks.reserve(num_tracks);
+
 		for(t_size trackidx = 0; trackidx < num_tracks; ++trackidx)
 		{
-			// read track start address
-			t_size pos_track = 0;
-			ifstr.seekg(pos_addresses + static_cast<t_pos>(trackidx*sizeof(t_size)), std::ios::beg);
-			ifstr.read(reinterpret_cast<char*>(&pos_track), sizeof(pos_track));
+			auto task_func = [this, &filename, pos_addresses, trackidx]() -> std::optional<t_track>
+			{
+				std::ifstream ifstr_track{filename, std::ios::binary};
+				if(!ifstr_track)
+					return std::nullopt;
 
-			// seek to track
-			ifstr.seekg(static_cast<t_pos>(pos_track), std::ios::beg);
+				// read track start address
+				t_size pos_track = 0;
+				ifstr_track.seekg(pos_addresses + static_cast<t_pos>(trackidx*sizeof(t_size)), std::ios::beg);
+				ifstr_track.read(reinterpret_cast<char*>(&pos_track), sizeof(pos_track));
 
-			t_track track{};
-			track.SetDistanceFunction(m_distance_function);
-			track.SetAscentEpsilon(m_asc_eps);
-			track.SetSmoothRadius(m_smooth_rad);
+				// seek to track
+				ifstr_track.seekg(static_cast<t_pos>(pos_track), std::ios::beg);
 
-			if(!track.Load(ifstr))
-				return false;
+				t_track track{};
+				track.SetDistanceFunction(m_distance_function);
+				track.SetAscentEpsilon(m_asc_eps);
+				track.SetSmoothRadius(m_smooth_rad);
 
-			m_tracks.emplace_back(std::move(track));
+				if(!track.Load(ifstr_track))
+					return std::nullopt;
+
+				return track;
+			};
+
+			auto task = std::make_shared<std::packaged_task<std::optional<t_track>()>>(task_func);
+			boost::asio::post(tp, [task]() -> void { (*task)(); });
+			tasks.push_back(task);
 		}
 
+		for(auto& task : tasks)
+		{
+			auto track = task->get_future().get();
+			if(track)
+				m_tracks.emplace_back(std::move(*track));
+		}
+
+		tp.join();
 		SortTracks();
 		return true;
 	}
@@ -247,7 +290,7 @@ public:
 
 
 	/**
-	 * number of neighbouring point to include in data smoothing
+	 * number of neighbouring points to include in data smoothing
 	 */
 	void SetSmoothRadius(t_size rad)
 	{
@@ -259,16 +302,39 @@ public:
 
 
 
+	void SetNumThreads(unsigned int num)
+	{
+		m_num_threads = num;
+	}
+
+
+
 	/**
 	 * total distance of all tracks
 	 */
 	t_real GetTotalDistance(bool planar = false) const
 	{
-		t_real dist{};
+		boost::asio::thread_pool tp{m_num_threads};
+		std::vector<std::shared_ptr<std::packaged_task<t_real()>>> tasks;
+		tasks.reserve(m_tracks.size());
 
 		for(const t_track& track : m_tracks)
-			dist += track.GetTotalDistance(planar);
+		{
+			auto task_func = [&track, planar]() -> t_real
+			{
+				return track.GetTotalDistance(planar);
+			};
 
+			auto task = std::make_shared<std::packaged_task<t_real()>>(task_func);
+			boost::asio::post(tp, [task]() -> void { (*task)(); });
+			tasks.push_back(task);
+		}
+
+		t_real dist{};
+		for(auto& task : tasks)
+			dist += task->get_future().get();
+
+		tp.join();
 		return dist;
 	}
 
@@ -280,29 +346,38 @@ public:
 	t_timept_map GetDistancePerPeriod(bool planar = false, bool yearly = false) const
 	{
 		t_timept_map map;
+		std::mutex mtx;
+
+		boost::asio::thread_pool tp{m_num_threads};
 
 		for(const t_track& track : m_tracks)
 		{
-			std::optional<t_timept> tp = track.GetStartTime();
-			if(!tp)
-				continue;
-			t_timept tp_rd = round_timepoint<t_clk, t_timept>(*tp, yearly);
-
-			t_real dist = track.GetTotalDistance(planar);
-			t_real time = track.GetTotalTime();
-
-			if(auto iter = map.find(tp_rd); iter != map.end())
+			boost::asio::post(tp, [&track, &map, &mtx, planar, yearly]() -> void
 			{
-				std::get<0>(iter->second) += dist;  // distance
-				std::get<1>(iter->second) += time;  // time
-				++std::get<2>(iter->second);        // track counter
-			}
-			else
-			{
-				map.insert(std::make_pair(tp_rd, std::make_tuple(dist, time, 1)));
-			}
+				std::optional<t_timept> tpt = track.GetStartTime();
+				if(!tpt)
+					return;
+				t_timept tpt_rd = round_timepoint<t_clk, t_timept>(*tpt, yearly);
+
+				t_real dist = track.GetTotalDistance(planar);
+				t_real time = track.GetTotalTime();
+
+				std::lock_guard lck{mtx};
+
+				if(auto iter = map.find(tpt_rd); iter != map.end())
+				{
+					std::get<0>(iter->second) += dist;  // distance
+					std::get<1>(iter->second) += time;  // time
+					++std::get<2>(iter->second);        // track counter
+				}
+				else
+				{
+					map.insert(std::make_pair(tpt_rd, std::make_tuple(dist, time, 1)));
+				}
+			});
 		}
 
+		tp.join();
 		return map;
 	}
 
@@ -315,6 +390,8 @@ private:
 
 	t_real m_asc_eps{5.};
 	t_size m_smooth_rad{10};
+
+	unsigned int m_num_threads = 4;
 };
 
 

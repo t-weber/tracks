@@ -33,6 +33,9 @@ extern t_int g_prec_gui;
 // radius for data smoothing
 extern t_int g_smooth_rad;
 
+// number of calculation threads
+extern t_int g_num_threads;
+
 
 // use recently used directory or a special document folder
 extern bool g_use_recent_dir;

@@ -895,6 +895,8 @@ void TracksWnd::ShowSettings(bool only_create)
 			{ "Haversine Formula", "Thomas Formula",
 			"Vincenty Formula", "Karney Formula" },
 			g_dist_func);
+		m_settings->AddSpinbox("settings/num_threads",
+			"Number of threads:", g_num_threads, 1, 64, 1);
 
 		if(tabs)
 			m_settings->AddTabPage("Maps");
@@ -948,6 +950,8 @@ void TracksWnd::ApplySettings()
 		value<decltype(g_smooth_rad)>();
 	g_dist_func = m_settings->GetValue("settings/distance_function").
 		value<decltype(g_dist_func)>();
+	g_num_threads = m_settings->GetValue("settings/num_threads").
+		value<decltype(g_num_threads)>();
 	g_assume_dt = m_settings->GetValue("settings/assume_dt").
 		value<decltype(g_assume_dt)>();
 	g_map_scale = m_settings->GetValue("settings/map_scale").
@@ -965,6 +969,7 @@ void TracksWnd::ApplySettings()
 	g_temp_dir = m_settings->GetValue("settings/temp_dir").toString();
 
 	CreateTempDir();
+	m_trackdb.SetNumThreads(g_num_threads);
 	m_trackdb.SetDistanceFunction(g_dist_func);
 	m_trackdb.SetAscentEpsilon(g_asc_eps);
 	m_trackdb.SetSmoothRadius(g_smooth_rad);

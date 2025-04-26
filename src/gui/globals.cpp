@@ -9,6 +9,7 @@
 
 #include <QtCore/QDir>
 
+#include <thread>
 //#include <limits>
 
 
@@ -21,6 +22,10 @@ t_int g_prec_gui = 4;
 
 // radius for data smoothing
 t_int g_smooth_rad = 10;
+
+
+// number of calculation threads
+t_int g_num_threads = std::max<unsigned int>(std::thread::hardware_concurrency() / 2, 1);
 
 
 bool g_use_recent_dir = true;
