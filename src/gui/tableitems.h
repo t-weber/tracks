@@ -68,7 +68,7 @@ public:
 	}
 
 
-	void SetTextFromData()
+	virtual void SetTextFromData()
 	{
 		std::ostringstream ostr;
 		ostr.precision(m_prec);
@@ -96,7 +96,7 @@ public:
 	}
 
 
-private:
+protected:
 	T m_val{};
 	int m_prec{6};
 
@@ -277,6 +277,40 @@ public:
 
 private:
 	t_epoch m_val{};
+};
+
+
+
+template<class t_pace>
+class PaceTableWidgetItem : public NumericTableWidgetItem<t_pace>
+{
+public:
+	PaceTableWidgetItem(const t_pace& val, int prec = 6, const std::string& suffix = "")
+		: NumericTableWidgetItem<t_pace>{val, prec, suffix}
+	{
+		SetTextFromData();
+	}
+
+
+	virtual ~PaceTableWidgetItem() = default;
+
+
+	virtual QTableWidgetItem* clone() const override
+	{
+		return new PaceTableWidgetItem<t_pace>(this->m_val, this->m_prec, this->m_suffix);
+	}
+
+
+	virtual void SetTextFromData() override
+	{
+		std::ostringstream ostr;
+		ostr.precision(this->m_prec);
+
+		ostr << get_pace_str(this->m_val);
+		ostr << this->m_suffix;
+
+		this->setText(ostr.str().c_str());
+	}
 };
 
 

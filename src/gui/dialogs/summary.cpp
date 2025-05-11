@@ -10,6 +10,8 @@
 #include "../helpers.h"
 #include "../tableitems.h"
 
+#include <optional>
+
 #include <QtCore/QSettings>
 #include <QtCore/QByteArray>
 #include <QtWidgets/QGridLayout>
@@ -18,18 +20,19 @@
 
 
 // table columns
-#define TAB_NAME       0
-#define TAB_DATE       1
-#define TAB_DURATION   2
-#define TAB_DISTANCE   3
-#define TAB_PACE       4
-#define TAB_UPHILL     5
-#define TAB_HEIGHT     6
-#define TAB_LASTTRACK  7
-#define TAB_NUM_COLS   8
+#define TAB_NAME         0
+#define TAB_DATE         1
+#define TAB_DURATION     2
+#define TAB_DISTANCE     3
+#define TAB_DISTANCE_SUM 4
+#define TAB_PACE         5
+#define TAB_UPHILL       6
+#define TAB_HEIGHT       7
+#define TAB_LASTTRACK    8
+#define TAB_NUM_COLS     9
 
 
-#define TRACK_IDX     Qt::UserRole + 0
+#define TRACK_IDX Qt::UserRole + 0
 
 
 Summary::Summary(QWidget* parent)
@@ -52,6 +55,7 @@ Summary::Summary(QWidget* parent)
 	m_table->setHorizontalHeaderItem(TAB_DATE, new QTableWidgetItem{"Date"});
 	m_table->setHorizontalHeaderItem(TAB_DURATION, new QTableWidgetItem{"Duration"});
 	m_table->setHorizontalHeaderItem(TAB_DISTANCE, new QTableWidgetItem{"Distance"});
+	m_table->setHorizontalHeaderItem(TAB_DISTANCE_SUM, new QTableWidgetItem{"Distance Sum"});
 	m_table->setHorizontalHeaderItem(TAB_PACE, new QTableWidgetItem{"Pace"});
 	m_table->setHorizontalHeaderItem(TAB_UPHILL, new QTableWidgetItem{"Uphill"});
 	m_table->setHorizontalHeaderItem(TAB_HEIGHT, new QTableWidgetItem{"Height"});
@@ -150,6 +154,10 @@ Summary::Summary(QWidget* parent)
 		m_table->setColumnWidth(TAB_DISTANCE, settings.value("dlg_summary/distance_col").toInt());
 	else
 		m_table->setColumnWidth(TAB_DISTANCE, 115);
+	if(settings.contains("dlg_summary/distance_sum_col"))
+		m_table->setColumnWidth(TAB_DISTANCE_SUM, settings.value("dlg_summary/distance_sum_col").toInt());
+	else
+		m_table->setColumnWidth(TAB_DISTANCE_SUM, 115);
 	if(settings.contains("dlg_summary/pace_col"))
 		m_table->setColumnWidth(TAB_PACE, settings.value("dlg_summary/pace_col").toInt());
 	else
@@ -191,12 +199,14 @@ void Summary::FillTable()
 	m_table->setRowCount(m_trackdb->GetTrackCount());
 
 	// iterate all tracks
-	for(t_size track_idx = 0; track_idx < m_trackdb->GetTrackCount(); ++track_idx)
+	t_real distance_sum{};
+	for(t_size _track_idx = 0; _track_idx < m_trackdb->GetTrackCount(); ++_track_idx)
 	{
+		const t_size track_idx = m_trackdb->GetTrackCount() - _track_idx - 1;
 		const t_track *track = m_trackdb->GetTrack(track_idx);
-		const int row = static_cast<int>(track_idx);
+
 		const std::optional<typename t_track::t_timept> start_time = track->GetStartTime();
-		t_real sincelasttrack = 99999.;
+		std::optional<t_real> sincelasttrack;
 		if(track_idx < m_trackdb->GetTrackCount() - 1)
 		{
 			const t_track *last_track = m_trackdb->GetTrack(track_idx + 1);
@@ -208,20 +218,43 @@ void Summary::FillTable()
 		const t_real epoch = start_time ? std::chrono::duration_cast<typename t_track::t_sec>(
 			start_time->time_since_epoch()).count() : 0.;
 		const t_real duration = track->GetTotalTime() / 60.;
+
 		const t_real distance = track->GetTotalDistance() / 1000.;
+		distance_sum += distance;
+
 		const auto [ climb, climb_down ] = track->GetAscentDescent();
 		const auto [ min_elev, max_elev ] = track->GetElevationRange();
 		const t_real height = max_elev - min_elev;
 
+		const int row = static_cast<int>(track_idx);
 		m_table->setItem(row, TAB_NAME, new QTableWidgetItem{track->GetFileName().c_str()});
 		m_table->setItem(row, TAB_DATE, new DateTimeTableWidgetItem<
 			typename t_track::t_clk, typename t_track::t_timept, t_real>(epoch));
-		m_table->setItem(row, TAB_DURATION, new NumericTableWidgetItem<t_real>(duration, g_prec_gui, " min"));
-		m_table->setItem(row, TAB_DISTANCE, new NumericTableWidgetItem<t_real>(distance, g_prec_gui, " km"));
-		m_table->setItem(row, TAB_PACE, new NumericTableWidgetItem<t_real>(duration / distance, g_prec_gui, " min/km"));
-		m_table->setItem(row, TAB_UPHILL, new NumericTableWidgetItem<t_real>(climb, g_prec_gui, " m"));
-		m_table->setItem(row, TAB_HEIGHT, new NumericTableWidgetItem<t_real>(height, g_prec_gui, " m"));
-		m_table->setItem(row, TAB_LASTTRACK, new NumericTableWidgetItem<t_real>(sincelasttrack, g_prec_gui, " d"));
+		m_table->setItem(row, TAB_DURATION,
+			new NumericTableWidgetItem<t_real>(duration, g_prec_gui, " min"));
+		m_table->setItem(row, TAB_DISTANCE,
+			new NumericTableWidgetItem<t_real>(distance, g_prec_gui, " km"));
+		m_table->setItem(row, TAB_DISTANCE_SUM,
+			new NumericTableWidgetItem<t_real>(distance_sum, g_prec_gui, " km"));
+		m_table->setItem(row, TAB_PACE,
+			new PaceTableWidgetItem<t_real>(duration / distance, g_prec_gui, ""));
+		m_table->setItem(row, TAB_UPHILL,
+			new NumericTableWidgetItem<t_real>(climb, g_prec_gui, " m"));
+		m_table->setItem(row, TAB_HEIGHT,
+			new NumericTableWidgetItem<t_real>(height, g_prec_gui, " m"));
+		if(sincelasttrack)
+		{
+			m_table->setItem(row, TAB_LASTTRACK,
+				new NumericTableWidgetItem<t_real>(*sincelasttrack, g_prec_gui, " d"));
+		}
+		else
+		{
+			// first track, no time since last track available
+			NumericTableWidgetItem<t_real>* item =
+				new NumericTableWidgetItem<t_real>(99999., g_prec_gui, " d");
+			item->setText("--");
+			m_table->setItem(row, TAB_LASTTRACK, item);
+		}
 
 		// set all items read-only
 		for(int col = 0; col < TAB_NUM_COLS; ++col)
@@ -344,6 +377,7 @@ void Summary::accept()
 		settings.setValue("dlg_summary/date_col", m_table->columnWidth(TAB_DATE));
 		settings.setValue("dlg_summary/duration_col", m_table->columnWidth(TAB_DURATION));
 		settings.setValue("dlg_summary/distance_col", m_table->columnWidth(TAB_DISTANCE));
+		settings.setValue("dlg_summary/distance_sum_col", m_table->columnWidth(TAB_DISTANCE_SUM));
 		settings.setValue("dlg_summary/pace_col", m_table->columnWidth(TAB_PACE));
 		settings.setValue("dlg_summary/climb_col", m_table->columnWidth(TAB_UPHILL));
 		settings.setValue("dlg_summary/height_col", m_table->columnWidth(TAB_HEIGHT));
