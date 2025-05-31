@@ -484,6 +484,8 @@ void TrackInfos::PlotAlt()
 		return;
 
 	m_alt_plot->clearPlottables();
+	m_distances.clear();
+	m_altitudes.clear();
 
 	const bool plot_time = m_time_check->isChecked();
 	if(plot_time)
@@ -491,9 +493,8 @@ void TrackInfos::PlotAlt()
 	else
 		m_alt_plot->xAxis->setLabel("Distance (km)");
 
-	QVector<t_real> dist, alt;
-	dist.reserve(m_track->GetPoints().size());
-	alt.reserve(m_track->GetPoints().size());
+	m_distances.reserve(m_track->GetPoints().size());
+	m_altitudes.reserve(m_track->GetPoints().size());
 
 	m_min_alt = std::numeric_limits<t_real>::max();
 	m_max_alt = -m_min_alt;
@@ -504,15 +505,15 @@ void TrackInfos::PlotAlt()
 		{
 			if(std::abs(pt.elapsed) < g_eps)
 				continue;
-			dist.push_back(pt.elapsed_total / 60.);
+			m_distances.push_back(pt.elapsed_total / 60.);
 		}
 		else
 		{
 			if(std::abs(pt.distance) < g_eps)
 				continue;
-			dist.push_back(pt.distance_total / 1000.);
+			m_distances.push_back(pt.distance_total / 1000.);
 		}
-		alt.push_back(pt.elevation);
+		m_altitudes.push_back(pt.elevation);
 
 		m_min_alt = std::min(m_min_alt, pt.elevation);
 		m_max_alt = std::max(m_max_alt, pt.elevation);
@@ -520,15 +521,15 @@ void TrackInfos::PlotAlt()
 
 	// smooth curve
 	if(m_smooth_check->isChecked() && g_smooth_rad > 0)
-		alt = smooth_data(alt, g_smooth_rad);
+		m_altitudes = smooth_data(m_altitudes, g_smooth_rad);
 
-	if(!alt.size())
+	if(!m_altitudes.size())
 		return;
 
 	if(plot_time)
 	{
-		m_min_dist_alt = *dist.begin();
-		m_max_dist_alt = *dist.rbegin() * 1.01;
+		m_min_dist_alt = *m_distances.begin();
+		m_max_dist_alt = *m_distances.rbegin() * 1.01;
 	}
 	else
 	{
@@ -538,7 +539,7 @@ void TrackInfos::PlotAlt()
 	}
 
 	QCPGraph *curve = new QCPGraph(m_alt_plot->xAxis, m_alt_plot->yAxis);
-	curve->setData(dist, alt);
+	curve->setData(m_distances, m_altitudes);
 	curve->setLineStyle(QCPGraph::lsLine);
 
 	QPen pen = curve->pen();
@@ -570,6 +571,8 @@ void TrackInfos::PlotPace()
 		return;
 
 	m_pace_plot->clearPlottables();
+	m_times.clear();
+	m_dists.clear();
 
 	const t_real dist_bin = m_dist_binlen->value() * 1000.;
 	const bool plot_speed = m_speed_check->isChecked();
@@ -578,20 +581,20 @@ void TrackInfos::PlotPace()
 	else
 		m_pace_plot->yAxis->setLabel("Pace (min/km)");
 
-	auto [times, dists] = m_track->GetTimePerDistance<QVector>(dist_bin, false);
+	std::tie(m_times, m_dists) = m_track->GetTimePerDistance<QVector>(dist_bin, false);
 	auto [times_planar, dists_planar] = m_track->GetTimePerDistance<QVector>(dist_bin, true);
-	if(!times.size() || times.size() != dists.size()
+	if(!m_times.size() || m_times.size() != m_dists.size()
 		|| !times_planar.size() || times_planar.size() != dists_planar.size())
 		return;
 
-	for(int i = 0; i < times.size(); ++i)
+	for(int i = 0; i < m_times.size(); ++i)
 	{
-		times[i] /= 60. * (dist_bin / 1000.);  // to [min/km]
-		dists[i] -= dist_bin / 2.;             // centre histogram bar
-		dists[i] /= 1000.;                     // to [km]
+		m_times[i] /= 60. * (dist_bin / 1000.);  // to [min/km]
+		m_dists[i] -= dist_bin / 2.;             // centre histogram bar
+		m_dists[i] /= 1000.;                     // to [km]
 
 		if(plot_speed)
-			times[i] = speed_to_pace<t_real>(times[i]);
+			m_times[i] = speed_to_pace<t_real>(m_times[i]);
 	}
 
 	for(int i = 0; i < times_planar.size(); ++i)
@@ -604,8 +607,8 @@ void TrackInfos::PlotPace()
 			times_planar[i] = speed_to_pace<t_real>(times_planar[i]);
 	}
 
-	auto [min_dist_iter, max_dist_iter] = std::minmax_element(dists.begin(), dists.end());
-	auto [min_time_iter, max_time_iter] = std::minmax_element(times.begin(), times.end());
+	auto [min_dist_iter, max_dist_iter] = std::minmax_element(m_dists.begin(), m_dists.end());
+	auto [min_time_iter, max_time_iter] = std::minmax_element(m_times.begin(), m_times.end());
 	auto [min_dist_pl_iter, max_dist_pl_iter] = std::minmax_element(dists_planar.begin(), dists_planar.end());
 	auto [min_time_pl_iter, max_time_pl_iter] = std::minmax_element(times_planar.begin(), times_planar.end());
 
@@ -632,7 +635,7 @@ void TrackInfos::PlotPace()
 	//QCPCurve *curve = new QCPCurve(m_pace_plot->xAxis, m_pace_plot->yAxis);
 	QCPBars *curve = new QCPBars(m_pace_plot->xAxis, m_pace_plot->yAxis);
 	curve->setWidth(dist_bin / 1000.);
-	curve->setData(dists, times);
+	curve->setData(m_dists, m_times);
 	curve->setName("Non-Planar");
 	//curve->setLineStyle(QCPCurve::lsLine);
 
@@ -911,6 +914,12 @@ void TrackInfos::Clear()
 	m_track = nullptr;
 	m_infos->clear();
 
+	m_times.clear();
+	m_dists.clear();
+
+	m_distances.clear();
+	m_altitudes.clear();
+
 	if(m_comments)
 	{
 		m_comments->setReadOnly(true);
@@ -1024,8 +1033,30 @@ void TrackInfos::PacePlotMouseMove(QMouseEvent *evt)
 	qreal y = evt->y();
 #endif
 
-	t_real dist = m_pace_plot->xAxis->pixelToCoord(x);
-	t_real pace = m_pace_plot->yAxis->pixelToCoord(y);
+	t_real dist_cursor = m_pace_plot->xAxis->pixelToCoord(x);
+	t_real pace_cursor = m_pace_plot->yAxis->pixelToCoord(y);
+
+	// find closest point on the curve
+	t_real dist = std::numeric_limits<t_real>::max();
+	t_real pace = std::numeric_limits<t_real>::max();
+	bool point_found = false;
+	for(int i = 0; i < m_dists.size(); ++i)
+	{
+		t_real d = m_dists[i];
+		if(std::abs(d - dist_cursor) >= std::abs(dist - dist_cursor))
+			continue;
+
+		dist = d;
+		pace = m_times[i];
+		point_found = true;
+	}
+
+	if(!point_found)
+	{
+		// just show the cursor coordinates
+		dist = dist_cursor;
+		pace = pace_cursor;
+	}
 
 	std::ostringstream ostr;
 	ostr.precision(g_prec_gui);
@@ -1055,8 +1086,30 @@ void TrackInfos::AltPlotMouseMove(QMouseEvent *evt)
 	qreal y = evt->y();
 #endif
 
-	t_real dist = m_alt_plot->xAxis->pixelToCoord(x);
-	t_real alt = m_alt_plot->yAxis->pixelToCoord(y);
+	t_real dist_cursor = m_alt_plot->xAxis->pixelToCoord(x);
+	t_real alt_cursor = m_alt_plot->yAxis->pixelToCoord(y);
+
+	// find closest point on the curve
+	t_real dist = std::numeric_limits<t_real>::max();
+	t_real alt = std::numeric_limits<t_real>::max();
+	bool point_found = false;
+	for(int i = 0; i < m_distances.size(); ++i)
+	{
+		t_real d = m_distances[i];
+		if(std::abs(d - dist_cursor) >= std::abs(dist - dist_cursor))
+			continue;
+
+		dist = d;
+		alt = m_altitudes[i];
+		point_found = true;
+	}
+
+	if(!point_found)
+	{
+		// just show the cursor coordinates
+		dist = dist_cursor;
+		alt = alt_cursor;
+	}
 
 	std::ostringstream ostr;
 	ostr.precision(g_prec_gui);

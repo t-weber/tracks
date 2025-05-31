@@ -41,10 +41,14 @@ protected:
 	void PlotSpeeds();
 	void ResetSpeedPlotRange();
 
+	void CalcSpeed();
+	void CalcPace();
+
 
 private:
 	std::shared_ptr<QCustomPlot> m_plot{};
 	std::shared_ptr<QDoubleSpinBox> m_min_speed{}, m_max_speed{};
+	std::shared_ptr<QDoubleSpinBox> m_speed{}, m_pace{};
 	std::shared_ptr<QLabel> m_status{};
 	std::shared_ptr<QDialogButtonBox> m_buttonbox{};
 

@@ -41,6 +41,8 @@ Conversions::Conversions(QWidget* parent)
 	// plot settings
 	QLabel *min_speed_label = new QLabel{"Min. Speed:", this};
 	QLabel *max_speed_label = new QLabel{"Max. Speed:", this};
+	QLabel *speed_label = new QLabel{"Speed:", this};
+	QLabel *pace_label = new QLabel{"Pace:", this};
 
 	m_min_speed = std::make_shared<QDoubleSpinBox>(this);
 	m_max_speed = std::make_shared<QDoubleSpinBox>(this);
@@ -50,15 +52,37 @@ Conversions::Conversions(QWidget* parent)
 	m_min_speed->setSingleStep(0.5);
 	m_min_speed->setDecimals(2);
 	m_min_speed->setSuffix(" km/h");
+
 	m_max_speed->setValue(20.);
 	m_max_speed->setRange(0.01, 99.);
 	m_max_speed->setSingleStep(0.5);
 	m_max_speed->setDecimals(2);
 	m_max_speed->setSuffix(" km/h");
 
+	QFrame *line = new QFrame{this};
+	line->setFrameStyle(QFrame::HLine);
+	line->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+
+	m_speed = std::make_shared<QDoubleSpinBox>(this);
+	m_pace = std::make_shared<QDoubleSpinBox>(this);
+
+	m_speed->setValue(10.);
+	m_speed->setRange(0.01, 99.);
+	m_speed->setSingleStep(0.1);
+	m_speed->setDecimals(2);
+	m_speed->setSuffix(" km/h");
+
+	m_pace->setValue(speed_to_pace<t_real>(m_speed->value()));
+	m_pace->setRange(speed_to_pace<t_real>(m_speed->maximum()), speed_to_pace<t_real>(m_speed->minimum()));
+	m_pace->setSingleStep(0.1);
+	m_pace->setDecimals(2);
+	m_pace->setSuffix(" min/km");
+
 	auto value_changed = static_cast<void (QDoubleSpinBox::*)(double)>(&QDoubleSpinBox::valueChanged);
 	connect(m_min_speed.get(), value_changed, this, &Conversions::PlotSpeeds);
 	connect(m_max_speed.get(), value_changed, this, &Conversions::PlotSpeeds);
+	connect(m_speed.get(), value_changed, this, &Conversions::CalcPace);
+	connect(m_pace.get(), value_changed, this, &Conversions::CalcSpeed);
 
 	// status bar
 	m_status = std::make_shared<QLabel>(this);
@@ -96,13 +120,22 @@ Conversions::Conversions(QWidget* parent)
 	mainlayout->setContentsMargins(8, 8, 8, 8);
 	mainlayout->setVerticalSpacing(4);
 	mainlayout->setHorizontalSpacing(4);
+
 	mainlayout->addWidget(m_plot.get(), 0, 0, 1, 4);
 	mainlayout->addWidget(btn_replot, 1, 3, 1, 1);
+
 	mainlayout->addWidget(min_speed_label, 2, 0, 1, 1);
 	mainlayout->addWidget(max_speed_label, 2, 2, 1, 1);
 	mainlayout->addWidget(m_min_speed.get(), 2, 1, 1, 1);
 	mainlayout->addWidget(m_max_speed.get(), 2, 3, 1, 1);
-	mainlayout->addWidget(panel, 3, 0, 1, 4);
+
+	mainlayout->addWidget(line, 3, 0, 1, 4);
+	mainlayout->addWidget(speed_label, 4, 0, 1, 1);
+	mainlayout->addWidget(pace_label, 4, 2, 1, 1);
+	mainlayout->addWidget(m_speed.get(), 4, 1, 1, 1);
+	mainlayout->addWidget(m_pace.get(), 4, 3, 1, 1);
+
+	mainlayout->addWidget(panel, 5, 0, 1, 4);
 
 	// restore settings
 	QSettings settings{this};
@@ -204,6 +237,22 @@ void Conversions::PlotMouseMove(QMouseEvent *evt)
 	ostr.precision(g_prec_gui);
 	ostr << speed << " km/h \xe2\x89\x98 " << get_pace_str(pace) << ".";
 	m_status->setText(ostr.str().c_str());
+}
+
+
+void Conversions::CalcSpeed()
+{
+	m_speed->blockSignals(true);
+	m_speed->setValue(speed_to_pace<t_real>(m_pace->value()));
+	m_speed->blockSignals(false);
+}
+
+
+void Conversions::CalcPace()
+{
+	m_pace->blockSignals(true);
+	m_pace->setValue(speed_to_pace<t_real>(m_speed->value()));
+	m_pace->blockSignals(false);
 }
 
 

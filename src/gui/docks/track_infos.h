@@ -109,12 +109,14 @@ private:
 	std::shared_ptr<QCheckBox> m_time_check{};
 	std::shared_ptr<QCheckBox> m_smooth_check{};
 	std::shared_ptr<QMenu> m_alt_context{};
+	QVector<t_real> m_distances{}, m_altitudes{};
 
 	// pace tab
 	std::shared_ptr<QCustomPlot> m_pace_plot{};
 	std::shared_ptr<QDoubleSpinBox> m_dist_binlen{};
 	std::shared_ptr<QCheckBox> m_speed_check{};
 	std::shared_ptr<QMenu> m_pace_context{};
+	QVector<t_real> m_times{}, m_dists{};
 
 	// svg image of the map
 	QByteArray m_map_image{};
