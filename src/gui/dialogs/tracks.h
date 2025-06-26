@@ -25,14 +25,14 @@
 /**
  * widget for listing tracks
  */
-class Summary : public QDialog
+class TracksDlg : public QDialog
 { Q_OBJECT
 public:
-	Summary(QWidget *parent = nullptr);
-	virtual ~Summary();
+	TracksDlg(QWidget *parent = nullptr);
+	virtual ~TracksDlg();
 
-	Summary(const Summary&) = delete;
-	Summary& operator=(const Summary&) = delete;
+	TracksDlg(const TracksDlg&) = delete;
+	TracksDlg& operator=(const TracksDlg&) = delete;
 
 	void SetTrackDB(const t_tracks *trackdb);
 	void FillTable();

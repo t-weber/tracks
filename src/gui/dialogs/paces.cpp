@@ -5,7 +5,7 @@
  * @license see 'LICENSE' file
  */
 
-#include "statistics.h"
+#include "paces.h"
 #include "lib/calc.h"
 #include "../helpers.h"
 
@@ -27,10 +27,10 @@
 #endif
 
 
-Statistics::Statistics(QWidget* parent)
+PacesDlg::PacesDlg(QWidget* parent)
 	: QDialog(parent)
 {
-	setWindowTitle("Pace Statistics");
+	setWindowTitle("Paces");
 	setSizeGripEnabled(true);
 
 	// plot
@@ -44,27 +44,27 @@ Statistics::Statistics(QWidget* parent)
 	ticker->setDateTimeSpec(Qt::LocalTime);
 	ticker->setDateTimeFormat("yyyy-MM-dd");
 	m_plot->xAxis->setTicker(QSharedPointer<QCPAxisTicker>{ticker});
-	connect(m_plot.get(), &QCustomPlot::mouseMove, this, &Statistics::PlotMouseMove);
-	connect(m_plot.get(), &QCustomPlot::mousePress, this, &Statistics::PlotMouseClick);
+	connect(m_plot.get(), &QCustomPlot::mouseMove, this, &PacesDlg::PlotMouseMove);
+	connect(m_plot.get(), &QCustomPlot::mousePress, this, &PacesDlg::PlotMouseClick);
 
 	// context menu
 	m_context = std::make_shared<QMenu>(this);
 	QIcon iconSavePdf = QIcon::fromTheme("image-x-generic");
 	QAction *actionSavePdf = new QAction(iconSavePdf, "Save Image...", m_context.get());
 	m_context->addAction(actionSavePdf);
-	connect(actionSavePdf, &QAction::triggered, this, &Statistics::SavePlotPdf);
+	connect(actionSavePdf, &QAction::triggered, this, &PacesDlg::SavePlotPdf);
 
 	// speed/pace checkbox
 	m_speed_check = std::make_shared<QCheckBox>(this);
 	m_speed_check->setText("Plot speeds instead.");
 	m_speed_check->setToolTip("Show speeds instead of paces.");
 	m_speed_check->setChecked(false);
-	connect(m_speed_check.get(), &QCheckBox::toggled, this, &Statistics::PlotSpeeds);
+	connect(m_speed_check.get(), &QCheckBox::toggled, this, &PacesDlg::PlotSpeeds);
 
 	// plot reset button
 	QPushButton *btn_replot = new QPushButton(this);
 	btn_replot->setText("Reset Plot");
-	connect(btn_replot, &QAbstractButton::clicked, this, &Statistics::ResetSpeedPlotRange);
+	connect(btn_replot, &QAbstractButton::clicked, this, &PacesDlg::ResetSpeedPlotRange);
 
 	// track length check boxes
 	for(t_size idx = 0; idx < s_num_lengths; ++idx)
@@ -84,7 +84,7 @@ Statistics::Statistics(QWidget* parent)
 		m_length_checks[idx]->setChecked(true);
 
 		connect(m_length_checks[idx].get(), &QCheckBox::toggled,
-			this, &Statistics::PlotSpeeds);
+			this, &PacesDlg::PlotSpeeds);
 	}
 
 	// status bar
@@ -146,9 +146,9 @@ Statistics::Statistics(QWidget* parent)
 	// restore settings
 	QSettings settings{this};
 
-	if(settings.contains("dlg_statistics/wnd_geo"))
+	if(settings.contains("dlg_paces/wnd_geo"))
 	{
-		QByteArray arr{settings.value("dlg_statistics/wnd_geo").toByteArray()};
+		QByteArray arr{settings.value("dlg_paces/wnd_geo").toByteArray()};
 		this->restoreGeometry(arr);
 	}
 	else
@@ -158,33 +158,33 @@ Statistics::Statistics(QWidget* parent)
 
 	for(t_size idx = 0; idx < s_num_lengths; ++idx)
 	{
-		QString key = QString{"dlg_statistics/length_check_%1"}.arg(idx);
+		QString key = QString{"dlg_paces/length_check_%1"}.arg(idx);
 		if(!settings.contains(key))
 			continue;
 		m_length_checks[idx]->setChecked(settings.value(key).toBool());
 	}
 
-	if(settings.contains("dlg_statistics/speed_check"))
-		m_speed_check->setChecked(settings.value("dlg_statistics/speed_check").toBool());
+	if(settings.contains("dlg_paces/speed_check"))
+		m_speed_check->setChecked(settings.value("dlg_paces/speed_check").toBool());
 
-	if(settings.contains("dlg_statistics/recent_pdfs"))
-		m_pdfdir = settings.value("dlg_statistics/recent_pdfs").toString().toStdString();
+	if(settings.contains("dlg_paces/recent_pdfs"))
+		m_pdfdir = settings.value("dlg_paces/recent_pdfs").toString().toStdString();
 }
 
 
-Statistics::~Statistics()
+PacesDlg::~PacesDlg()
 {
 }
 
 
-void Statistics::SetTrackDB(const t_tracks *trackdb)
+void PacesDlg::SetTrackDB(const t_tracks *trackdb)
 {
 	m_trackdb = trackdb;
 	PlotSpeeds();
 }
 
 
-void Statistics::ResetSpeedPlotRange()
+void PacesDlg::ResetSpeedPlotRange()
 {
 	m_plot->xAxis->setRange(
 		m_min_epoch - (m_max_epoch - m_min_epoch) / 20.,
@@ -198,7 +198,7 @@ void Statistics::ResetSpeedPlotRange()
 }
 
 
-void Statistics::PlotSpeeds()
+void PacesDlg::PlotSpeeds()
 {
 	if(!m_trackdb || !m_plot)
 		return;
@@ -326,7 +326,7 @@ void Statistics::PlotSpeeds()
 /**
  * the mouse has been moved in the plot widget
  */
-void Statistics::PlotMouseMove(QMouseEvent *evt)
+void PacesDlg::PlotMouseMove(QMouseEvent *evt)
 {
 	if(!m_plot)
 		return;
@@ -362,7 +362,7 @@ void Statistics::PlotMouseMove(QMouseEvent *evt)
 /**
  * the mouse has been clicked in the plot widget
  */
-void Statistics::PlotMouseClick(QMouseEvent *evt)
+void PacesDlg::PlotMouseClick(QMouseEvent *evt)
 {
 	if(!m_plot || !m_context)
 		return;
@@ -387,7 +387,7 @@ void Statistics::PlotMouseClick(QMouseEvent *evt)
 /**
  * save the plot as a pdf image
  */
-void Statistics::SavePlotPdf()
+void PacesDlg::SavePlotPdf()
 {
 	if(!m_plot)
 		return;
@@ -419,28 +419,28 @@ void Statistics::SavePlotPdf()
 }
 
 
-void Statistics::accept()
+void PacesDlg::accept()
 {
 	// save settings
 	QSettings settings{this};
 
 	QByteArray geo{this->saveGeometry()};
-	settings.setValue("dlg_statistics/wnd_geo", geo);
+	settings.setValue("dlg_paces/wnd_geo", geo);
 
 	for(t_size idx = 0; idx < s_num_lengths; ++idx)
 	{
-		settings.setValue(QString("dlg_statistics/length_check_%1").arg(idx),
+		settings.setValue(QString("dlg_paces/length_check_%1").arg(idx),
 			m_length_checks[idx]->isChecked());
 	}
 
-	settings.setValue("dlg_statistics/speed_check", m_speed_check->isChecked());
-	settings.setValue("dlg_statistics/recent_pdfs", m_pdfdir.c_str());
+	settings.setValue("dlg_paces/speed_check", m_speed_check->isChecked());
+	settings.setValue("dlg_paces/recent_pdfs", m_pdfdir.c_str());
 
 	QDialog::accept();
 }
 
 
-void Statistics::reject()
+void PacesDlg::reject()
 {
 	QDialog::reject();
 }

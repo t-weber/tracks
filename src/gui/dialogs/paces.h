@@ -31,14 +31,14 @@
 /**
  * widget for listing tracks
  */
-class Statistics : public QDialog
+class PacesDlg : public QDialog
 { Q_OBJECT
 public:
-	Statistics(QWidget *parent = nullptr);
-	virtual ~Statistics();
+	PacesDlg(QWidget *parent = nullptr);
+	virtual ~PacesDlg();
 
-	Statistics(const Statistics&) = delete;
-	Statistics& operator=(const Statistics&) = delete;
+	PacesDlg(const PacesDlg&) = delete;
+	PacesDlg& operator=(const PacesDlg&) = delete;
 
 	void SetTrackDB(const t_tracks *trackdb);
 	void PlotSpeeds();

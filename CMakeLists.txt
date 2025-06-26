@@ -107,10 +107,10 @@ add_executable(tracks
 
 	# dialogs
 	src/gui/dialogs/conversions.cpp src/gui/dialogs/conversions.h
+	src/gui/dialogs/distance_calc.cpp src/gui/dialogs/distance_calc.h
+	src/gui/dialogs/paces.cpp src/gui/dialogs/paces.h
 	src/gui/dialogs/distances.cpp src/gui/dialogs/distances.h
-	src/gui/dialogs/statistics.cpp src/gui/dialogs/statistics.h
-	src/gui/dialogs/reports.cpp src/gui/dialogs/reports.h
-	src/gui/dialogs/summary.cpp src/gui/dialogs/summary.h
+	src/gui/dialogs/tracks.cpp src/gui/dialogs/tracks.h
 	src/gui/dialogs/about.cpp src/gui/dialogs/about.h
 	src/gui/dialogs/settings.cpp src/gui/dialogs/settings.h
 

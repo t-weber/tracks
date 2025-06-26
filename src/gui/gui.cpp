@@ -208,16 +208,16 @@ void TracksWnd::SetupGUI()
 	});
 
 	QIcon iconStatistics = QIcon::fromTheme("applications-science");
-	QAction *actionStatistics = new QAction{iconStatistics, "Pace Statistics...", this};
-	connect(actionStatistics, &QAction::triggered, this, &TracksWnd::ShowStatistics);
+	QAction *actionStatistics = new QAction{iconStatistics, "Paces...", this};
+	connect(actionStatistics, &QAction::triggered, this, &TracksWnd::ShowPaceStatistics);
 
 	QIcon iconReports = QIcon::fromTheme("x-office-presentation");
-	QAction *actionReports = new QAction{iconReports, "Distance Reports...", this};
-	connect(actionReports, &QAction::triggered, this, &TracksWnd::ShowReports);
+	QAction *actionReports = new QAction{iconReports, "Distances...", this};
+	connect(actionReports, &QAction::triggered, this, &TracksWnd::ShowDistanceReports);
 
 	QIcon iconSummary = QIcon::fromTheme("x-office-spreadsheet");
-	QAction *actionSummary = new QAction{iconSummary, "Track Summary...", this};
-	connect(actionSummary, &QAction::triggered, this, &TracksWnd::ShowSummary);
+	QAction *actionSummary = new QAction{iconSummary, "Tracks...", this};
+	connect(actionSummary, &QAction::triggered, this, &TracksWnd::ShowTracksSummary);
 
 	menuTracks->addAction(actionRecalc);
 	menuTracks->addAction(actionResort);
@@ -887,7 +887,7 @@ void TracksWnd::ShowSettings(bool only_create)
 		m_settings->AddDoubleSpinbox("settings/epsilon",
 			"Calculation epsilon:", g_eps, 0., 1., 1e-6, 8);
 		m_settings->AddDoubleSpinbox("settings/epsilon_ascent",
-			"Ascent epsilon:", g_asc_eps, 0.1, 999., 1., 1, " m");
+			"Uphill epsilon:", g_asc_eps, 0.1, 999., 1., 1, " m");
 		m_settings->AddSpinbox("settings/smooth_radius",
 			"Data smooth radius:", g_smooth_rad, 0, 999, 1);
 		m_settings->AddCombobox("settings/distance_function",
@@ -1027,11 +1027,11 @@ void TracksWnd::ShowDistances()
 /**
  * show speed statistics dialog
  */
-void TracksWnd::ShowStatistics()
+void TracksWnd::ShowPaceStatistics()
 {
 	if(!m_statistics)
 	{
-		m_statistics = std::make_shared<Statistics>(this);
+		m_statistics = std::make_shared<PacesDlg>(this);
 		m_statistics->SetTrackDB(&m_trackdb);
 	}
 
@@ -1042,11 +1042,11 @@ void TracksWnd::ShowStatistics()
 /**
  * show speed statistics dialog
  */
-void TracksWnd::ShowReports()
+void TracksWnd::ShowDistanceReports()
 {
 	if(!m_reports)
 	{
-		m_reports = std::make_shared<Reports>(this);
+		m_reports = std::make_shared<DistancesDlg>(this);
 		m_reports->SetTrackDB(&m_trackdb);
 	}
 
@@ -1057,14 +1057,14 @@ void TracksWnd::ShowReports()
 /**
  * show track summary dialog
  */
-void TracksWnd::ShowSummary()
+void TracksWnd::ShowTracksSummary()
 {
 	if(!m_summary)
 	{
-		m_summary = std::make_shared<Summary>(this);
+		m_summary = std::make_shared<TracksDlg>(this);
 		m_summary->SetTrackDB(&m_trackdb);
 
-		connect(m_summary.get(), &Summary::TrackSelected,
+		connect(m_summary.get(), &TracksDlg::TrackSelected,
 			m_tracks->GetWidget(), &TrackBrowser::SelectTrack);
 	}
 

@@ -5,7 +5,7 @@
  * @license see 'LICENSE' file
  */
 
-#include "summary.h"
+#include "tracks.h"
 #include "lib/calc.h"
 #include "../helpers.h"
 #include "../tableitems.h"
@@ -35,10 +35,10 @@
 #define TRACK_IDX Qt::UserRole + 0
 
 
-Summary::Summary(QWidget* parent)
+TracksDlg::TracksDlg(QWidget* parent)
 	: QDialog(parent)
 {
-	setWindowTitle("Track Summary");
+	setWindowTitle("Tracks");
 	setSizeGripEnabled(true);
 
 	// track table
@@ -66,7 +66,7 @@ Summary::Summary(QWidget* parent)
 	m_table->verticalHeader()->setVisible(true);
 
 	connect(m_table.get(), &QTableWidget::cellDoubleClicked,
-		this, &Summary::TableDoubleClicked);
+		this, &TracksDlg::TableDoubleClicked);
 
 	// search field
 	m_search = std::make_shared<QLineEdit>(this);
@@ -78,8 +78,8 @@ Summary::Summary(QWidget* parent)
 	next_match->setToolTip("Search for next matching track.");
 	next_match->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Preferred);
 
-	connect(m_search.get(), &QLineEdit::textChanged, this, &Summary::SearchTrack);
-	connect(next_match, &QAbstractButton::clicked, this, &Summary::SearchNextTrack);
+	connect(m_search.get(), &QLineEdit::textChanged, this, &TracksDlg::SearchTrack);
+	connect(next_match, &QAbstractButton::clicked, this, &TracksDlg::SearchNextTrack);
 
 	// status bar
 	m_status = std::make_shared<QLabel>(this);
@@ -127,9 +127,9 @@ Summary::Summary(QWidget* parent)
 	// restore settings
 	QSettings settings{this};
 
-	if(settings.contains("dlg_summary/wnd_geo"))
+	if(settings.contains("dlg_tracks/wnd_geo"))
 	{
-		QByteArray arr{settings.value("dlg_summary/wnd_geo").toByteArray()};
+		QByteArray arr{settings.value("dlg_tracks/wnd_geo").toByteArray()};
 		this->restoreGeometry(arr);
 	}
 	else
@@ -138,58 +138,58 @@ Summary::Summary(QWidget* parent)
 	}
 
 	// table column widths
-	if(settings.contains("dlg_summary/name_col"))
-		m_table->setColumnWidth(TAB_NAME, settings.value("dlg_summary/name_col").toInt());
+	if(settings.contains("dlg_tracks/name_col"))
+		m_table->setColumnWidth(TAB_NAME, settings.value("dlg_tracks/name_col").toInt());
 	else
 		m_table->setColumnWidth(TAB_NAME, 150);
-	if(settings.contains("dlg_summary/data_col"))
-		m_table->setColumnWidth(TAB_DATE, settings.value("dlg_summary/date_col").toInt());
+	if(settings.contains("dlg_tracks/data_col"))
+		m_table->setColumnWidth(TAB_DATE, settings.value("dlg_tracks/date_col").toInt());
 	else
 		m_table->setColumnWidth(TAB_DATE, 150);
-	if(settings.contains("dlg_summary/duration_col"))
-		m_table->setColumnWidth(TAB_DURATION, settings.value("dlg_summary/duration_col").toInt());
+	if(settings.contains("dlg_tracks/duration_col"))
+		m_table->setColumnWidth(TAB_DURATION, settings.value("dlg_tracks/duration_col").toInt());
 	else
 		m_table->setColumnWidth(TAB_DURATION, 115);
-	if(settings.contains("dlg_summary/distance_col"))
-		m_table->setColumnWidth(TAB_DISTANCE, settings.value("dlg_summary/distance_col").toInt());
+	if(settings.contains("dlg_tracks/distance_col"))
+		m_table->setColumnWidth(TAB_DISTANCE, settings.value("dlg_tracks/distance_col").toInt());
 	else
 		m_table->setColumnWidth(TAB_DISTANCE, 115);
-	if(settings.contains("dlg_summary/distance_sum_col"))
-		m_table->setColumnWidth(TAB_DISTANCE_SUM, settings.value("dlg_summary/distance_sum_col").toInt());
+	if(settings.contains("dlg_tracks/distance_sum_col"))
+		m_table->setColumnWidth(TAB_DISTANCE_SUM, settings.value("dlg_tracks/distance_sum_col").toInt());
 	else
 		m_table->setColumnWidth(TAB_DISTANCE_SUM, 115);
-	if(settings.contains("dlg_summary/pace_col"))
-		m_table->setColumnWidth(TAB_PACE, settings.value("dlg_summary/pace_col").toInt());
+	if(settings.contains("dlg_tracks/pace_col"))
+		m_table->setColumnWidth(TAB_PACE, settings.value("dlg_tracks/pace_col").toInt());
 	else
 		m_table->setColumnWidth(TAB_PACE, 115);
-	if(settings.contains("dlg_summary/climb_col"))
-		m_table->setColumnWidth(TAB_UPHILL, settings.value("dlg_summary/climb_col").toInt());
+	if(settings.contains("dlg_tracks/climb_col"))
+		m_table->setColumnWidth(TAB_UPHILL, settings.value("dlg_tracks/climb_col").toInt());
 	else
 		m_table->setColumnWidth(TAB_UPHILL, 115);
-	if(settings.contains("dlg_summary/height_col"))
-		m_table->setColumnWidth(TAB_HEIGHT, settings.value("dlg_summary/height_col").toInt());
+	if(settings.contains("dlg_tracks/height_col"))
+		m_table->setColumnWidth(TAB_HEIGHT, settings.value("dlg_tracks/height_col").toInt());
 	else
 		m_table->setColumnWidth(TAB_HEIGHT, 115);
-	if(settings.contains("dlg_summary/lasttrack_col"))
-		m_table->setColumnWidth(TAB_LASTTRACK, settings.value("dlg_summary/lasttrack_col").toInt());
+	if(settings.contains("dlg_tracks/lasttrack_col"))
+		m_table->setColumnWidth(TAB_LASTTRACK, settings.value("dlg_tracks/lasttrack_col").toInt());
 	else
 		m_table->setColumnWidth(TAB_LASTTRACK, 115);
 }
 
 
-Summary::~Summary()
+TracksDlg::~TracksDlg()
 {
 }
 
 
-void Summary::SetTrackDB(const t_tracks *trackdb)
+void TracksDlg::SetTrackDB(const t_tracks *trackdb)
 {
 	m_trackdb = trackdb;
 	FillTable();
 }
 
 
-void Summary::FillTable()
+void TracksDlg::FillTable()
 {
 	if(!m_trackdb || !m_table)
 		return;
@@ -276,7 +276,7 @@ void Summary::FillTable()
 /**
  * search for a track containing the given name and select it
  */
-void Summary::SearchTrack(const QString& name)
+void TracksDlg::SearchTrack(const QString& name)
 {
 	if(!m_table || name == "")
 	{
@@ -298,7 +298,7 @@ void Summary::SearchTrack(const QString& name)
 /**
  * select the next track in the search results
  */
-void Summary::SearchNextTrack()
+void TracksDlg::SearchNextTrack()
 {
 	if(!m_table || m_search_results.size() == 0)
 		return;
@@ -348,7 +348,7 @@ void Summary::SearchNextTrack()
 /**
  * show the double-clicked track in the main window
  */
-void Summary::TableDoubleClicked(int row, [[maybe_unused]] int col)
+void TracksDlg::TableDoubleClicked(int row, [[maybe_unused]] int col)
 {
 	if(!m_table)
 		return;
@@ -362,33 +362,33 @@ void Summary::TableDoubleClicked(int row, [[maybe_unused]] int col)
 }
 
 
-void Summary::accept()
+void TracksDlg::accept()
 {
 	// save settings
 	QSettings settings{this};
 
 	QByteArray geo{this->saveGeometry()};
-	settings.setValue("dlg_summary/wnd_geo", geo);
+	settings.setValue("dlg_tracks/wnd_geo", geo);
 
 	if(m_table)
 	{
 		// table column widths
-		settings.setValue("dlg_summary/name_col", m_table->columnWidth(TAB_NAME));
-		settings.setValue("dlg_summary/date_col", m_table->columnWidth(TAB_DATE));
-		settings.setValue("dlg_summary/duration_col", m_table->columnWidth(TAB_DURATION));
-		settings.setValue("dlg_summary/distance_col", m_table->columnWidth(TAB_DISTANCE));
-		settings.setValue("dlg_summary/distance_sum_col", m_table->columnWidth(TAB_DISTANCE_SUM));
-		settings.setValue("dlg_summary/pace_col", m_table->columnWidth(TAB_PACE));
-		settings.setValue("dlg_summary/climb_col", m_table->columnWidth(TAB_UPHILL));
-		settings.setValue("dlg_summary/height_col", m_table->columnWidth(TAB_HEIGHT));
-		settings.setValue("dlg_summary/lasttrack_col", m_table->columnWidth(TAB_LASTTRACK));
+		settings.setValue("dlg_tracks/name_col", m_table->columnWidth(TAB_NAME));
+		settings.setValue("dlg_tracks/date_col", m_table->columnWidth(TAB_DATE));
+		settings.setValue("dlg_tracks/duration_col", m_table->columnWidth(TAB_DURATION));
+		settings.setValue("dlg_tracks/distance_col", m_table->columnWidth(TAB_DISTANCE));
+		settings.setValue("dlg_tracks/distance_sum_col", m_table->columnWidth(TAB_DISTANCE_SUM));
+		settings.setValue("dlg_tracks/pace_col", m_table->columnWidth(TAB_PACE));
+		settings.setValue("dlg_tracks/climb_col", m_table->columnWidth(TAB_UPHILL));
+		settings.setValue("dlg_tracks/height_col", m_table->columnWidth(TAB_HEIGHT));
+		settings.setValue("dlg_tracks/lasttrack_col", m_table->columnWidth(TAB_LASTTRACK));
 	}
 
 	QDialog::accept();
 }
 
 
-void Summary::reject()
+void TracksDlg::reject()
 {
 	QDialog::reject();
 }

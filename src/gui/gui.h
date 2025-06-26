@@ -27,10 +27,10 @@
 
 // dialogs
 #include "dialogs/conversions.h"
+#include "dialogs/distance_calc.h"
+#include "dialogs/paces.h"
 #include "dialogs/distances.h"
-#include "dialogs/statistics.h"
-#include "dialogs/reports.h"
-#include "dialogs/summary.h"
+#include "dialogs/tracks.h"
 #include "dialogs/settings.h"
 #include "dialogs/about.h"
 
@@ -105,9 +105,9 @@ public:
 	void ShowSettings(bool only_create = false);
 	void ShowConversions();
 	void ShowDistances();
-	void ShowStatistics();
-	void ShowReports();
-	void ShowSummary();
+	void ShowPaceStatistics();
+	void ShowDistanceReports();
+	void ShowTracksSummary();
 	void ShowAbout();
 
 	Resources& GetResources() { return m_res; }
@@ -157,9 +157,9 @@ private:
 	// dialogs
 	std::shared_ptr<Conversions> m_conversions{};
 	std::shared_ptr<Distances> m_distances{};
-	std::shared_ptr<Statistics> m_statistics{};
-	std::shared_ptr<Reports> m_reports{};
-	std::shared_ptr<Summary> m_summary{};
+	std::shared_ptr<PacesDlg> m_statistics{};
+	std::shared_ptr<DistancesDlg> m_reports{};
+	std::shared_ptr<TracksDlg> m_summary{};
 
 	t_tracks m_trackdb{};
 
