@@ -127,9 +127,9 @@ Distances::Distances(QWidget* parent)
 
 	// restore settings
 	QSettings settings{this};
-	if(settings.contains("dlg_distances/wnd_geo"))
+	if(settings.contains("dlg_calc_distances/wnd_geo"))
 	{
-		QByteArray arr{settings.value("dlg_distances/wnd_geo").toByteArray()};
+		QByteArray arr{settings.value("dlg_calc_distances/wnd_geo").toByteArray()};
 		this->restoreGeometry(arr);
 	}
 	else
@@ -137,8 +137,8 @@ Distances::Distances(QWidget* parent)
 		this->resize(512, 128);
 	}
 
-	if(settings.contains("dlg_distances/accept_coords"))
-		m_accept_coords->setChecked(settings.value("dlg_distances/accept_coords").toBool());
+	if(settings.contains("dlg_calc_distances/accept_coords"))
+		m_accept_coords->setChecked(settings.value("dlg_calc_distances/accept_coords").toBool());
 
 	Calculate();
 }
@@ -219,9 +219,9 @@ void Distances::accept()
 	// save settings
 	QSettings settings{this};
 	QByteArray geo{this->saveGeometry()};
-	settings.setValue("dlg_distances/wnd_geo", geo);
+	settings.setValue("dlg_calc_distances/wnd_geo", geo);
 
-	settings.setValue("dlg_distances/accept_coords", m_accept_coords->isChecked());
+	settings.setValue("dlg_calc_distances/accept_coords", m_accept_coords->isChecked());
 
 	QDialog::accept();
 }
