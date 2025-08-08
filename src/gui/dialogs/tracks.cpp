@@ -142,7 +142,7 @@ TracksDlg::TracksDlg(QWidget* parent)
 		m_table->setColumnWidth(TAB_NAME, settings.value("dlg_tracks/name_col").toInt());
 	else
 		m_table->setColumnWidth(TAB_NAME, 150);
-	if(settings.contains("dlg_tracks/data_col"))
+	if(settings.contains("dlg_tracks/date_col"))
 		m_table->setColumnWidth(TAB_DATE, settings.value("dlg_tracks/date_col").toInt());
 	else
 		m_table->setColumnWidth(TAB_DATE, 150);
