@@ -165,8 +165,18 @@ TrackInfos::TrackInfos(QWidget* parent) : QWidget{parent}
 
 	m_pace_context = std::make_shared<QMenu>(pace_panel);
 	QIcon iconSavePacePdf = QIcon::fromTheme("image-x-generic");
+	QAction *actionToggleLegend = new QAction("Toggle Legend", m_pace_context.get());
 	QAction *actionSavePacePdf = new QAction(iconSavePacePdf, "Save Image...", m_pace_context.get());
+	m_pace_context->addAction(actionToggleLegend);
+	m_pace_context->addSeparator();
 	m_pace_context->addAction(actionSavePacePdf);
+	connect(actionToggleLegend, &QAction::triggered, [this]()
+	{
+		if(!m_pace_plot)
+			return;
+		m_pace_plot->legend->setVisible(!m_pace_plot->legend->visible());
+		m_pace_plot->replot();
+	});
 	connect(actionSavePacePdf, &QAction::triggered, [this]()
 	{
 		SavePlotPdf(m_pace_plot.get(), "pace");
@@ -576,10 +586,26 @@ void TrackInfos::PlotPace()
 
 	const t_real dist_bin = m_dist_binlen->value() * 1000.;
 	const bool plot_speed = m_speed_check->isChecked();
+	Qt::Alignment legend_pos = Qt::AlignRight;
 	if(plot_speed)
+	{
 		m_pace_plot->yAxis->setLabel("Speed (km/h)");
+		legend_pos |= Qt::AlignBottom;
+	}
 	else
+	{
 		m_pace_plot->yAxis->setLabel("Pace (min/km)");
+		legend_pos |= Qt::AlignTop;
+	}
+
+	// legend placement
+	if(m_pace_plot->axisRectCount() > 0)
+	{
+		int legend_idx = 0;
+		QCPAxisRect *rect = m_pace_plot->axisRect(0);
+		rect->insetLayout()->setInsetPlacement(legend_idx, QCPLayoutInset::ipBorderAligned);
+		rect->insetLayout()->setInsetAlignment(legend_idx, legend_pos);
+	}
 
 	std::tie(m_times, m_dists) = m_track->GetTimePerDistance<QVector>(dist_bin, false);
 	auto [times_planar, dists_planar] = m_track->GetTimePerDistance<QVector>(dist_bin, true);

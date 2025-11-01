@@ -51,6 +51,7 @@ protected:
 	void PlotMouseMove(QMouseEvent *evt);
 	void PlotMouseClick(QMouseEvent *evt);
 	void ResetSpeedPlotRange();
+	void ToggleLegend();
 	void SavePlotPdf();
 
 

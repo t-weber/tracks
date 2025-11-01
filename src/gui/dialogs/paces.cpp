@@ -50,8 +50,12 @@ PacesDlg::PacesDlg(QWidget* parent)
 	// context menu
 	m_context = std::make_shared<QMenu>(this);
 	QIcon iconSavePdf = QIcon::fromTheme("image-x-generic");
+	QAction *actionToggleLegend = new QAction("Toggle Legend", m_context.get());
 	QAction *actionSavePdf = new QAction(iconSavePdf, "Save Image...", m_context.get());
+	m_context->addAction(actionToggleLegend);
+	m_context->addSeparator();
 	m_context->addAction(actionSavePdf);
+	connect(actionToggleLegend, &QAction::triggered, this, &PacesDlg::ToggleLegend);
 	connect(actionSavePdf, &QAction::triggered, this, &PacesDlg::SavePlotPdf);
 
 	// speed/pace checkbox
@@ -207,10 +211,26 @@ void PacesDlg::PlotSpeeds()
 	const bool plot_speed = m_speed_check && m_speed_check->isChecked();
 
 	m_plot->clearPlottables();
+	Qt::Alignment legend_pos = Qt::AlignRight;
 	if(plot_speed)
+	{
 		m_plot->yAxis->setLabel("Speed (km/h)");
+		legend_pos |= Qt::AlignBottom;
+	}
 	else
+	{
 		m_plot->yAxis->setLabel("Pace (min/km)");
+		legend_pos |= Qt::AlignTop;
+	}
+
+	// legend placement
+	if(m_plot->axisRectCount() > 0)
+	{
+		int legend_idx = 0;
+		QCPAxisRect *rect = m_plot->axisRect(0);
+		rect->insetLayout()->setInsetPlacement(legend_idx, QCPLayoutInset::ipBorderAligned);
+		rect->insetLayout()->setInsetAlignment(legend_idx, legend_pos);
+	}
 
 	m_min_epoch = std::numeric_limits<t_real>::max();
 	m_max_epoch = -m_min_epoch;
@@ -381,6 +401,18 @@ void PacesDlg::PlotMouseClick(QMouseEvent *evt)
 
 		m_context->popup(posGlobal);
 	}
+}
+
+
+/**
+ * save the plot as a pdf image
+ */
+void PacesDlg::ToggleLegend()
+{
+	if(!m_plot)
+		return;
+	m_plot->legend->setVisible(!m_plot->legend->visible());
+	m_plot->replot();
 }
 
 
