@@ -199,6 +199,33 @@ requires std::floating_point<t_real> && std::integral<t_int>
 
 
 template<class t_real = double, class t_int = int>
+std::string get_dist_str(t_real m)
+requires std::floating_point<t_real> && std::integral<t_int>
+{
+	t_int km = std::floor(m / 1000.);
+	m = std::fmod(m, 1000.);
+
+	std::ostringstream ostr;
+	bool started = false;
+	if(km || started)
+	{
+		ostr << km << " km";
+		started = true;
+	}
+	if(started)
+		ostr << ", ";
+	if(m || started)
+	{
+		ostr << m << " m";
+		started = true;
+	}
+
+	return ostr.str();
+}
+
+
+
+template<class t_real = double, class t_int = int>
 std::string get_pace_str(t_real min)
 requires std::floating_point<t_real> && std::integral<t_int>
 {

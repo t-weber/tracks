@@ -340,6 +340,7 @@ std::optional<t_real> TrackBrowser::GetTrackTime(int row) const
 
 void TrackBrowser::DeleteSelectedTracks()
 {
+	// decrease the indices of the tracks following the deleted one
 	auto decrease_indices = [this](int start_row, t_size deleted_idx)
 	{
 		for(int row = start_row; row < m_list->count(); ++row)
@@ -361,9 +362,9 @@ void TrackBrowser::DeleteSelectedTracks()
 		if(idx == m_invalid_idx)
 			continue;
 
-		decrease_indices(row, idx);
-
+		//std::cout << "Deleting row " << row << " and index " << idx << std::endl;
 		emit TrackDeleted(idx);
+		decrease_indices(row, idx);
 		delete item;
 	}
 }

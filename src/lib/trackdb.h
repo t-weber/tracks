@@ -113,6 +113,7 @@ public:
 		if(idx >= GetTrackCount())
 			return;
 
+		//std::cout << "Deleting track index " << idx << ": " << GetTrack(idx)->GetFileName() << std::endl;
 		m_tracks.erase(m_tracks.begin() + idx);
 	}
 
@@ -380,6 +381,39 @@ public:
 		tp.join();
 		return map;
 	}
+
+
+
+	/**
+	 * print an overview of the tracks contained in this database
+	 */
+	friend std::ostream& operator<<(std::ostream& ostr, const MultipleTracks<t_real, t_size>& tracks)
+	{
+		const int idx_width = 6;
+		const int field_width = 25;
+		const int name_width = 45;
+
+		// header
+		ostr
+			<< std::left << std::setw(idx_width) << "Number" << " "
+			<< std::left << std::setw(field_width) << "Dist." << " "
+			<< std::left << std::setw(field_width) << "Time" << " "
+			<< std::left << std::setw(name_width) << "Name" << "\n";
+
+		for(t_size idx = 0; idx < tracks.GetTrackCount(); ++idx)
+		{
+			const t_track* track = tracks.GetTrack(idx);
+
+			ostr
+				<< std::left << std::setw(idx_width) << idx + 1 << " "
+				<< std::left << std::setw(field_width) << get_dist_str(track->GetTotalDistance()) << " "
+				<< std::left << std::setw(field_width) << get_time_str(track->GetTotalTime()) << " "
+				<< std::left << std::setw(name_width) << track->GetFileName() << "\n";
+		}
+
+		return ostr;
+	}
+
 
 
 
