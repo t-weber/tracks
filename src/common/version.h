@@ -11,7 +11,7 @@
 
 #define TRACKS_IDENT    "tracks"
 #define TRACKS_TITLE    "Tracks"
-#define TRACKS_VERSION  "0.4"
+#define TRACKS_VERSION  "0.5"
 
 
 #endif
