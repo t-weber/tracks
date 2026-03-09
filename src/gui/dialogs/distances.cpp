@@ -27,6 +27,8 @@
 	namespace fs = boost::filesystem;
 #endif
 
+#include <boost/algorithm/string.hpp>
+
 
 // table columns
 #define TAB_DATE      0
@@ -45,6 +47,7 @@ DistancesDlg::DistancesDlg(QWidget* parent)
 	setSizeGripEnabled(true);
 
 	QWidget *plot_panel = new QWidget(this);
+	QWidget *table_panel = new QWidget(this);
 
 	// plot
 	//m_plot = std::make_shared<QCustomPlot>(plot_panel);
@@ -91,15 +94,15 @@ DistancesDlg::DistancesDlg(QWidget* parent)
 
 	QGridLayout *plot_panel_layout = new QGridLayout(plot_panel);
 	plot_panel_layout->setContentsMargins(0, 0, 0, 0);
-	plot_panel_layout->setVerticalSpacing(0);
-	plot_panel_layout->setHorizontalSpacing(0);
+	plot_panel_layout->setVerticalSpacing(4);
+	plot_panel_layout->setHorizontalSpacing(4);
 	plot_panel_layout->addWidget(m_plot/*.get()*/, 0, 0, 1, 3);
 	plot_panel_layout->addWidget(m_all_tracks.get(), 1, 0, 1, 1);
 	plot_panel_layout->addWidget(m_cumulative.get(), 1, 1, 1, 1);
 	plot_panel_layout->addWidget(btn_replot, 1, 2, 1, 1);
 
 	// track table
-	m_table = std::make_shared<QTableWidget>(this);
+	m_table = std::make_shared<QTableWidget>(table_panel);
 	m_table->setShowGrid(true);
 	m_table->setSortingEnabled(true);
 	m_table->setMouseTracking(true);
@@ -118,11 +121,31 @@ DistancesDlg::DistancesDlg(QWidget* parent)
 	m_table->verticalHeader()->setDefaultSectionSize(24);
 	m_table->verticalHeader()->setVisible(false);
 
+	// filter
+	m_filter = std::make_shared<QLineEdit>(table_panel);
+	m_filter->setClearButtonEnabled(true);
+	m_filter->setPlaceholderText("Filter Tracks");
+	m_filter->setToolTip("Only show tracks containing the given keyword.");
+	connect(m_filter.get(), &QLineEdit::textChanged, this, &DistancesDlg::CalcDistances);
+
+	m_comments = std::make_shared<QCheckBox>(table_panel);
+	m_comments->setText("Include Comments");
+	m_comments->setChecked(true);
+	connect(m_comments.get(), &QCheckBox::toggled, this, &DistancesDlg::CalcDistances);
+
+	QGridLayout *table_panel_layout = new QGridLayout(table_panel);
+	table_panel_layout->setContentsMargins(0, 0, 0, 0);
+	table_panel_layout->setVerticalSpacing(4);
+	table_panel_layout->setHorizontalSpacing(4);
+	table_panel_layout->addWidget(m_table.get(), 0, 0, 1, 2);
+	table_panel_layout->addWidget(m_filter.get(), 1, 0, 1, 1);
+	table_panel_layout->addWidget(m_comments.get(), 1, 1, 1, 1);
+
 	// splitter
 	m_split = std::make_shared<QSplitter>(this);
 	m_split->setOrientation(Qt::Vertical);
 	m_split->addWidget(plot_panel);
-	m_split->addWidget(m_table.get());
+	m_split->addWidget(table_panel);
 	m_split->setStretchFactor(0, 10);
 	m_split->setStretchFactor(1, 1);
 
@@ -182,6 +205,8 @@ DistancesDlg::DistancesDlg(QWidget* parent)
 		m_all_tracks->setChecked(settings.value("dlg_distances/all_tracks").toBool());
 	if(settings.contains("dlg_distances/sum_distances"))
 		m_cumulative->setChecked(settings.value("dlg_distances/sum_distances").toBool());
+	if(settings.contains("dlg_distances/use_comments"))
+		m_comments->setChecked(settings.value("dlg_distances/use_comments").toBool());
 
 	QByteArray split = settings.value("dlg_distances/split").toByteArray();
 	if(split.size())
@@ -334,8 +359,11 @@ void DistancesDlg::CalcDistances()
 	if(!m_trackdb)
 		return;
 
-	m_monthly = m_trackdb->GetDistancePerPeriod(false, false);
-	m_yearly = m_trackdb->GetDistancePerPeriod(false, true);
+	std::string filter = boost::to_lower_copy(m_filter->text().toStdString());
+	bool use_comments = m_comments->isChecked();
+
+	m_monthly = m_trackdb->GetDistancePerPeriod(false, false, filter, use_comments);
+	m_yearly = m_trackdb->GetDistancePerPeriod(false, true, filter, use_comments);
 
 	PlotDistances();
 	FillDistancesTable();
@@ -389,6 +417,8 @@ void DistancesDlg::PlotDistances()
 
 	bool cumulative = m_cumulative && m_cumulative->isChecked();
 	bool all_tracks = m_all_tracks && m_all_tracks->isChecked();
+	std::string filter = boost::to_lower_copy(m_filter->text().toStdString());
+	bool use_comments = m_comments->isChecked();
 
 	// show sum for all tracks
 	if(all_tracks)
@@ -403,6 +433,23 @@ void DistancesDlg::PlotDistances()
 			const t_track *track = m_trackdb->GetTrack(num_tracks - track_idx - 1);
 			if(!track)
 				continue;
+
+			if(filter != "")
+			{
+				std::string title = boost::to_lower_copy(track->GetFileName());
+
+				if(use_comments)
+				{
+					std::string comment = boost::to_lower_copy(track->GetComment());
+					if(title.find(filter) == std::string::npos && comment.find(filter) == std::string::npos)
+						continue;
+				}
+				else
+				{
+					if(title.find(filter) == std::string::npos)
+						continue;
+				}
+			}
 
 			// get track time
 			auto tp = track->GetStartTime();
@@ -610,6 +657,7 @@ void DistancesDlg::accept()
 
 	settings.setValue("dlg_distances/all_tracks", m_all_tracks->isChecked());
 	settings.setValue("dlg_distances/sum_distances", m_cumulative->isChecked());
+	settings.setValue("dlg_distances/use_comments", m_comments->isChecked());
 	settings.setValue("dlg_distances/recent_pdfs", m_pdfdir.c_str());
 
 	QByteArray split{m_split->saveState()};

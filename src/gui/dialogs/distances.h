@@ -10,6 +10,7 @@
 
 #include <QtWidgets/QDialog>
 #include <QtWidgets/QLabel>
+#include <QtWidgets/QLineEdit>
 #include <QtWidgets/QCheckBox>
 #include <QtWidgets/QTableWidget>
 #include <QtWidgets/QSplitter>
@@ -64,6 +65,8 @@ private:
 	QCustomPlot *m_plot{};
 	std::shared_ptr<QSplitter> m_split{};
 	std::shared_ptr<QTableWidget> m_table{};
+	std::shared_ptr<QLineEdit> m_filter{};
+	std::shared_ptr<QCheckBox> m_comments{};
 	std::shared_ptr<QCheckBox> m_all_tracks{}, m_cumulative{};
 	std::shared_ptr<QLabel> m_status{};
 	std::shared_ptr<QDialogButtonBox> m_buttonbox{};

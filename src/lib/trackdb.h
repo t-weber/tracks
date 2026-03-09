@@ -19,7 +19,9 @@
 #include <thread>
 #include <mutex>
 #include <future>
+
 #include <boost/asio.hpp>
+#include <boost/algorithm/string.hpp>
 
 
 #define TRACKDB_MAGIC "TRACKDB"
@@ -344,7 +346,8 @@ public:
 	/**
 	 * distance of all tracks sorted by months
 	 */
-	t_timept_map GetDistancePerPeriod(bool planar = false, bool yearly = false) const
+	t_timept_map GetDistancePerPeriod(bool planar = false, bool yearly = false,
+		std::string filter = "", bool use_comments = true) const
 	{
 		t_timept_map map;
 		std::mutex mtx;
@@ -353,6 +356,26 @@ public:
 
 		for(const t_track& track : m_tracks)
 		{
+			// filter tracks
+			if(filter != "")
+			{
+				filter = boost::to_lower_copy(filter);
+				std::string title = boost::to_lower_copy(track.GetFileName());
+
+				if(use_comments)
+				{
+					std::string comment = boost::to_lower_copy(track.GetComment());
+					if(title.find(filter) == std::string::npos && comment.find(filter) == std::string::npos)
+						continue;
+				}
+				else
+				{
+					if(title.find(filter) == std::string::npos)
+						continue;
+				}
+			}
+
+			// calculate distances in thread pool
 			boost::asio::post(tp, [&track, &map, &mtx, planar, yearly]() -> void
 			{
 				std::optional<t_timept> tpt = track.GetStartTime();
