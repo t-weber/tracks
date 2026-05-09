@@ -119,7 +119,7 @@ int main(int argc, char **argv)
 {
 	if(argc <= 1)
 	{
-		std::cerr << "Please give a .tracks or a .gpx track file." << std::endl;
+		std::cerr << "Please give a .tracks or a .gpx/.tcx track file." << std::endl;
 		return -1;
 	}
 
@@ -145,7 +145,8 @@ int main(int argc, char **argv)
 		else
 			load_tracks(file, track_idx);
 	}
-	else if(file.extension() == ".gpx")
+	else if(boost::to_lower_copy(file.extension().string()) == ".gpx"
+		|| boost::to_lower_copy(file.extension().string()) == ".tcx")
 	{
 		load_gpx(file);
 	}

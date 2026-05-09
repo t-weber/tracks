@@ -43,7 +43,7 @@ struct TrackPoint
 	t_real longitude{};              // [deg]
 	t_real elevation{};              // [m]
 
-	t_timept timept{};
+	t_timept timept{};               // current time
 
 	t_real elapsed{};                // time elapsed since previous point  [s]
 	t_real elapsed_total{};          // time elapsed since first point [s]
@@ -53,6 +53,8 @@ struct TrackPoint
 
 	t_real distance{};               // full distance to previous point  [m]
 	t_real distance_total{};         // full distance to first point [m]
+
+	t_real heart{};                  // heart frequency [bpm]
 };
 
 
@@ -258,11 +260,29 @@ public:
 
 
 	/**
+	 * import a track from an external file
+	 */
+	bool Import(const std::string& trackfilename, t_real assume_dt = 1.)
+	{
+		// try to load as gpx
+		if(ImportGPX(trackfilename, assume_dt))
+			return true;
+		// try to load as tcx
+		else if(ImportTCX(trackfilename, assume_dt))
+			return true;
+
+		// no valid loader
+		return false;
+	}
+
+
+
+	/**
 	 * import a track from a gpx file
 	 * @see https://en.wikipedia.org/wiki/GPS_Exchange_Format
 	 * @see https://www.topografix.com/gpx/1/1/
 	 */
-	bool Import(const std::string& trackfilename, t_real assume_dt = 1.)
+	bool ImportGPX(const std::string& trackfilename, t_real assume_dt = 1.)
 	{
 		namespace ptree = boost::property_tree;
 		namespace num = std::numbers;
@@ -338,6 +358,131 @@ public:
 				}  // point iteration
 			}  // segment iteration
 		}  // track iteration
+
+		Calculate();
+		CalculateHash();
+
+		return true;
+	}
+
+
+
+	/**
+	 * import a track from a tcx file
+	 * @see https://en.wikipedia.org/wiki/Training_Center_XML
+	 */
+	bool ImportTCX(const std::string& trackfilename, t_real assume_dt = 1.)
+	{
+		namespace ptree = boost::property_tree;
+		namespace num = std::numbers;
+		namespace fs = __gpx_fs;
+
+		fs::path trackfile{trackfilename};
+		if(!fs::exists(trackfile))
+			return false;
+
+		ptree::ptree track;
+		ptree::read_xml(trackfilename, track);
+		if(track.begin() == track.end())
+			return false;
+
+		// check root node
+		if(track.begin()->first.find("Database") == std::string::npos)
+			return false;
+		const auto& tcx = track.begin()->second;
+
+		const auto& activities_root = tcx.get_child_optional("Activities");
+		if(!activities_root)
+			return false;
+		const auto& activities = activities_root->get_child_optional("");
+		if(!activities)
+			return false;
+
+		m_filename = trackfile.filename().string();
+		m_version = tcx.get<std::string>("Author.Version.Major", "<unknown>");
+		m_creator = tcx.get<std::string>("Author.Name", "<unknown>");
+
+		// clear old track points
+		m_points.clear();
+		t_size pt_idx = 0;
+		std::set<t_size> invalid_elevations; 
+
+		for(const auto& activity : *activities)
+		{
+			if(activity.first != "Activity")
+				continue;
+			const auto& laps = activity.second.get_child_optional("");
+			for(const auto& lap : *laps)
+			{
+				if(lap.first != "Lap")
+					continue;
+
+				const auto& tracks = lap.second.get_child_optional("");
+				for(const auto& track : *tracks)
+				{
+					if(track.first != "Track")
+						continue;
+
+					const auto& pts = track.second.get_child_optional("");
+					for(const auto& pt : *pts)
+					{
+						if(pt.first != "Trackpoint")
+							continue;
+
+						auto alt = pt.second.get_optional<t_real>("AltitudeMeters");
+						bool alt_valid = !!alt;
+
+						t_trackpt trackpt
+						{
+							.latitude = pt.second.get<t_real>("Position.LatitudeDegrees") / t_real(180) * num::pi_v<t_real>,
+							.longitude = pt.second.get<t_real>("Position.LongitudeDegrees") / t_real(180) * num::pi_v<t_real>,
+							.elevation = alt_valid ? *alt : 0.,
+							//.timept = to_timepoint<t_clk>(pt.second.get<std::string>("Time")),
+							.heart = pt.second.get<t_real>("HeartRateBpm.Value", 0.),
+						};
+
+						if(auto time_opt = pt.second.get_optional<std::string>("Time"))
+						{
+							trackpt.timept = to_timepoint<t_clk>(*time_opt);
+						}
+						else
+						{
+							trackpt.timept = t_timept{};
+							trackpt.timept +=
+								static_cast<t_time_ty>(t_real(pt_idx * 1000) * assume_dt) *
+								t_dur(std::chrono::milliseconds(1));
+						}
+
+						if(!alt_valid)
+							invalid_elevations.insert(pt_idx);
+
+						++pt_idx;
+						m_points.emplace_back(std::move(trackpt));
+					}  // point iteration
+				}  // track iteration
+			}  // lap iteration
+		}  // activity iteration
+
+		// fix invalid elevations
+		for(t_size idx : invalid_elevations)
+		{
+			// look for a valid elevation at previous and next points
+			for(t_size i = 0; i < m_points.size(); ++i)
+			{
+				// previous point
+				if(i <= idx && !invalid_elevations.contains(idx - i))
+				{
+					m_points[idx].elevation = m_points[idx - i].elevation;
+					break;
+				}
+				// next point
+				if(i + idx < m_points.size() && !invalid_elevations.contains(idx + i))
+				{
+					m_points[idx].elevation = m_points[idx + i].elevation;
+					break;
+				}
+			}
+		}
 
 		Calculate();
 		CalculateHash();
@@ -750,7 +895,9 @@ public:
 			<< std::left << std::setw(field_width) << "\xce\x94t" << "  "
 			<< std::left << std::setw(field_width) << "\xce\x94s" << "  "
 			<< std::left << std::setw(field_width) << "t" << " "
-			<< std::left << std::setw(field_width) << "s" << "\n";
+			<< std::left << std::setw(field_width) << "s" << " "
+			<< std::left << std::setw(field_width) << "heart" << " "
+			<< std::left << std::setw(field_width) << "Time" << "\n";
 
 		for(const t_trackpt& pt : track.GetPoints())
 		{
@@ -764,7 +911,8 @@ public:
 				<< std::left << std::setw(field_width) << pt.elapsed << " "
 				<< std::left << std::setw(field_width) << pt.distance << " "
 				<< std::left << std::setw(field_width) << pt.elapsed_total << " "
-				<< std::left << std::setw(field_width) << pt.distance_total << " ";
+				<< std::left << std::setw(field_width) << pt.distance_total << " "
+				<< std::left << std::setw(field_width) << pt.heart << " ";
 
 			// time point
 			std::string timestr = from_timepoint<t_clk, t_timept>(pt.timept);

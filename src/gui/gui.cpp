@@ -766,7 +766,7 @@ bool TracksWnd::FileImport()
 {
 	auto filedlg = std::make_shared<QFileDialog>(
 		this, "Import Tracks", GetImportDir(),
-		"Track Files (*.gpx);;All Files (* *.*)");
+		"Track Files (*.gpx *.tcx);;All Files (* *.*)");
 	filedlg->setAcceptMode(QFileDialog::AcceptOpen);
 	filedlg->setDefaultSuffix("gpx");
 	filedlg->setFileMode(QFileDialog::ExistingFiles);
@@ -1287,7 +1287,7 @@ void TracksWnd::dropEvent(QDropEvent *evt)
 			return this->FileLoadRecent(filename);
 		});
 	}
-	else if(ext == ".gpx")
+	else if(ext == ".gpx" || ext == ".tcx")
 	{
 		if(!ImportFiles({ filename }))
 		{
