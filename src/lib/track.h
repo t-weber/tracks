@@ -378,7 +378,6 @@ public:
 
 	/**
 	 * import a track from a tcx file
-	 * @see https://en.wikipedia.org/wiki/Training_Center_XML
 	 */
 	bool ImportTCX(const std::string& trackfilename, t_real assume_dt = 1.)
 	{
