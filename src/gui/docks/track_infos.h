@@ -81,6 +81,10 @@ protected:
 	void ResetAltPlotRange();
 	void PlotAlt();
 
+	void HeartPlotMouseMove(QMouseEvent *evt);
+	void ResetHeartPlotRange();
+	void PlotHeart();
+
 	void CommentChanged();
 
 
@@ -106,8 +110,8 @@ private:
 
 	// altitude tab
 	std::shared_ptr<QCustomPlot> m_alt_plot{};
-	std::shared_ptr<QCheckBox> m_time_check{};
-	std::shared_ptr<QCheckBox> m_smooth_check{};
+	std::shared_ptr<QCheckBox> m_alt_time_check{};
+	std::shared_ptr<QCheckBox> m_alt_smooth_check{};
 	std::shared_ptr<QMenu> m_alt_context{};
 	QVector<t_real> m_distances{}, m_altitudes{};
 
@@ -117,6 +121,13 @@ private:
 	std::shared_ptr<QCheckBox> m_speed_check{};
 	std::shared_ptr<QMenu> m_pace_context{};
 	QVector<t_real> m_times{}, m_dists{};
+
+	// heart tab
+	std::shared_ptr<QCustomPlot> m_heart_plot{};
+	std::shared_ptr<QCheckBox> m_heart_time_check{};
+	std::shared_ptr<QCheckBox> m_heart_smooth_check{};
+	std::shared_ptr<QMenu> m_heart_context{};
+	QVector<t_real> m_distances_heart{}, m_heart{};
 
 	// svg image of the map
 	QByteArray m_map_image{};
@@ -136,6 +147,10 @@ private:
 	// pace plot ranges
 	t_real m_min_dist{}, m_max_dist{};
 	t_real m_min_pace{}, m_max_pace{};
+
+	// heart frequency range
+	t_real m_min_dist_heart{}, m_max_dist_heart{};
+	t_real m_min_heart{}, m_max_heart{};
 
 	// currently selected track
 	t_track *m_track{};

@@ -20,16 +20,17 @@
 
 
 // table columns
-#define TAB_NAME         0
-#define TAB_DATE         1
-#define TAB_DURATION     2
-#define TAB_DISTANCE     3
-#define TAB_DISTANCE_SUM 4
-#define TAB_PACE         5
-#define TAB_UPHILL       6
-#define TAB_HEIGHT       7
-#define TAB_LASTTRACK    8
-#define TAB_NUM_COLS     9
+#define TAB_NAME          0
+#define TAB_DATE          1
+#define TAB_DURATION      2
+#define TAB_DISTANCE      3
+#define TAB_DISTANCE_SUM  4
+#define TAB_PACE          5
+#define TAB_HEART         6
+#define TAB_UPHILL        7
+#define TAB_HEIGHT        8
+#define TAB_LASTTRACK     9
+#define TAB_NUM_COLS     10
 
 
 #define TRACK_IDX Qt::UserRole + 0
@@ -57,6 +58,7 @@ TracksDlg::TracksDlg(QWidget* parent)
 	m_table->setHorizontalHeaderItem(TAB_DISTANCE, new QTableWidgetItem{"Distance"});
 	m_table->setHorizontalHeaderItem(TAB_DISTANCE_SUM, new QTableWidgetItem{"Distance Sum"});
 	m_table->setHorizontalHeaderItem(TAB_PACE, new QTableWidgetItem{"Pace"});
+	m_table->setHorizontalHeaderItem(TAB_HEART, new QTableWidgetItem{"Heart"});
 	m_table->setHorizontalHeaderItem(TAB_UPHILL, new QTableWidgetItem{"Uphill"});
 	m_table->setHorizontalHeaderItem(TAB_HEIGHT, new QTableWidgetItem{"Height"});
 	m_table->setHorizontalHeaderItem(TAB_LASTTRACK, new QTableWidgetItem{"Since Last"});
@@ -162,6 +164,10 @@ TracksDlg::TracksDlg(QWidget* parent)
 		m_table->setColumnWidth(TAB_PACE, settings.value("dlg_tracks/pace_col").toInt());
 	else
 		m_table->setColumnWidth(TAB_PACE, 115);
+	if(settings.contains("dlg_tracks/heart_col"))
+		m_table->setColumnWidth(TAB_HEART, settings.value("dlg_tracks/heart_col").toInt());
+	else
+		m_table->setColumnWidth(TAB_HEART, 115);
 	if(settings.contains("dlg_tracks/climb_col"))
 		m_table->setColumnWidth(TAB_UPHILL, settings.value("dlg_tracks/climb_col").toInt());
 	else
@@ -222,6 +228,8 @@ void TracksDlg::FillTable()
 		const t_real distance = track->GetTotalDistance() / 1000.;
 		distance_sum += distance;
 
+		const auto [ heart_mean, heart_dev ] = track->GetHeartMean();
+
 		const auto [ climb, climb_down ] = track->GetAscentDescent();
 		const auto [ min_elev, max_elev ] = track->GetElevationRange();
 		const t_real height = max_elev - min_elev;
@@ -238,6 +246,8 @@ void TracksDlg::FillTable()
 			new NumericTableWidgetItem<t_real>(distance_sum, g_prec_gui, " km"));
 		m_table->setItem(row, TAB_PACE,
 			new PaceTableWidgetItem<t_real>(duration / distance, g_prec_gui, ""));
+		m_table->setItem(row, TAB_HEART,
+			new NumericTableWidgetItem<t_real>(heart_mean, g_prec_gui, " bpm"));
 		m_table->setItem(row, TAB_UPHILL,
 			new NumericTableWidgetItem<t_real>(climb, g_prec_gui, " m"));
 		m_table->setItem(row, TAB_HEIGHT,
@@ -379,6 +389,7 @@ void TracksDlg::accept()
 		settings.setValue("dlg_tracks/distance_col", m_table->columnWidth(TAB_DISTANCE));
 		settings.setValue("dlg_tracks/distance_sum_col", m_table->columnWidth(TAB_DISTANCE_SUM));
 		settings.setValue("dlg_tracks/pace_col", m_table->columnWidth(TAB_PACE));
+		settings.setValue("dlg_tracks/heart_col", m_table->columnWidth(TAB_HEART));
 		settings.setValue("dlg_tracks/climb_col", m_table->columnWidth(TAB_UPHILL));
 		settings.setValue("dlg_tracks/height_col", m_table->columnWidth(TAB_HEIGHT));
 		settings.setValue("dlg_tracks/lasttrack_col", m_table->columnWidth(TAB_LASTTRACK));

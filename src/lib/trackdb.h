@@ -169,8 +169,10 @@ public:
 			return false;
 
 		const t_size num_tracks = GetTrackCount();
+		const std::uint8_t real_size = sizeof(t_real);
 
 		ofstr.write(TRACKDB_MAGIC, sizeof(TRACKDB_MAGIC));
+		ofstr.write(reinterpret_cast<const char*>(&real_size), sizeof(real_size));
 		ofstr.write(reinterpret_cast<const char*>(&num_tracks), sizeof(num_tracks));
 		t_pos pos_addresses = ofstr.tellp();
 		ofstr.seekp(num_tracks * sizeof(t_size), std::ios::cur);
@@ -211,6 +213,11 @@ public:
 		char magic[sizeof(TRACKDB_MAGIC)];
 		ifstr.read(magic, sizeof(magic));
 		if(std::string_view(magic) != TRACKDB_MAGIC)
+			return false;
+
+		std::uint8_t real_size;
+		ifstr.read(reinterpret_cast<char*>(&real_size), sizeof(real_size));
+		if(real_size != (std::uint8_t)sizeof(t_real))
 			return false;
 
 		t_size num_tracks = 0;

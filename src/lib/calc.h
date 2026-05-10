@@ -201,4 +201,35 @@ requires requires(t_cont cont)
 }
 
 
+
+/**
+ * mean and standard deviation
+ */
+template<class t_real = double, class t_size = std::size_t, class t_fkt = t_real(t_size)>
+std::pair<t_real, t_real> mean(t_size N, const t_fkt& get_val)
+requires(std::floating_point<t_real> && std::integral<t_size>
+	&& std::floating_point<std::invoke_result_t<t_fkt, t_size>>)
+{
+	// mean
+	t_real mean{};
+	for(t_size idx = 0; idx < N; ++idx)
+	{
+		t_real val = get_val(idx);
+		mean += val;
+	}
+	if(N > 0)
+		mean /= t_real(N);
+
+	// standard deviation
+	t_real stddev{};
+	for(t_size idx = 0; idx < N; ++idx)
+		stddev += (get_val(idx) - mean)*(get_val(idx) - mean);
+	if(N > 0)
+		stddev /= t_real(N);
+	stddev = std::sqrt(stddev);
+
+	return std::make_pair(mean, stddev);
+}
+
+
 #endif

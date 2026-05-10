@@ -118,11 +118,10 @@ public:
 	void Calculate()
 	{
 		// clear old values
-		m_total_dist = 0.;
-		m_total_dist_planar = 0.;
+		m_total_dist = m_total_dist_planar = 0.;
 		m_total_time = 0.;
-		m_ascent = 0.;
-		m_descent = 0.;
+		m_ascent = m_descent = 0.;
+		m_heart_mean = m_heart_dev = 0.;
 
 		// reset ranges
 		m_min_elev = std::numeric_limits<t_real>::max();
@@ -210,6 +209,16 @@ public:
 			if(!elevation_last_asc)  // only assign at first point
 				elevation_last_asc = elevation;
 		}  // loop over elevations
+
+		// calculate mean heart frequency
+		auto get_heart = [this](t_size idx) -> t_real
+		{
+			if(idx >= m_points.size())
+				return 0.;
+
+			return m_points[idx].heart;
+		};
+		std::tie(m_heart_mean, m_heart_dev) = mean<t_real, t_size>(m_points.size(), get_heart);
 	}
 
 
@@ -591,7 +600,6 @@ public:
 
 
 
-
 	t_real GetTotalDistance(bool planar = false) const
 	{
 		return planar ? m_total_dist_planar : m_total_dist;
@@ -630,6 +638,13 @@ public:
 	std::pair<t_real, t_real> GetAscentDescent() const
 	{
 		return std::make_pair(m_ascent, m_descent);
+	}
+
+
+
+	std::pair<t_real, t_real> GetHeartMean() const
+	{
+		return std::make_pair(m_heart_mean, m_heart_dev);
 	}
 
 
@@ -696,6 +711,8 @@ public:
 			ofstr.write(reinterpret_cast<const char*>(&pt.distance), sizeof(pt.distance));
 			ofstr.write(reinterpret_cast<const char*>(&pt.distance_total), sizeof(pt.distance_total));
 
+			ofstr.write(reinterpret_cast<const char*>(&pt.heart), sizeof(pt.heart));
+
 			t_real secs = std::chrono::duration_cast<t_sec>(
 				pt.timept.time_since_epoch()).count();
 			ofstr.write(reinterpret_cast<const char*>(&secs), sizeof(secs));
@@ -715,6 +732,9 @@ public:
 
 		ofstr.write(reinterpret_cast<const char*>(&m_ascent), sizeof(m_ascent));
 		ofstr.write(reinterpret_cast<const char*>(&m_descent), sizeof(m_descent));
+
+		ofstr.write(reinterpret_cast<const char*>(&m_heart_mean), sizeof(m_heart_mean));
+		ofstr.write(reinterpret_cast<const char*>(&m_heart_dev), sizeof(m_heart_dev));
 
 		// write track name
 		const t_size name_len = m_filename.size();
@@ -760,6 +780,8 @@ public:
 			ifstr.read(reinterpret_cast<char*>(&pt.distance), sizeof(pt.distance));
 			ifstr.read(reinterpret_cast<char*>(&pt.distance_total), sizeof(pt.distance_total));
 
+			ifstr.read(reinterpret_cast<char*>(&pt.heart), sizeof(pt.heart));
+
 			t_real secs{};
 			ifstr.read(reinterpret_cast<char*>(&secs), sizeof(secs));
 			pt.timept = t_timept{static_cast<t_time_ty>(secs * 1000.)
@@ -783,6 +805,9 @@ public:
 
 		ifstr.read(reinterpret_cast<char*>(&m_ascent), sizeof(m_ascent));
 		ifstr.read(reinterpret_cast<char*>(&m_descent), sizeof(m_descent));
+
+		ifstr.read(reinterpret_cast<char*>(&m_heart_mean), sizeof(m_heart_mean));
+		ifstr.read(reinterpret_cast<char*>(&m_heart_dev), sizeof(m_heart_dev));
 
 		// read track name
 		t_size name_len{};
@@ -818,6 +843,7 @@ public:
 		t_real s_planar = GetTotalDistance(true);
 		auto [ min_elev, max_elev ] = GetElevationRange();
 		auto [ asc, desc ] = GetAscentDescent();
+		auto [ heart_mean, heart_dev ] = GetHeartMean();
 		std::optional<t_timept> start_time = GetStartTime();
 		std::optional<t_timept> end_time = GetEndTime();
 
@@ -873,6 +899,19 @@ public:
 			<< (s_planar / 1000.) / (t / 60. / 60.) << " km/h"
 			<< " = " << s_planar / t << " m/s" << ").</li>";
 
+		if(heart_mean > 0.)
+		{
+			ostr << "<li>";
+			if(show_icons)
+				ostr << "&#x1fac0; ";
+			ostr << "<b>Heart frequency</b>: " << heart_mean << " bpm";
+			if(show_icons)
+				ostr << " &#xb1; ";
+			else
+				ostr << " +- ";
+			ostr << heart_dev << " bpm.</li>";
+		}
+
 		ostr << "</ul>";
 		ostr << "</html>";
 
@@ -927,6 +966,7 @@ public:
 		t_real s_planar = track.GetTotalDistance(true);
 		auto [ min_elev, max_elev ] = track.GetElevationRange();
 		auto [ asc, desc ] = track.GetAscentDescent();
+		auto [ heart_mean, heart_dev ] = track.GetHeartMean();
 
 		ostr << "\n";
 		ostr << "Number of track points: " << track.GetPoints().size() << "\n";
@@ -940,6 +980,8 @@ public:
 		ostr << "Planar speed: " << s_planar / t << " m/s" << " = " << (s_planar / 1000.) / (t / 60. / 60.) << " km/h\n";
 		ostr << "Pace: " << get_pace_str((t / 60.) / (s / 1000.)) << "\n";
 		ostr << "Planar pace: " << get_pace_str((t / 60.) / (s_planar / 1000.)) << "\n";
+		if(heart_mean > 0.)
+			ostr << "Heart frequency: " << heart_mean << " bpm +- " << heart_dev << " bpm\n";
 
 		return ostr;
 	}
@@ -981,6 +1023,8 @@ private:
 	t_real m_min_lat{}, m_max_lat{};
 	t_real m_min_long{}, m_max_long{};
 	t_real m_min_elev{}, m_max_elev{};
+
+	t_real m_heart_mean{}, m_heart_dev{};
 
 	// minimum height difference [m] before being counted as climb
 	t_real m_asc_eps{5.};

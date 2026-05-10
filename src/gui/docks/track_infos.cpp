@@ -34,8 +34,9 @@ namespace num = std::numbers;
 #define TAB_TRACK    0
 #define TAB_ALT      1
 #define TAB_PACE     2
-#define TAB_MAP      3
-#define TAB_COMMENT  4
+#define TAB_HEART    3
+#define TAB_MAP      4
+#define TAB_COMMENT  5
 
 
 /**
@@ -48,12 +49,14 @@ TrackInfos::TrackInfos(QWidget* parent) : QWidget{parent}
 	QWidget *plot_panel = new QWidget(m_tab.get());
 	QWidget *alt_panel = new QWidget(m_tab.get());
 	QWidget *pace_panel = new QWidget(m_tab.get());
+	QWidget *heart_panel = new QWidget(m_tab.get());
 	QWidget *map_panel = new QWidget(m_tab.get());
 	QWidget *comment_panel = new QWidget(m_tab.get());
 
 	m_tab->addTab(plot_panel, "Track");
 	m_tab->addTab(alt_panel, "Altitude");
 	m_tab->addTab(pace_panel, "Pace");
+	m_tab->addTab(heart_panel, "Heart");
 	m_tab->addTab(map_panel, "Map");
 	m_tab->addTab(comment_panel, "Comment");
 
@@ -125,17 +128,17 @@ TrackInfos::TrackInfos(QWidget* parent) : QWidget{parent}
 		SavePlotPdf(m_alt_plot.get(), "altitude");
 	});
 
-	m_time_check = std::make_shared<QCheckBox>(alt_panel);
-	m_time_check->setText("Plot Times");
-	m_time_check->setToolTip("Show elapsed time instead of distance.");
-	m_time_check->setChecked(false);
-	connect(m_time_check.get(), &QCheckBox::toggled, this, &TrackInfos::PlotAlt);
+	m_alt_time_check = std::make_shared<QCheckBox>(alt_panel);
+	m_alt_time_check->setText("Plot Times");
+	m_alt_time_check->setToolTip("Show elapsed time instead of distance.");
+	m_alt_time_check->setChecked(false);
+	connect(m_alt_time_check.get(), &QCheckBox::toggled, this, &TrackInfos::PlotAlt);
 
-	m_smooth_check = std::make_shared<QCheckBox>(alt_panel);
-	m_smooth_check->setText("Smooth Curve");
-	m_smooth_check->setToolTip("Smooth altitude curve.");
-	m_smooth_check->setChecked(true);
-	connect(m_smooth_check.get(), &QCheckBox::toggled, this, &TrackInfos::PlotAlt);
+	m_alt_smooth_check = std::make_shared<QCheckBox>(alt_panel);
+	m_alt_smooth_check->setText("Smooth Curve");
+	m_alt_smooth_check->setToolTip("Smooth altitude curve.");
+	m_alt_smooth_check->setChecked(true);
+	connect(m_alt_smooth_check.get(), &QCheckBox::toggled, this, &TrackInfos::PlotAlt);
 
 	QPushButton *btn_replot_alt = new QPushButton(alt_panel);
 	btn_replot_alt->setText("Reset Plot");
@@ -147,8 +150,8 @@ TrackInfos::TrackInfos(QWidget* parent) : QWidget{parent}
 	alt_panel_layout->setVerticalSpacing(4);
 	alt_panel_layout->setHorizontalSpacing(4);
 	alt_panel_layout->addWidget(m_alt_plot.get(), 0, 0, 1, 4);
-	alt_panel_layout->addWidget(m_time_check.get(), 1, 0, 1, 1);
-	alt_panel_layout->addWidget(m_smooth_check.get(), 1, 1, 1, 1);
+	alt_panel_layout->addWidget(m_alt_time_check.get(), 1, 0, 1, 1);
+	alt_panel_layout->addWidget(m_alt_smooth_check.get(), 1, 1, 1, 1);
 	alt_panel_layout->addWidget(btn_replot_alt, 1, 3, 1, 1);
 
 	// pace plot panel
@@ -213,6 +216,53 @@ TrackInfos::TrackInfos(QWidget* parent) : QWidget{parent}
 	pace_panel_layout->addWidget(new QLabel("Distance Binning:", pace_panel), 1, 1, 1, 1);
 	pace_panel_layout->addWidget(m_dist_binlen.get(), 1, 2, 1, 1);
 	pace_panel_layout->addWidget(btn_replot_pace, 1, 3, 1, 1);
+
+	// heart frequency plot panel
+	m_heart_plot = std::make_shared<QCustomPlot>(heart_panel);
+	m_heart_plot->setSelectionRectMode(QCP::srmZoom);
+	m_heart_plot->setInteraction(QCP::Interaction(int(QCP::iRangeZoom) | int(QCP::iRangeDrag)));
+	m_heart_plot->yAxis->setLabel("Heart Frequency (bpm)");
+	m_heart_plot->legend->setVisible(false);
+	connect(m_heart_plot.get(), &QCustomPlot::mouseMove, this, &TrackInfos::HeartPlotMouseMove);
+	connect(m_heart_plot.get(), &QCustomPlot::mousePress, [this](QMouseEvent *evt)
+	{
+		PlotMouseClick(evt, m_heart_context.get(), m_heart_plot.get());
+	});
+
+	m_heart_context = std::make_shared<QMenu>(heart_panel);
+	QIcon iconSaveHeartPdf = QIcon::fromTheme("image-x-generic");
+	QAction *actionSaveHeartPdf = new QAction(iconSaveHeartPdf, "Save Image...", m_heart_context.get());
+	m_heart_context->addAction(actionSaveHeartPdf);
+	connect(actionSaveHeartPdf, &QAction::triggered, [this]()
+	{
+		SavePlotPdf(m_heart_plot.get(), "heart");
+	});
+
+	m_heart_time_check = std::make_shared<QCheckBox>(heart_panel);
+	m_heart_time_check->setText("Plot Times");
+	m_heart_time_check->setToolTip("Show elapsed time instead of distance.");
+	m_heart_time_check->setChecked(false);
+	connect(m_heart_time_check.get(), &QCheckBox::toggled, this, &TrackInfos::PlotHeart);
+
+	m_heart_smooth_check = std::make_shared<QCheckBox>(heart_panel);
+	m_heart_smooth_check->setText("Smooth Curve");
+	m_heart_smooth_check->setToolTip("Smooth heart curve.");
+	m_heart_smooth_check->setChecked(true);
+	connect(m_heart_smooth_check.get(), &QCheckBox::toggled, this, &TrackInfos::PlotHeart);
+
+	QPushButton *btn_replot_heart = new QPushButton(heart_panel);
+	btn_replot_heart->setText("Reset Plot");
+	btn_replot_heart->setToolTip("Reset the plotting range.");
+	connect(btn_replot_heart, &QAbstractButton::clicked, this, &TrackInfos::ResetHeartPlotRange);
+
+	QGridLayout *heart_panel_layout = new QGridLayout(heart_panel);
+	heart_panel_layout->setContentsMargins(4, 4, 4, 4);
+	heart_panel_layout->setVerticalSpacing(4);
+	heart_panel_layout->setHorizontalSpacing(4);
+	heart_panel_layout->addWidget(m_heart_plot.get(), 0, 0, 1, 4);
+	heart_panel_layout->addWidget(m_heart_time_check.get(), 1, 0, 1, 1);
+	heart_panel_layout->addWidget(m_heart_smooth_check.get(), 1, 1, 1, 1);
+	heart_panel_layout->addWidget(btn_replot_heart, 1, 3, 1, 1);
 
 	// map plot panel
 	m_map = std::make_shared<MapDrawer>(map_panel);
@@ -339,6 +389,7 @@ void TrackInfos::ShowTrack(t_track *track)
 	PlotTrack();
 	PlotPace();
 	PlotAlt();
+	PlotHeart();
 	PlotMap(true);
 }
 
@@ -497,7 +548,7 @@ void TrackInfos::PlotAlt()
 	m_distances.clear();
 	m_altitudes.clear();
 
-	const bool plot_time = m_time_check->isChecked();
+	const bool plot_time = m_alt_time_check->isChecked();
 	if(plot_time)
 		m_alt_plot->xAxis->setLabel("Time (min)");
 	else
@@ -523,14 +574,14 @@ void TrackInfos::PlotAlt()
 				continue;
 			m_distances.push_back(pt.distance_total / 1000.);
 		}
-		m_altitudes.push_back(pt.elevation);
 
+		m_altitudes.push_back(pt.elevation);
 		m_min_alt = std::min(m_min_alt, pt.elevation);
 		m_max_alt = std::max(m_max_alt, pt.elevation);
 	}
 
 	// smooth curve
-	if(m_smooth_check->isChecked() && g_smooth_rad > 0)
+	if(m_alt_smooth_check->isChecked() && g_smooth_rad > 0)
 		m_altitudes = smooth_data(m_altitudes, g_smooth_rad);
 
 	if(!m_altitudes.size())
@@ -676,6 +727,93 @@ void TrackInfos::PlotPace()
 	curve->setBrush(brush);
 
 	ResetPacePlotRange();
+}
+
+
+void TrackInfos::ResetHeartPlotRange()
+{
+	if(!m_heart_plot)
+		return;
+
+	t_real heart_range = m_max_heart - m_min_heart;
+
+	m_heart_plot->xAxis->setRange(m_min_dist_heart, m_max_dist_heart);
+	m_heart_plot->yAxis->setRange(m_min_heart - heart_range / 20., m_max_heart + heart_range / 20.);
+
+	m_heart_plot->replot();
+}
+
+
+void TrackInfos::PlotHeart()
+{
+	if(!m_track || !m_heart_plot)
+		return;
+
+	m_heart_plot->clearPlottables();
+	m_distances_heart.clear();
+	m_heart.clear();
+
+	const bool plot_time = m_heart_time_check->isChecked();
+	if(plot_time)
+		m_heart_plot->xAxis->setLabel("Time (min)");
+	else
+		m_heart_plot->xAxis->setLabel("Distance (km)");
+
+	m_distances_heart.reserve(m_track->GetPoints().size());
+	m_heart.reserve(m_track->GetPoints().size());
+
+	m_min_heart = std::numeric_limits<t_real>::max();
+	m_max_heart = -m_min_heart;
+
+	for(const t_track_pt& pt : m_track->GetPoints())
+	{
+		if(plot_time)
+		{
+			if(std::abs(pt.elapsed) < g_eps)
+				continue;
+			m_distances_heart.push_back(pt.elapsed_total / 60.);
+		}
+		else
+		{
+			if(std::abs(pt.distance) < g_eps)
+				continue;
+			m_distances_heart.push_back(pt.distance_total / 1000.);
+		}
+
+		m_heart.push_back(pt.heart);
+		m_min_heart = std::min(m_min_heart, pt.heart);
+		m_max_heart = std::max(m_max_heart, pt.heart);
+	}
+
+	// smooth curve
+	if(m_heart_smooth_check->isChecked() && g_smooth_rad > 0)
+		m_heart = smooth_data(m_heart, g_smooth_rad);
+
+	if(!m_heart.size())
+		return;
+
+	if(plot_time)
+	{
+		m_min_dist_heart = *m_distances_heart.begin();
+		m_max_dist_heart = *m_distances_heart.rbegin() * 1.01;
+	}
+	else
+	{
+		// use same distance range as in pace plot
+		m_min_dist_heart = m_min_dist;
+		m_max_dist_heart = m_max_dist;
+	}
+
+	QCPGraph *curve = new QCPGraph(m_heart_plot->xAxis, m_heart_plot->yAxis);
+	curve->setData(m_distances_heart, m_heart);
+	curve->setLineStyle(QCPGraph::lsLine);
+
+	QPen pen = curve->pen();
+	pen.setWidthF(2.);
+	pen.setColor(QColor{0x00, 0x00, 0xff, 0xff});
+	curve->setPen(pen);
+
+	ResetHeartPlotRange();
 }
 
 
@@ -946,6 +1084,9 @@ void TrackInfos::Clear()
 	m_distances.clear();
 	m_altitudes.clear();
 
+	m_distances_heart.clear();
+	m_heart.clear();
+
 	if(m_comments)
 	{
 		m_comments->setReadOnly(true);
@@ -968,6 +1109,12 @@ void TrackInfos::Clear()
 	{
 		m_pace_plot->clearPlottables();
 		m_pace_plot->replot();
+	}
+
+	if(m_heart_plot)
+	{
+		m_heart_plot->clearPlottables();
+		m_heart_plot->replot();
 	}
 
 	if(m_map)
@@ -1048,8 +1195,8 @@ void TrackInfos::TrackPlotMouseClick(QMouseEvent *evt)
  */
 void TrackInfos::PacePlotMouseMove(QMouseEvent *evt)
 {
-        if(!m_pace_plot)
-                return;
+	if(!m_pace_plot)
+		return;
 
 #if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
 	qreal x = evt->position().x();
@@ -1101,8 +1248,8 @@ void TrackInfos::PacePlotMouseMove(QMouseEvent *evt)
  */
 void TrackInfos::AltPlotMouseMove(QMouseEvent *evt)
 {
-        if(!m_alt_plot)
-                return;
+	if(!m_alt_plot)
+		return;
 
 #if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
 	qreal x = evt->position().x();
@@ -1140,11 +1287,65 @@ void TrackInfos::AltPlotMouseMove(QMouseEvent *evt)
 	std::ostringstream ostr;
 	ostr.precision(g_prec_gui);
 
-	if(m_time_check->isChecked())
+	if(m_alt_time_check->isChecked())
 		ostr << "Time: " << dist << " min";
 	else
 		ostr << "Distance: " << dist << " km";
 	ostr << ", Altitude: " << alt << " m.";
+
+	emit StatusMessageChanged(ostr.str().c_str());
+}
+
+
+/**
+ * the mouse has moved in the heart plot widget
+ */
+void TrackInfos::HeartPlotMouseMove(QMouseEvent *evt)
+{
+	if(!m_heart_plot)
+		return;
+
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+	qreal x = evt->position().x();
+	qreal y = evt->position().y();
+#else
+	qreal x = evt->x();
+	qreal y = evt->y();
+#endif
+
+	t_real dist_cursor = m_heart_plot->xAxis->pixelToCoord(x);
+	t_real heart_cursor = m_heart_plot->yAxis->pixelToCoord(y);
+
+	// find closest point on the curve
+	t_real dist = std::numeric_limits<t_real>::max();
+	t_real heart = std::numeric_limits<t_real>::max();
+	bool point_found = false;
+	for(int i = 0; i < m_distances_heart.size(); ++i)
+	{
+		t_real d = m_distances_heart[i];
+		if(std::abs(d - dist_cursor) >= std::abs(dist - dist_cursor))
+			continue;
+
+		dist = d;
+		heart = m_heart[i];
+		point_found = true;
+	}
+
+	if(!point_found)
+	{
+		// just show the cursor coordinates
+		dist = dist_cursor;
+		heart = heart_cursor;
+	}
+
+	std::ostringstream ostr;
+	ostr.precision(g_prec_gui);
+
+	if(m_heart_time_check->isChecked())
+		ostr << "Time: " << dist << " min";
+	else
+		ostr << "Distance: " << dist << " km";
+	ostr << ", Heart: " << heart << " bpm.";
 
 	emit StatusMessageChanged(ostr.str().c_str());
 }
@@ -1275,8 +1476,10 @@ void TrackInfos::SaveSettings(QSettings& settings)
 	settings.setValue("track_info/recent_tab", m_tab->currentIndex());
 	settings.setValue("track_info/distance_bin", m_dist_binlen->value());
 	settings.setValue("track_info/speed_check", m_speed_check->isChecked());
-	settings.setValue("track_info/time_check", m_time_check->isChecked());
-	settings.setValue("track_info/smooth_check", m_smooth_check->isChecked());
+	settings.setValue("track_info/time_check", m_alt_time_check->isChecked());
+	settings.setValue("track_info/smooth_check", m_alt_smooth_check->isChecked());
+	settings.setValue("track_info/heart_time_check", m_heart_time_check->isChecked());
+	settings.setValue("track_info/heart_smooth_check", m_heart_smooth_check->isChecked());
 }
 
 
@@ -1312,8 +1515,14 @@ void TrackInfos::RestoreSettings(QSettings& settings)
 		m_speed_check->setChecked(settings.value("track_info/speed_check").toBool());
 
 	if(settings.contains("track_info/time_check"))
-		m_time_check->setChecked(settings.value("track_info/time_check").toBool());
+		m_alt_time_check->setChecked(settings.value("track_info/time_check").toBool());
 
 	if(settings.contains("track_info/smooth_check"))
-		m_smooth_check->setChecked(settings.value("track_info/smooth_check").toBool());
+		m_alt_smooth_check->setChecked(settings.value("track_info/smooth_check").toBool());
+
+	if(settings.contains("track_info/heart_time_check"))
+		m_heart_time_check->setChecked(settings.value("track_info/heart_time_check").toBool());
+
+	if(settings.contains("track_info/heart_smooth_check"))
+		m_heart_smooth_check->setChecked(settings.value("track_info/heart_smooth_check").toBool());
 }
