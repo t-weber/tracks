@@ -778,22 +778,27 @@ bool TracksWnd::FileImport()
 	if(files.size() == 0 || files[0] == "")
 		return false;
 
+	t_size old_count = m_trackdb.GetTrackCount();
 	if(!ImportFiles(files))
 	{
 		QMessageBox::critical(this, "Error",
 			QString("Selected files could not be imported."));
 		return false;
 	}
+	t_size new_count = m_trackdb.GetTrackCount();
 
 	fs::path file{files[0].toStdString()};
 	m_recent.SetRecentImportDir(file.parent_path().string().c_str());
 
-	if(QMessageBox::question(this, "Sort Tracks?",
-		"New tracks have been inserted to the end of the list. "
-		"Re-sort the track list?") == QMessageBox::Yes)
+	if(old_count > 0 && new_count > old_count)
 	{
-		PopulateTrackList(true);
-		SetStatusMessage(QString("%1 track(s) imported and sorted.").arg(files.size()));
+		if(QMessageBox::question(this, "Sort Tracks?",
+			"New tracks have been inserted to the end of the list. "
+			"Re-sort the track list?") == QMessageBox::Yes)
+		{
+			PopulateTrackList(true);
+			SetStatusMessage(QString("%1 track(s) imported and sorted.").arg(files.size()));
+		}
 	}
 
 	SetWindowModified(true);

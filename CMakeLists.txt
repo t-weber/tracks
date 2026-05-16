@@ -21,7 +21,7 @@ add_compile_options(-std=c++20)
 add_compile_options(-Wall -Wextra -Weffc++)
 
 # see: https://cmake.org/cmake/help/latest/module/FindBoost.html
-find_package(Boost REQUIRED COMPONENTS system filesystem)
+find_package(Boost REQUIRED COMPONENTS filesystem)
 add_compile_options(${Boost_CXX_FLAGS})
 
 
@@ -128,7 +128,7 @@ add_executable(tracks
 target_link_libraries(tracks
 	${OSMIUM_LIBRARIES}
 	${QtTargets}
-	Boost::system Boost::filesystem
+	Boost::filesystem
 )
 
 install(TARGETS tracks RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
