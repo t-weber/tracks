@@ -40,6 +40,10 @@
 #define TAB_NUM_COLS  6
 
 
+// approx. number of seconds in a month
+#define MONTH_SECS    (30. * 24. * 60. * 60.)
+
+
 DistancesDlg::DistancesDlg(QWidget* parent)
 	: QDialog(parent)
 {
@@ -377,25 +381,23 @@ void DistancesDlg::ResetDistPlotRange()
 	t_real xmin = m_min_epoch;
 	t_real xmax = m_max_epoch;
 
-	t_real ymin = m_min_dist;
+	//t_real ymin = m_min_dist;
 	t_real ymax = m_max_dist + (m_max_dist - m_min_dist) / 20.;
 
 	if(all_tracks)
 	{
 		xmin -= (m_max_epoch - m_min_epoch) / 20.;
 		xmax += (m_max_epoch - m_min_epoch) / 20.;
-		ymin -= (m_max_dist - m_min_dist) / 20.;
+		//ymin -= (m_max_dist - m_min_dist) / 20.;
 	}
 	else
 	{
-		t_real month = 30. * 24. * 60. * 60.;
-
-		xmin -= month;
-		xmax += month;
+		xmin -= MONTH_SECS * 0.5;
+		xmax += MONTH_SECS * 1.5;
 	}
 
 	m_plot->xAxis->setRange(xmin, xmax);
-	m_plot->yAxis->setRange(ymin, ymax);
+	m_plot->yAxis->setRange(/*ymin*/0., ymax);
 	m_plot->replot();
 }
 
@@ -531,7 +533,12 @@ void DistancesDlg::PlotDistances()
 	auto add_bars = [this](const QVector<t_real>& epochs, const QVector<t_real>& dists)
 	{
 		QCPBars *graph = new QCPBars(m_plot->xAxis, m_plot->yAxis);
-		graph->setWidth(30. * 24. * 60. * 60.);
+		graph->setWidth(MONTH_SECS);
+
+		// re-centre bars
+		QVector<t_real> epochs_shifted = epochs;
+		for(t_real& secs : epochs_shifted)
+			secs += MONTH_SECS / 2.;
 
 		QPen pen = graph->pen();
 		pen.setWidthF(2.);
@@ -541,7 +548,7 @@ void DistancesDlg::PlotDistances()
 		brush.setStyle(Qt::SolidPattern);
 		brush.setColor(QColor{0, 0, 0xff, 0x99});
 
-		graph->setData(epochs, dists, true);
+		graph->setData(epochs_shifted, dists, true);
 		graph->setPen(pen);
 		graph->setBrush(brush);
 	};

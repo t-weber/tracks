@@ -413,7 +413,7 @@ public:
 		// clear old track points
 		m_points.clear();
 		t_size pt_idx = 0;
-		std::set<t_size> invalid_elevations; 
+		std::set<t_size> invalid_elevations, invalid_longitudes, invalid_latitudes; 
 
 		for(const auto& activity : *activities)
 		{
@@ -438,12 +438,16 @@ public:
 							continue;
 
 						auto alt = pt.second.get_optional<t_real>("AltitudeMeters");
+						auto lat = pt.second.get_optional<t_real>("Position.LatitudeDegrees");
+						auto lon = pt.second.get_optional<t_real>("Position.LongitudeDegrees");
 						bool alt_valid = !!alt;
+						bool lat_valid = !!lat;
+						bool lon_valid = !!lon;
 
 						t_trackpt trackpt
 						{
-							.latitude = pt.second.get<t_real>("Position.LatitudeDegrees") / t_real(180) * num::pi_v<t_real>,
-							.longitude = pt.second.get<t_real>("Position.LongitudeDegrees") / t_real(180) * num::pi_v<t_real>,
+							.latitude = lat_valid ? (*lat / t_real(180) * num::pi_v<t_real>) : 0.,
+							.longitude = lon_valid ? (*lon / t_real(180) * num::pi_v<t_real>) : 0.,
 							.elevation = alt_valid ? *alt : 0.,
 							//.timept = to_timepoint<t_clk>(pt.second.get<std::string>("Time")),
 							.heart = pt.second.get<t_real>("HeartRateBpm.Value", 0.),
@@ -463,6 +467,10 @@ public:
 
 						if(!alt_valid)
 							invalid_elevations.insert(pt_idx);
+						if(!lat_valid)
+							invalid_latitudes.insert(pt_idx);
+						if(!lon_valid)
+							invalid_longitudes.insert(pt_idx);
 
 						++pt_idx;
 						m_points.emplace_back(std::move(trackpt));
@@ -471,26 +479,48 @@ public:
 			}  // lap iteration
 		}  // activity iteration
 
-		// fix invalid elevations
-		for(t_size idx : invalid_elevations)
+
+		// fix invalid elevations, longitudes and latitudes
+		std::array<const std::set<t_size>*, 3> invalid_arrs =
 		{
-			// look for a valid elevation at previous and next points
-			for(t_size i = 0; i < m_points.size(); ++i)
+			&invalid_elevations,
+			&invalid_latitudes,
+			&invalid_longitudes
+		};
+
+		std::array<t_real t_trackpt::*, 3> invalid_vals =
+		{
+			&t_trackpt::elevation,
+			&t_trackpt::latitude,
+			&t_trackpt::longitude,
+		};
+
+		for(t_size inv_idx = 0; inv_idx < invalid_arrs.size(); ++inv_idx)
+		{
+			const std::set<t_size>* invalid_arr = invalid_arrs[inv_idx];
+			t_real t_trackpt::* invalid_val = invalid_vals[inv_idx];
+
+			for(t_size idx : *invalid_arr)
 			{
-				// previous point
-				if(i <= idx && !invalid_elevations.contains(idx - i))
+				// look for a valid value at previous and next points
+				for(t_size i = 0; i < m_points.size(); ++i)
 				{
-					m_points[idx].elevation = m_points[idx - i].elevation;
-					break;
-				}
-				// next point
-				if(i + idx < m_points.size() && !invalid_elevations.contains(idx + i))
-				{
-					m_points[idx].elevation = m_points[idx + i].elevation;
-					break;
-				}
-			}
-		}
+					// previous point
+					if(i <= idx && !invalid_arr->contains(idx - i))
+					{
+						m_points[idx].*invalid_val = m_points[idx - i].*invalid_val;
+						break;
+					}
+					// next point
+					if(i + idx < m_points.size() && !invalid_arr->contains(idx + i))
+					{
+						m_points[idx].*invalid_val = m_points[idx + i].*invalid_val;
+						break;
+					}
+				}  // point
+			}  // invalid_arr
+		}  // invalid_arrs
+
 
 		Calculate();
 		CalculateHash();
