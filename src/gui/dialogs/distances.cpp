@@ -414,8 +414,24 @@ void DistancesDlg::PlotDistances()
 	m_min_dist = std::numeric_limits<t_real>::max();
 	m_max_dist = -m_min_dist;
 
-	QVector<t_real> epochs, dists;
+	const std::vector<QColor> cols_pen{{
+		QColor{0,    0, 0xff, 0xff},		
+		QColor{0xff, 0,    0, 0xff}
+	}};
+	const std::vector<QColor> cols_brush{{
+		QColor{0,    0, 0xff, 0x99},
+		QColor{0xff, 0,    0, 0x99}
+	}};
+
+	struct DistData
+	{
+		QVector<t_real> epochs{}, dists{};
+		t_size col_idx{};
+	};
+
+	std::vector<DistData> dist_datas;
 	t_real total_dist = 0.;
+	t_size cur_col = 0;
 
 	bool cumulative = m_cumulative && m_cumulative->isChecked();
 	bool all_tracks = m_all_tracks && m_all_tracks->isChecked();
@@ -426,8 +442,10 @@ void DistancesDlg::PlotDistances()
 	if(all_tracks)
 	{
 		const t_size num_tracks = m_trackdb->GetTrackCount();
-		epochs.reserve(num_tracks);
-		dists.reserve(num_tracks);
+
+		DistData data;
+		data.dists.reserve(num_tracks);
+		data.epochs.reserve(num_tracks);
 
 		for(std::size_t track_idx = 0; track_idx < num_tracks; ++track_idx)
 		{
@@ -465,8 +483,8 @@ void DistancesDlg::PlotDistances()
 			t_real dist = track->GetTotalDistance(false) / 1000.;
 			total_dist += dist;
 
-			epochs.push_back(epoch);
-			dists.push_back(cumulative ? total_dist : dist);
+			data.epochs.push_back(epoch);
+			data.dists.push_back(cumulative ? total_dist : dist);
 
 			// ranges
 			m_min_epoch = std::min(m_min_epoch, epoch);
@@ -475,14 +493,16 @@ void DistancesDlg::PlotDistances()
 			m_min_dist = std::min(m_min_dist, dist);
 			m_max_dist = std::max(m_max_dist, dist);
 		}
+
+		dist_datas.emplace_back(std::move(data));
 	}
 
 	// show monthly distance sum
 	else
 	{
-		const t_size num_tracks = m_monthly.size();
-		epochs.reserve(num_tracks);
-		dists.reserve(num_tracks);
+		DistData data;
+		typename t_track::t_timept tpt_rd{};
+		bool first_data = true;
 
 		for(const auto& pair : m_monthly)
 		{
@@ -491,8 +511,32 @@ void DistancesDlg::PlotDistances()
 			t_real dist = std::get<0>(pair.second) / 1000.;
 			total_dist += dist;
 
-			epochs.push_back(epoch);
-			dists.push_back(cumulative ? total_dist : dist);
+			// check if we're in a new year
+			typename t_track::t_timept tpt_rd_new =
+				round_timepoint<typename t_track::t_clk, typename t_track::t_timept>(
+					pair.first, true);
+			if(first_data)
+			{
+				tpt_rd = tpt_rd_new;
+				first_data = false;
+			}
+
+			if(tpt_rd_new != tpt_rd)
+			{
+				tpt_rd = tpt_rd_new;
+
+				data.col_idx = cur_col;
+				dist_datas.emplace_back(std::move(data));
+
+				// begin new data set
+				data = DistData{};
+				++cur_col;
+				if(cur_col >= cols_pen.size())
+					cur_col = 0;
+			}
+
+			data.epochs.push_back(epoch);
+			data.dists.push_back(cumulative ? total_dist : dist);
 
 			// ranges
 			m_min_epoch = std::min(m_min_epoch, epoch);
@@ -500,6 +544,13 @@ void DistancesDlg::PlotDistances()
 
 			m_min_dist = std::min(m_min_dist, dist);
 			m_max_dist = std::max(m_max_dist, dist);
+		}
+
+		// remaining data
+		if(data.epochs.size())
+		{
+			data.col_idx = cur_col;
+			dist_datas.emplace_back(std::move(data));
 		}
 	}
 
@@ -510,19 +561,19 @@ void DistancesDlg::PlotDistances()
 	}
 
 	// create graph
-	auto add_graph = [this](const QVector<t_real>& epochs, const QVector<t_real>& dists)
+	auto add_graph = [this, &cols_pen, &cols_brush](const DistData& data)
 	{
 		QCPGraph *graph = new QCPGraph(m_plot->xAxis, m_plot->yAxis);
 
 		QPen pen = graph->pen();
 		pen.setWidthF(2.);
-		pen.setColor(QColor{0, 0, 0xff, 0xff});
+		pen.setColor(cols_pen[data.col_idx]);
 
 		QBrush brush = graph->brush();
 		brush.setStyle(Qt::SolidPattern);
-		brush.setColor(QColor{0, 0, 0xff, 0x99});
+		brush.setColor(cols_brush[data.col_idx]);
 
-		graph->setData(epochs, dists, true);
+		graph->setData(data.epochs, data.dists, true);
 		graph->setLineStyle(QCPGraph::lsLine);
 		graph->setScatterStyle(QCPScatterStyle{QCPScatterStyle::ssDisc, pen, brush, 6.});
 		graph->setPen(pen);
@@ -530,34 +581,37 @@ void DistancesDlg::PlotDistances()
 	};
 
 	// create bar graph
-	auto add_bars = [this](const QVector<t_real>& epochs, const QVector<t_real>& dists)
+	auto add_bars = [this, &cols_pen, &cols_brush](const DistData& data)
 	{
 		QCPBars *graph = new QCPBars(m_plot->xAxis, m_plot->yAxis);
 		graph->setWidth(MONTH_SECS);
 
 		// re-centre bars
-		QVector<t_real> epochs_shifted = epochs;
+		QVector<t_real> epochs_shifted = data.epochs;
 		for(t_real& secs : epochs_shifted)
 			secs += MONTH_SECS / 2.;
 
 		QPen pen = graph->pen();
 		pen.setWidthF(2.);
-		pen.setColor(QColor{0, 0, 0xff, 0xff});
+		pen.setColor(cols_pen[data.col_idx]);
 
 		QBrush brush = graph->brush();
 		brush.setStyle(Qt::SolidPattern);
-		brush.setColor(QColor{0, 0, 0xff, 0x99});
+		brush.setColor(cols_brush[data.col_idx]);
 
-		graph->setData(epochs_shifted, dists, true);
+		graph->setData(epochs_shifted, data.dists, true);
 		graph->setPen(pen);
 		graph->setBrush(brush);
 	};
 
 	// plot distances
-	if(all_tracks)
-		add_graph(epochs, dists);
-	else
-		add_bars(epochs, dists);
+	for(const DistData& data : dist_datas)
+	{
+		if(all_tracks)
+			add_graph(data);
+		else
+			add_bars(data);
+		}
 
 	ResetDistPlotRange();
 }
