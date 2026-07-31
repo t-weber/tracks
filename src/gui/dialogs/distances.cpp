@@ -273,6 +273,8 @@ void DistancesDlg::FillDistancesTable()
 	m_table->clearContents();
 	m_table->setRowCount(m_monthly.size() + m_yearly.size());
 
+	auto [ cur_year, cur_year_prog ] = cur_year_progress<typename t_track::t_clk, t_real>();
+
 	// yearly distances
 	int row = 0;
 	t_real total_dist = 0.;
@@ -289,13 +291,30 @@ void DistancesDlg::FillDistancesTable()
 		t_real time = std::get<1>(iter->second) / 3600.;
 		total_time += time;
 
+		// estimated distance / time for full year
+		std::ostringstream ostr_dist, ostr_time;
+		ostr_dist.precision(g_prec_gui);
+		ostr_time.precision(g_prec_gui);
+		ostr_dist << " km";
+		ostr_time << " h";
+
+		auto [ year, month, day ] = date_from_timept<typename t_track::t_clk>(iter->first);
+		if(year == cur_year && cur_year_prog > g_eps && cur_year_prog < 1.)
+		{
+			t_real dist_est = dist / cur_year_prog;
+			t_real time_est = time / cur_year_prog;
+
+			ostr_dist << " (est.: " << dist_est << " km)";
+			ostr_time << " (est.: " << time_est << " h)";
+		}
+
 		int item_row = m_yearly.size() - row - 1;
 		m_table->setItem(item_row, TAB_DATE, new DateTableWidgetItem<
 			typename t_track::t_clk, typename t_track::t_timept, t_real>(epoch, false, " (full year)"));
 		m_table->setItem(item_row, TAB_COUNT, new NumericTableWidgetItem<t_size>(num_tracks, g_prec_gui));
-		m_table->setItem(item_row, TAB_DIST, new NumericTableWidgetItem<t_real>(dist, g_prec_gui, " km"));
+		m_table->setItem(item_row, TAB_DIST, new NumericTableWidgetItem<t_real>(dist, g_prec_gui, ostr_dist.str()));
 		m_table->setItem(item_row, TAB_DIST_SUM, new NumericTableWidgetItem<t_real>(total_dist, g_prec_gui, " km"));
-		m_table->setItem(item_row, TAB_TIME, new NumericTableWidgetItem<t_real>(time, g_prec_gui, " h"));
+		m_table->setItem(item_row, TAB_TIME, new NumericTableWidgetItem<t_real>(time, g_prec_gui, ostr_time.str()));
 		m_table->setItem(item_row, TAB_TIME_SUM, new NumericTableWidgetItem<t_real>(total_time, g_prec_gui, " h"));
 
 		for(int col = 0; col < TAB_NUM_COLS; ++col)
@@ -415,7 +434,7 @@ void DistancesDlg::PlotDistances()
 	m_max_dist = -m_min_dist;
 
 	const std::vector<QColor> cols_pen{{
-		QColor{0,    0, 0xff, 0xff},		
+		QColor{0,    0, 0xff, 0xff},
 		QColor{0xff, 0,    0, 0xff}
 	}};
 	const std::vector<QColor> cols_brush{{

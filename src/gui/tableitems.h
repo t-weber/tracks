@@ -75,6 +75,7 @@ public:
 		ostr << m_val;
 
 		setText((ostr.str() + m_suffix).c_str());
+		setToolTip((ostr.str() + m_suffix).c_str());
 	}
 
 
@@ -159,7 +160,7 @@ public:
 
 	void SetTextFromData()
 	{
-		auto [year, month, day] = date_from_epoch<t_clk, t_timept, t_epoch>(m_val);
+		auto [ year, month, day ] = date_from_epoch<t_clk, t_timept, t_epoch>(m_val);
 
 		std::ostringstream ostr;
 
@@ -170,6 +171,7 @@ public:
 		ostr << m_suffix;
 
 		setText(ostr.str().c_str());
+		setToolTip(ostr.str().c_str());
 	}
 
 
@@ -266,6 +268,7 @@ public:
 		ostr << std::setw(2) << std::setfill('0') << second;
 
 		setText(ostr.str().c_str());
+		setToolTip(ostr.str().c_str());
 	}
 
 
@@ -310,6 +313,7 @@ public:
 		ostr << this->m_suffix;
 
 		this->setText(ostr.str().c_str());
+		this->setToolTip(ostr.str().c_str());
 	}
 };
 
