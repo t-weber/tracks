@@ -170,6 +170,7 @@ protected slots:
 	void NewTrackSelected(t_size idx);
 	void TrackNameChanged(t_size idx, const std::string& name);
 	void TrackDeleted(t_size idx);
+	void SmoothTrack(t_size idx);
 
 	void PlotCoordsChanged(t_real longitude, t_real latitude,
 		t_real distance, t_real time);

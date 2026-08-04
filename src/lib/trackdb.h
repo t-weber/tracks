@@ -110,6 +110,16 @@ public:
 
 
 
+	void SmoothTrack(t_size idx)
+	{
+		if(idx >= GetTrackCount())
+			return;
+
+		m_tracks[idx].Smooth();
+	}
+
+
+
 	void DeleteTrack(t_size idx)
 	{
 		if(idx >= GetTrackCount())

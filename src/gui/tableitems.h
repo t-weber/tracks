@@ -75,7 +75,7 @@ public:
 		ostr << m_val;
 
 		setText((ostr.str() + m_suffix).c_str());
-		setToolTip((ostr.str() + m_suffix).c_str());
+		//setToolTip((ostr.str() + m_suffix).c_str());
 	}
 
 
@@ -171,7 +171,7 @@ public:
 		ostr << m_suffix;
 
 		setText(ostr.str().c_str());
-		setToolTip(ostr.str().c_str());
+		//setToolTip(ostr.str().c_str());
 	}
 
 
@@ -268,7 +268,7 @@ public:
 		ostr << std::setw(2) << std::setfill('0') << second;
 
 		setText(ostr.str().c_str());
-		setToolTip(ostr.str().c_str());
+		//setToolTip(ostr.str().c_str());
 	}
 
 
@@ -313,7 +313,7 @@ public:
 		ostr << this->m_suffix;
 
 		this->setText(ostr.str().c_str());
-		this->setToolTip(ostr.str().c_str());
+		//this->setToolTip(ostr.str().c_str());
 	}
 };
 

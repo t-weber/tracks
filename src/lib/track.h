@@ -113,9 +113,44 @@ public:
 
 
 	/**
+	 * smooth the track data and recalculate its properties
+	 */
+	void Smooth()
+	{
+		if(m_smooth_rad == 0)
+			return;
+
+		std::vector<t_real> latitudes, longitudes, elevations;
+		for(std::vector<t_real> *vec : { &latitudes, &longitudes, &elevations })
+			vec->reserve(m_points.size());
+
+		for(t_trackpt& trackpt : m_points)
+		{
+			latitudes.push_back(trackpt.latitude);
+			longitudes.push_back(trackpt.longitude);
+			elevations.push_back(trackpt.elevation);
+		}  // loop over track points
+
+		latitudes = smooth_data(latitudes, static_cast<int>(m_smooth_rad));
+		longitudes = smooth_data(longitudes, static_cast<int>(m_smooth_rad));
+		elevations = smooth_data(elevations, static_cast<int>(m_smooth_rad));
+
+		for(t_size idx = 0; idx < m_points.size(); ++idx)
+		{
+			m_points[idx].latitude = latitudes[idx];
+			m_points[idx].longitude = longitudes[idx];
+			m_points[idx].elevation = elevations[idx];
+		}
+
+		Calculate(true);
+	}
+
+
+
+	/**
 	 * calculate track properties
 	 */
-	void Calculate()
+	void Calculate(bool already_smoothed = false)
 	{
 		// clear old values
 		m_total_dist = m_total_dist_planar = 0.;
@@ -183,7 +218,7 @@ public:
 			time_pt_last = trackpt.timept;
 		}  // loop over track points
 
-		if(m_smooth_rad > 0)
+		if(m_smooth_rad > 0 && !already_smoothed)
 			elevations = smooth_data(elevations, static_cast<int>(m_smooth_rad));
 
 		// calulate ascent & descent
