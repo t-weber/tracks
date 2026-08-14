@@ -292,29 +292,45 @@ void DistancesDlg::FillDistancesTable()
 		total_time += time;
 
 		// estimated distance / time for full year
-		std::ostringstream ostr_dist, ostr_time;
-		ostr_dist.precision(g_prec_gui);
-		ostr_time.precision(g_prec_gui);
-		ostr_dist << " km";
-		ostr_time << " h";
+		std::ostringstream ostr_est_dist, ostr_est_time, ostr_est_count;
+		for(std::ostringstream* ostr : { &ostr_est_dist, &ostr_est_time, &ostr_est_count })
+			ostr->precision(g_prec_gui);
 
 		auto [ year, month, day ] = date_from_timept<typename t_track::t_clk>(iter->first);
 		if(year == cur_year && cur_year_prog > g_eps && cur_year_prog < 1.)
 		{
 			t_real dist_est = dist / cur_year_prog;
 			t_real time_est = time / cur_year_prog;
+			t_size count_est = t_size(t_real(num_tracks) / cur_year_prog);
 
-			ostr_dist << " (est.: " << dist_est << " km)";
-			ostr_time << " (est.: " << time_est << " h)";
+			ostr_est_count << "Estimated total track count for " << year << ": " << count_est << ".";
+			ostr_est_dist << "Estimated total distance for " << year << ": " << dist_est << " km.";
+			ostr_est_time << "Estimated total time for " << year << ": " << time_est << " h.";
 		}
+
+		// table widget items
+		NumericTableWidgetItem<t_size> *count_tab_widget =
+			new NumericTableWidgetItem<t_size>(num_tracks, g_prec_gui);
+		NumericTableWidgetItem<t_real> *dist_tab_widget =
+			new NumericTableWidgetItem<t_real>(dist, g_prec_gui, " km");
+		NumericTableWidgetItem<t_real> *time_tab_widget =
+			new NumericTableWidgetItem<t_real>(time, g_prec_gui, " h");
+
+		// estimates as tooltips
+		if(ostr_est_count.str().size())
+			count_tab_widget->setToolTip(ostr_est_count.str().c_str());
+		if(ostr_est_dist.str().size())
+			dist_tab_widget->setToolTip(ostr_est_dist.str().c_str());
+		if(ostr_est_time.str().size())
+			time_tab_widget->setToolTip(ostr_est_time.str().c_str());
 
 		int item_row = m_yearly.size() - row - 1;
 		m_table->setItem(item_row, TAB_DATE, new DateTableWidgetItem<
 			typename t_track::t_clk, typename t_track::t_timept, t_real>(epoch, false, " (full year)"));
-		m_table->setItem(item_row, TAB_COUNT, new NumericTableWidgetItem<t_size>(num_tracks, g_prec_gui));
-		m_table->setItem(item_row, TAB_DIST, new NumericTableWidgetItem<t_real>(dist, g_prec_gui, ostr_dist.str()));
+		m_table->setItem(item_row, TAB_COUNT, count_tab_widget);
+		m_table->setItem(item_row, TAB_DIST, dist_tab_widget);
 		m_table->setItem(item_row, TAB_DIST_SUM, new NumericTableWidgetItem<t_real>(total_dist, g_prec_gui, " km"));
-		m_table->setItem(item_row, TAB_TIME, new NumericTableWidgetItem<t_real>(time, g_prec_gui, ostr_time.str()));
+		m_table->setItem(item_row, TAB_TIME, time_tab_widget);
 		m_table->setItem(item_row, TAB_TIME_SUM, new NumericTableWidgetItem<t_real>(total_time, g_prec_gui, " h"));
 
 		for(int col = 0; col < TAB_NUM_COLS; ++col)
@@ -333,10 +349,10 @@ void DistancesDlg::FillDistancesTable()
 			bg.setStyle(Qt::SolidPattern);
 			item->setBackground(fg);
 			item->setForeground(bg);
-		}
+		}  // columns
 
 		++row;
-	}
+	}  // yearly distances
 
 	// monthly distances
 	total_dist = 0.;
@@ -368,10 +384,10 @@ void DistancesDlg::FillDistancesTable()
 
 			// set read-only
 			item->setFlags(item->flags() & ~Qt::ItemIsEditable);
-		}
+		}  // columns
 
 		++row;
-	}
+	}  // monthly distances
 
 	m_table->setSortingEnabled(true);
 }

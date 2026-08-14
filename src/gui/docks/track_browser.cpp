@@ -32,6 +32,13 @@ TrackBrowser::TrackBrowser(QWidget* parent)
 	// list context menu
 	QMenu *context_menu = new QMenu(m_list.get());
 	context_menu->addAction(
+		//QIcon::fromTheme("list-remove"),
+		"Smooth Track", m_list.get(), [this]()
+	{
+		SmoothSelectedTracks();
+	});
+	context_menu->addSeparator();
+	context_menu->addAction(
 		QIcon::fromTheme("list-remove"),
 		"Delete Track", m_list.get(), [this]()
 	{
@@ -335,6 +342,27 @@ std::optional<t_real> TrackBrowser::GetTrackTime(int row) const
 		return std::nullopt;
 
 	return val.value<t_real>();
+}
+
+
+void TrackBrowser::SmoothSelectedTracks()
+{
+	const t_size cur_idx = GetCurrentTrackIndex();
+
+	for(QListWidgetItem *item : m_list->selectedItems())
+	{
+		if(!item)
+			continue;
+
+		int row = m_list->row(item);
+		t_size idx = GetTrackIndex(row);
+		if(idx == m_invalid_idx)
+			continue;
+
+		emit SmoothTrack(idx);
+		if(idx == cur_idx)
+			emit NewTrackSelected(cur_idx);
+	}
 }
 
 

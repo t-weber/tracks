@@ -190,7 +190,7 @@ requires requires(t_cont cont)
 			if(idx >= SIZE || idx < 0)
 				continue;
 
-			elem += vec[i + j];
+			elem += vec[idx];
 			num += 1;
 		}
 

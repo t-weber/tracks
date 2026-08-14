@@ -39,6 +39,7 @@ public:
 	std::optional<t_real> GetTrackTime(int row) const;
 
 	void SelectTrack(t_size idx);
+	void SmoothSelectedTracks();
 	void DeleteSelectedTracks();
 
 	void SearchTrack(const QString& name);
@@ -65,6 +66,7 @@ signals:
 	void NewTrackSelected(t_size idx);
 	void TrackNameChanged(t_size idx, const std::string& name);
 	void TrackDeleted(t_size idx);
+	void SmoothTrack(t_size idx);
 
 	void StatusMessageChanged(const QString&);
 };

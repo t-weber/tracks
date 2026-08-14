@@ -88,6 +88,8 @@ void TracksWnd::SetupGUI()
 		this, &TracksWnd::TrackNameChanged);
 	connect(m_tracks->GetWidget(), &TrackBrowser::TrackDeleted,
 		this, &TracksWnd::TrackDeleted);
+	connect(m_tracks->GetWidget(), &TrackBrowser::SmoothTrack,
+		this, &TracksWnd::SmoothTrack);
 	connect(m_tracks->GetWidget(), &TrackBrowser::StatusMessageChanged,
 		[this](const QString& msg)
 	{
@@ -590,6 +592,16 @@ void TracksWnd::TrackNameChanged(t_size idx, const std::string& name)
 		track->SetFileName(name);
 		SetWindowModified(true);
 	}
+}
+
+
+void TracksWnd::SmoothTrack(t_size idx)
+{
+	if(!m_track || idx >= m_trackdb.GetTrackCount())
+		return;
+
+	m_trackdb.SmoothTrack(idx);
+	SetWindowModified(true);
 }
 
 
